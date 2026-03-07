@@ -15,6 +15,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "pto/common/event.hpp"
 #include "pto/common/pto_instr_impl.hpp"
 #include "pto/comm/pto_comm_inst.hpp"
+#include "pto/common/tassign_check.hpp"
 
 #define MAP_INSTR_IMPL(API, ...) API##_IMPL(__VA_ARGS__)
 
@@ -24,6 +25,19 @@ template <typename T, typename AddrType>
 PTO_INST void TASSIGN(T &obj, AddrType addr)
 {
     MAP_INSTR_IMPL(TASSIGN, obj, addr);
+}
+
+// Compile-time address overload: TASSIGN<Addr>(tile)
+// Performs static bounds and alignment checks when Addr is a compile-time constant.
+// Only enabled for Tile / ConvTile types (not GlobalTensor).
+template <std::size_t Addr, typename T>
+PTO_INST std::enable_if_t<is_tile_data_v<T> || is_conv_tile_v<T>> TASSIGN(T &obj)
+{
+    // Trigger compile-time checks (static_assert inside tassign_static_check).
+    (void)detail::tassign_static_check<std::remove_cv_t<T>, Addr>{};
+
+    // Delegate to the existing runtime TASSIGN path.
+    TASSIGN(obj, static_cast<std::size_t>(Addr));
 }
 
 template <Op OpCode>
@@ -1303,24 +1317,6 @@ PTO_INST RecordEvent TSCATTER(TileDataD &dst, TileDataS &src, TileDataI &indexes
     return {};
 }
 
-template <typename ParallelGroupType, typename GlobalSrcData, typename TileData, typename... WaitEvents>
-PTO_INST RecordEvent TBROADCAST(ParallelGroupType &parallelGroup, GlobalSrcData &srcGlobalData,
-                                TileData &stagingTileData, WaitEvents &... events)
-{
-    TSYNC(events...);
-    MAP_INSTR_IMPL(TBROADCAST, parallelGroup, srcGlobalData, stagingTileData);
-    return {};
-}
-
-template <typename ParallelGroupType, typename GlobalSrcData, typename TileData, typename... WaitEvents>
-PTO_INST RecordEvent TBROADCAST(ParallelGroupType &parallelGroup, GlobalSrcData &srcGlobalData, TileData &pingTile,
-                                TileData &pongTile, WaitEvents &... events)
-{
-    TSYNC(events...);
-    MAP_INSTR_IMPL(TBROADCAST, parallelGroup, srcGlobalData, pingTile, pongTile);
-    return {};
-}
-
 template <typename TileDataDst, typename TileDataSrc, typename... WaitEvents>
 PTO_INST RecordEvent TCOLEXPAND(TileDataDst &dst, TileDataSrc &src, WaitEvents &... events)
 {
@@ -1459,10 +1455,10 @@ PTO_INST RecordEvent TPOP(PipeCon &cons, TileData &tile, DataFifo &fifo, WaitEve
 }
 
 template <typename PipeCon, typename... WaitEvents>
-PTO_INST RecordEvent TPOPRELEASE(PipeCon &cons, WaitEvents &... events)
+PTO_INST RecordEvent TPOPDONE(PipeCon &cons, WaitEvents &... events)
 {
     TSYNC(events...);
-    MAP_INSTR_IMPL(TPOPRELEASE, cons);
+    MAP_INSTR_IMPL(TPOPDONE, cons);
     return {};
 }
 
@@ -1505,32 +1501,5 @@ PTO_INST RecordEvent TQUANT(TileDataOut &dst, TileDataSrc &src, TileDataPara &sc
     TQUANT_IMPL<quant_type, TileDataOut, TileDataSrc, TileDataPara>(dst, src, scale, offset);
     return {};
 }
-
-template <typename GlobalSignalData, typename... WaitEvents>
-PTO_INST bool TTEST(GlobalSignalData &signalData, int32_t cmpValue, CmpMode cmp, WaitEvents &... events)
-{
-    TSYNC(events...);
-    return MAP_INSTR_IMPL(TTEST, signalData, cmpValue, cmp);
-}
-
-template <typename ParallelGroupType, typename GlobalDstData, typename TileData, typename... WaitEvents>
-PTO_INST RecordEvent TREDUCE(ParallelGroupType &parallelGroup, GlobalDstData &dstGlobalData, TileData &accTileData,
-                             TileData &recvTileData, pto::comm::ReduceOp op, WaitEvents &... events)
-{
-    TSYNC(events...);
-    MAP_INSTR_IMPL(TREDUCE, parallelGroup, dstGlobalData, accTileData, recvTileData, op);
-    return {};
-}
-
-template <typename ParallelGroupType, typename GlobalDstData, typename TileData, typename... WaitEvents>
-PTO_INST RecordEvent TREDUCE(ParallelGroupType &parallelGroup, GlobalDstData &dstGlobalData, TileData &accTileData,
-                             TileData &pingTileData, TileData &pongTileData, pto::comm::ReduceOp op,
-                             WaitEvents &... events)
-{
-    TSYNC(events...);
-    MAP_INSTR_IMPL(TREDUCE, parallelGroup, dstGlobalData, accTileData, pingTileData, pongTileData, op);
-    return {};
-}
-
 } // namespace pto
 #endif
