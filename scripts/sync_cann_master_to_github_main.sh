@@ -4,20 +4,56 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${REPO_DIR}/logs"
 mkdir -p "${LOG_DIR}"
+RUN_LOG="${LOG_DIR}/sync_cann_master_to_github_main.log"
+SUMMARY_FILE="${LOG_DIR}/sync_cann_master_to_github_main.summary"
 
 mkdir -p "${HOME}/.cache/pto-isa"
 LOCK_FILE="${HOME}/.cache/pto-isa/sync_cann_to_github_main.lock"
 exec 9>"${LOCK_FILE}"
 if ! flock -n 9; then
-  echo "[$(date -Is)] Another sync is running; exiting."
+  echo "[$(date -Is)] Another sync is running; exiting." | tee -a "${RUN_LOG}"
   exit 0
 fi
+
+touch "${RUN_LOG}"
+exec > >(tee -a "${RUN_LOG}") 2>&1
+
+SYNC_STATUS="ERROR"
+SYNC_MODE="none"
+START_TS="$(date -Is)"
+HEAD_BEFORE=""
+HEAD_AFTER=""
+ORIGIN_SHA=""
+CANN_SHA=""
+BASE_SHA=""
+DETAILS=""
 
 log() {
   echo "[$(date -Is)] $*"
 }
 
+write_summary() {
+  cat > "${SUMMARY_FILE}" <<EOF
+status=${SYNC_STATUS}
+mode=${SYNC_MODE}
+start=${START_TS}
+end=$(date -Is)
+head_before=${HEAD_BEFORE}
+head_after=${HEAD_AFTER}
+origin_main=${ORIGIN_SHA}
+cann_master=${CANN_SHA}
+merge_base=${BASE_SHA}
+details=${DETAILS}
+EOF
+}
+
+finish() {
+  write_summary
+}
+trap finish EXIT
+
 die() {
+  DETAILS="$*"
   log "ERROR: $*"
   exit 1
 }
@@ -78,31 +114,44 @@ if ! git show-ref --verify --quiet refs/remotes/cann/master; then
   die "cann/master not found after fetch"
 fi
 
-HEAD_SHA="$(git rev-parse HEAD)"
+HEAD_BEFORE="$(git rev-parse HEAD)"
 ORIGIN_SHA="$(git rev-parse origin/main)"
 CANN_SHA="$(git rev-parse cann/master)"
-BASE="$(git merge-base HEAD cann/master || true)"
+BASE_SHA="$(git merge-base HEAD cann/master || true)"
 
-log "main=${HEAD_SHA}"
+log "main=${HEAD_BEFORE}"
 log "origin/main=${ORIGIN_SHA}"
 log "cann/master=${CANN_SHA}"
+log "merge-base=${BASE_SHA}"
 
-if [[ "${HEAD_SHA}" != "${ORIGIN_SHA}" ]]; then
+if [[ "${HEAD_BEFORE}" != "${ORIGIN_SHA}" ]]; then
   die "local main diverged from origin/main after ff-only step"
 fi
 
-if [[ "${HEAD_SHA}" == "${CANN_SHA}" ]]; then
+if [[ "${HEAD_BEFORE}" == "${CANN_SHA}" ]]; then
+  SYNC_STATUS="OK"
+  SYNC_MODE="noop"
+  HEAD_AFTER="${HEAD_BEFORE}"
+  DETAILS="main already matches cann/master"
   log "main already matches cann/master; nothing to do"
   exit 0
 fi
 
-if [[ -n "${BASE}" && "${BASE}" == "${HEAD_SHA}" ]]; then
+if [[ -n "${BASE_SHA}" && "${BASE_SHA}" == "${HEAD_BEFORE}" ]]; then
+  SYNC_MODE="fast-forward"
+  DETAILS="fast-forward main to cann/master"
   log "cann/master is ahead of main; attempting ff-only update"
   git merge --ff-only cann/master || die "expected fast-forward from main to cann/master, but ff-only failed"
-elif [[ -n "${BASE}" && "${BASE}" == "${CANN_SHA}" ]]; then
+elif [[ -n "${BASE_SHA}" && "${BASE_SHA}" == "${CANN_SHA}" ]]; then
+  SYNC_STATUS="OK"
+  SYNC_MODE="noop-behind"
+  HEAD_AFTER="${HEAD_BEFORE}"
+  DETAILS="cann/master is behind main; nothing to merge"
   log "cann/master is behind main; nothing to merge"
   exit 0
 else
+  SYNC_MODE="merge"
+  DETAILS="merge divergent histories to preserve both sides"
   MSG="sync: merge cann/master into main ($(date +%Y-%m-%d))"
   log "histories diverged; creating merge commit to preserve both histories"
   git merge --no-ff --no-edit -m "${MSG}" cann/master || {
@@ -111,7 +160,10 @@ else
   }
 fi
 
-NEW_SHA="$(git rev-parse HEAD)"
-log "pushing ${NEW_SHA} to origin main"
+HEAD_AFTER="$(git rev-parse HEAD)"
+log "pushing ${HEAD_AFTER} to origin main"
 git push origin HEAD:main
-log "DONE. main is now at ${NEW_SHA}"
+SYNC_STATUS="OK"
+DETAILS="sync completed successfully"
+log "DONE. main moved ${HEAD_BEFORE} -> ${HEAD_AFTER} (${SYNC_MODE})"
+log "SUMMARY: status=${SYNC_STATUS} mode=${SYNC_MODE} before=${HEAD_BEFORE} after=${HEAD_AFTER} origin=${ORIGIN_SHA} cann=${CANN_SHA}"
