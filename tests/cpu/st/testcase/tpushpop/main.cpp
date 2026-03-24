@@ -42,11 +42,15 @@ std::vector<T> makeExpected(int iter)
 template <typename T, int rows, int cols, TileType srcLoc>
 void testPushPopSingleThread()
 {
-    using PPDataFIFO = DataFIFO<T, FIFOType::GM_FIFO, 8, 1>;
-    using PPSync = TFIFOSync<0, PPDataFIFO, TSyncOpType::TSTORE_C2GM, TSyncOpType::TLOAD>;
+    constexpr int FiFoDepth = 8;
+    constexpr int FiFoPeriod = 1;
+    constexpr int LocalDepth = 2;
+    using PPipe =
+        TPipe<0, T, FIFOType::GM_FIFO, FiFoDepth, FiFoPeriod, LocalDepth, TSyncOpType::TSTORE_C2GM, TSyncOpType::TLOAD>;
     using PPTile = Tile<srcLoc, T, rows, cols>;
-    std::vector<T> fifoStorage(PPTile::Numel * PPDataFIFO::fifoDepth, static_cast<T>(0));
-    PPDataFIFO gmFIFO(fifoStorage.data());
+    std::vector<T> fifoStorage(PPTile::Numel * PPipe::DataFiFo::fifoDepth, static_cast<T>(0));
+    PPipe::reset_for_cpu_sim();
+    PPipe pipe(fifoStorage.data(), 0x0);
     PPTile src;
     PPTile dst;
     fillTile<T, rows, cols, srcLoc>(src, 0);
@@ -54,12 +58,8 @@ void testPushPopSingleThread()
         dst.data()[i] = static_cast<T>(0);
     }
 
-    PPSync::reset_for_cpu_sim();
-    typename PPSync::Producer prod;
-    typename PPSync::Consumer cons;
-
-    TPUSH(prod, src, gmFIFO);
-    TPOP(cons, dst, gmFIFO);
+    TPUSH(src, pipe);
+    TPOP(dst, pipe);
 
     const auto expected = makeExpected<T, rows, cols, srcLoc>(0);
     EXPECT_TRUE(ResultCmp(expected, dst.data(), 0));
@@ -68,24 +68,24 @@ void testPushPopSingleThread()
 template <typename T, int rows, int cols, TileType srcLoc>
 void testPushPopMultiCore()
 {
-    using PPDataFIFO = DataFIFO<T, FIFOType::GM_FIFO, 4, 1>;
-    using PPSync = TFIFOSync<1, PPDataFIFO, TSyncOpType::TSTORE_C2GM, TSyncOpType::TLOAD>;
+    constexpr int FiFoDepth = 4;
+    constexpr int FiFoPeriod = 1;
+    constexpr int LocalDepth = 0;
+    using PPipe =
+        TPipe<1, T, FIFOType::GM_FIFO, FiFoDepth, FiFoPeriod, LocalDepth, TSyncOpType::TSTORE_C2GM, TSyncOpType::TLOAD>;
     using PPTile = Tile<srcLoc, T, rows, cols>;
 
     constexpr int kIterations = 12;
-    std::vector<T> fifoStorage(PPTile::Numel * PPDataFIFO::fifoDepth, static_cast<T>(0));
+    std::vector<T> fifoStorage(PPTile::Numel * PPipe::DataFiFo::fifoDepth, static_cast<T>(0));
     std::vector<std::vector<T>> actual(kIterations);
-    PPDataFIFO gmFIFO(fifoStorage.data());
-
-    PPSync::reset_for_cpu_sim();
-    typename PPSync::Producer prod;
-    typename PPSync::Consumer cons;
+    PPipe::reset_for_cpu_sim();
+    PPipe pipe(fifoStorage.data(), 0x0);
 
     std::thread producer([&]() {
         for (int iter = 0; iter < kIterations; ++iter) {
             PPTile src;
             fillTile<T, rows, cols, srcLoc>(src, iter);
-            TPUSH(prod, src, gmFIFO);
+            TPUSH(src, pipe);
         }
     });
 
@@ -97,7 +97,7 @@ void testPushPopMultiCore()
             for (int i = 0; i < dst.Numel; ++i) {
                 dst.data()[i] = static_cast<T>(0);
             }
-            TPOP(cons, dst, gmFIFO);
+            TPOP(dst, pipe);
             actual[iter].assign(dst.data(), dst.data() + dst.Numel);
         }
     });
