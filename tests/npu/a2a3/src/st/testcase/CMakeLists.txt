@@ -200,6 +200,7 @@ tcolexpandsub
 tquant
 tdequant
 t_dhrystone
+tconcatidx
 tconcat
 )
 if (NOT AUTO_MODE)
