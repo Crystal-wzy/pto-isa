@@ -71,6 +71,7 @@ tpartmin
 trsqrt
 tsel
 tsort32
+tdiv
 trem
 tshl
 tshr
@@ -78,6 +79,7 @@ tand
 tor
 txor
 tmin
+tmax
 tcmp
 tlog
 tneg
@@ -119,7 +121,14 @@ treduce
 treshape
 tpushpop
 tpushpop_cv
-tcpu_missing_ops
+trandom
+thistogram
+timg2col
+tquant
+tgatherb
+tmul
+tsub
+tisa_coverage
 )
 
 foreach(TESTCASE ${ALL_TESTCASES})

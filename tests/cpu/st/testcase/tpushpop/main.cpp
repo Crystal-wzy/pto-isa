@@ -43,14 +43,12 @@ template <typename T, int rows, int cols, TileType srcLoc>
 void testPushPopSingleThread()
 {
     constexpr int FiFoDepth = 8;
-    constexpr int FiFoPeriod = 1;
     constexpr int LocalDepth = 2;
-    using PPipe =
-        TPipe<0, T, FIFOType::GM_FIFO, FiFoDepth, FiFoPeriod, LocalDepth, TSyncOpType::TSTORE_C2GM, TSyncOpType::TLOAD>;
     using PPTile = Tile<srcLoc, T, rows, cols>;
-    std::vector<T> fifoStorage(PPTile::Numel * PPipe::DataFiFo::fifoDepth, static_cast<T>(0));
+    using PPipe = TPipe<0, Direction::DIR_C2V, sizeof(T) * PPTile::Numel, FiFoDepth, LocalDepth>;
+    std::vector<T> fifoStorage(PPTile::Numel * FiFoDepth, static_cast<T>(0));
     PPipe::reset_for_cpu_sim();
-    PPipe pipe(fifoStorage.data(), 0x0);
+    PPipe pipe(fifoStorage.data(), 0x0, 0x0);
     PPTile src;
     PPTile dst;
     fillTile<T, rows, cols, srcLoc>(src, 0);
@@ -60,6 +58,7 @@ void testPushPopSingleThread()
 
     TPUSH(src, pipe);
     TPOP(dst, pipe);
+    TFREE(pipe);
 
     const auto expected = makeExpected<T, rows, cols, srcLoc>(0);
     EXPECT_TRUE(ResultCmp(expected, dst.data(), 0));
@@ -69,17 +68,15 @@ template <typename T, int rows, int cols, TileType srcLoc>
 void testPushPopMultiCore()
 {
     constexpr int FiFoDepth = 4;
-    constexpr int FiFoPeriod = 1;
     constexpr int LocalDepth = 0;
-    using PPipe =
-        TPipe<1, T, FIFOType::GM_FIFO, FiFoDepth, FiFoPeriod, LocalDepth, TSyncOpType::TSTORE_C2GM, TSyncOpType::TLOAD>;
     using PPTile = Tile<srcLoc, T, rows, cols>;
+    using PPipe = TPipe<1, Direction::DIR_C2V, sizeof(T) * PPTile::Numel, FiFoDepth, LocalDepth>;
 
     constexpr int kIterations = 12;
-    std::vector<T> fifoStorage(PPTile::Numel * PPipe::DataFiFo::fifoDepth, static_cast<T>(0));
+    std::vector<T> fifoStorage(PPTile::Numel * FiFoDepth, static_cast<T>(0));
     std::vector<std::vector<T>> actual(kIterations);
     PPipe::reset_for_cpu_sim();
-    PPipe pipe(fifoStorage.data(), 0x0);
+    PPipe pipe(fifoStorage.data(), 0x0, 0x0);
 
     std::thread producer([&]() {
         for (int iter = 0; iter < kIterations; ++iter) {
@@ -98,6 +95,7 @@ void testPushPopMultiCore()
                 dst.data()[i] = static_cast<T>(0);
             }
             TPOP(dst, pipe);
+            TFREE(pipe);
             actual[iter].assign(dst.data(), dst.data() + dst.Numel);
         }
     });
@@ -137,4 +135,61 @@ TPUSHPOP_TEST(uint32_t, 128, 128, Mat)
 TEST_F(TPushPopTest, multicore_float_64_128_Vec)
 {
     testPushPopMultiCore<float, 64, 128, TileType::Vec>();
+}
+
+TEST_F(TPushPopTest, a5_style_c2v_local_split_push_pop)
+{
+    using AccTile = TileAcc<float, 16, 16>;
+    using VecTile = Tile<TileType::Vec, float, 8, 16, BLayout::RowMajor, 8, 16>;
+    using Pipe = TPipe<2, Direction::DIR_C2V, sizeof(float) * VecTile::Numel, 2>;
+
+    Pipe::reset_for_cpu_sim();
+    Pipe pipe((__gm__ void *)nullptr, 0x0, 0x0);
+
+    AccTile src;
+    VecTile dst;
+    fillTile<float, 16, 16, TileType::Acc>(src, 0);
+    std::fill(dst.data(), dst.data() + dst.Numel, 0.0f);
+
+    EXPECT_EQ(get_subblockid(), 0u);
+    EXPECT_EQ(get_subblockdim(), 1u);
+
+    TPUSH<Pipe, AccTile, TileSplitAxis::TILE_UP_DOWN>(pipe, src);
+    TPOP<Pipe, VecTile, TileSplitAxis::TILE_UP_DOWN>(pipe, dst);
+    TFREE<Pipe, TileSplitAxis::TILE_UP_DOWN>(pipe);
+
+    for (int r = 0; r < dst.GetValidRow(); ++r) {
+        for (int c = 0; c < dst.GetValidCol(); ++c) {
+            EXPECT_EQ(dst.data()[r * dst.Cols + c], src.data()[r * src.Cols + c]);
+        }
+    }
+}
+
+TEST_F(TPushPopTest, a5_style_v2c_local_split_push_pop)
+{
+    using VecTile = Tile<TileType::Vec, float, 8, 16, BLayout::RowMajor, 8, 16>;
+    using MatTile = Tile<TileType::Mat, float, 16, 16, BLayout::RowMajor, 16, 16>;
+    using Pipe = TPipe<3, Direction::DIR_V2C, sizeof(float) * MatTile::Numel, 2>;
+
+    Pipe::reset_for_cpu_sim();
+    Pipe pipe((__gm__ void *)nullptr, 0x0, 0x10000);
+
+    VecTile src;
+    MatTile dst;
+    fillTile<float, 8, 16, TileType::Vec>(src, 0);
+    std::fill(dst.data(), dst.data() + dst.Numel, 0.0f);
+
+    TPUSH<Pipe, VecTile, TileSplitAxis::TILE_UP_DOWN>(pipe, src);
+    TPOP<Pipe, MatTile, TileSplitAxis::TILE_UP_DOWN>(pipe, dst);
+    TFREE<Pipe, TileSplitAxis::TILE_UP_DOWN>(pipe);
+
+    for (int c = 0; c < dst.GetValidCol(); ++c) {
+        EXPECT_EQ(dst.data()[GetTileElementOffset<MatTile>(0, c)], src.data()[GetTileElementOffset<VecTile>(0, c)]);
+        for (int r = 0; r < src.GetValidRow(); ++r) {
+            EXPECT_EQ(dst.data()[GetTileElementOffset<MatTile>(r, c)], src.data()[GetTileElementOffset<VecTile>(r, c)]);
+        }
+        for (int r = src.GetValidRow(); r < dst.GetValidRow(); ++r) {
+            EXPECT_EQ(dst.data()[GetTileElementOffset<MatTile>(r, c)], 0.0f);
+        }
+    }
 }

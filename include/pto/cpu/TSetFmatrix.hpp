@@ -7,23 +7,15 @@ THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, E
 INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 See LICENSE in the root of the software repository for the full text of the License.
 */
-#ifndef TSUBVIEW_CPU_HPP
-#define TSUBVIEW_CPU_HPP
-
-#include <cstdint>
+#ifndef TSETFMATRIX_CPU_HPP
+#define TSETFMATRIX_CPU_HPP
 
 namespace pto {
-template <typename TileDataDst, typename TileDataSrc>
-PTO_INTERNAL void TSUBVIEW_IMPL(TileDataDst &dst, TileDataSrc &src, uint16_t rowIdx, uint16_t colIdx)
+template <typename ConvTileData, SetFmatrixMode FmatrixMode = SetFmatrixMode::FMATRIX_A_MANUAL>
+PTO_INTERNAL void TSETFMATRIX_IMPL(ConvTileData &src)
 {
-    constexpr int kRowStride = TileDataSrc::RowStride;
-    constexpr int kColStride = TileDataSrc::ColStride;
-    const uint64_t totalOffset = rowIdx * kRowStride + colIdx * kColStride;
-
-    static_assert(TileDataDst::Loc == TileDataSrc::Loc,
-                  "The destination and source tiles must have the same TileType!");
-
-    dst.data() = src.data() + totalOffset;
+    (void)FmatrixMode;
+    PTO_CPU_ASSERT(src.GetFmapH() > 0 && src.GetFmapW() > 0, "Fix: TSETFMATRIX requires non-zero fmap size.");
 }
 } // namespace pto
 
