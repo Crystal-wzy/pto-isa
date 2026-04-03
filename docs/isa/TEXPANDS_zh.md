@@ -16,24 +16,12 @@ $$ \mathrm{dst}_{i,j} = \mathrm{scalar} $$
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
 
 同步形式：
 
 ```text
 %dst = texpands %scalar : f32, !pto.tile<...>
-```
-
-### AS Level 1 (SSA)
-
-```text
-%dst = pto.texpands %scalar : dtype -> !pto.tile<...>
-```
-
-### AS Level 2 (DPS)
-
-```text
-pto.texpands ins(%scalar : dtype) outs(%dst : !pto.tile_buf<...>)
 ```
 
 ### AS Level 1（SSA）
@@ -50,7 +38,7 @@ pto.texpands ins(%scalar : dtype) outs(%dst : !pto.tile_buf<...>)
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileData, typename... WaitEvents>
@@ -59,31 +47,31 @@ PTO_INST RecordEvent TEXPANDS(TileData &dst, typename TileData::DType scalar, Wa
 
 ## 约束
 
-- **实现检查 (A2A3)**:
-    - For `TileType::Vec` :
-    - `TileData::DType` must be one of: `int32_t`, `int16_t`, `half`, `float`.
-    - Tile 布局 must be row-major (`TileData::isRowMajor`).
-    - Static valid bounds: `TileData::ValidRow <= TileData::Rows` and `TileData::ValidCol <= TileData::Cols`.
-    - For  `TileType::Mat` :
-    - `TileData::DType` must be one of: `uint8_t`, `int8_t`, `uint16_t`, `int16_t`, `uint32_t`, `int32_t`, `half`, `float`.
-    - Static valid bounds: `The range of  TileData::Rows * TileData::Cols * sizeof(T) / 32 is [1, 32767]`.
-- **实现检查 (A5)**:
-    - For `TileType::Vec` :
-    - `TileData::DType` must be one of: `uint8_t`, `int8_t`, `uint16_t`, `int16_t`, `uint32_t`, `int32_t`, `half`, `float`.
-    - Tile 布局 must be row-major (`TileData::isRowMajor`).
-    - Static valid bounds: `TileData::ValidRow <= TileData::Rows` and `TileData::ValidCol <= TileData::Cols`.
-    - For  `TileType::Mat` :
-    - `TileData::DType` must be one of: `uint8_t`, `int8_t`, `uint16_t`, `int16_t`, `uint32_t`, `int32_t`, `half`, `float`.
-    - For`TileDataDst::layout == pto::Layout::NC1HWC0 || TileDataDst::layout == pto::Layout::FRACTAL_Z`:
-      - `The range of convtile's (shape0 * shape1 * shape2 * shape3) is [1, 32767]`.
-    - For`TileDataDst::layout == pto::Layout::NDC1HWC0 || TileDataDst::layout == pto::Layout::FRACTAL_Z_3D`:
-      - `The range of convtile's (shape0 * shape1 * shape2 * shape3 * shape4) is [1, 32767]`.
-- **有效区域**:
-    - For `TileType::Vec` :
-    - The op fills `dst` over `dst.GetValidRow()` / `dst.GetValidCol()`.
-    - For  `TileType::Mat` :
-    - For Tile : The op fills `dst` over `TileData::Rows` / `TileData::Cols`.
-    - For ConvTile : The op fills `dst` over `ConvTileData`'s shape.
+- **实现检查（A2A3）**：
+  - 对于 `TileType::Vec`：
+    - `TileData::DType` 必须是以下之一：`uint8_t`、`int8_t`、`uint16_t`、`int16_t`、`uint32_t`、`int32_t`、`half`、`bfloat16_t`、`float`。
+    - 支持行优先和列优先向量 Tile。
+    - 静态有效边界：`TileData::ValidRow <= TileData::Rows` 且 `TileData::ValidCol <= TileData::Cols`。
+  - 对于 `TileType::Mat`：
+    - `TileData::DType` 必须是以下之一：`uint8_t`、`int8_t`、`uint16_t`、`int16_t`、`uint32_t`、`int32_t`、`half`、`bfloat16_t`、`float`。
+    - 静态有效边界：`TileData::Rows * TileData::Cols * sizeof(T) / 32` 必须在 `[1, 32767]` 范围内。
+- **实现检查（A5）**：
+  - 对于 `TileType::Vec`：
+    - `TileData::DType` 必须是以下之一：`uint8_t`、`int8_t`、`uint16_t`、`int16_t`、`uint32_t`、`int32_t`、`half`、`bfloat16_t`、`float`。
+    - 支持行优先和列优先向量 Tile。
+    - 静态有效边界：`TileData::ValidRow <= TileData::Rows` 且 `TileData::ValidCol <= TileData::Cols`。
+  - 对于 `TileType::Mat`：
+    - `TileData::DType` 必须是以下之一：`uint8_t`、`int8_t`、`uint16_t`、`int16_t`、`uint32_t`、`int32_t`、`half`、`bfloat16_t`、`float`。
+    - 对于 `TileData::layout == pto::Layout::NC1HWC0 || TileData::layout == pto::Layout::FRACTAL_Z`：
+      - `shape0 * shape1 * shape2 * shape3` 必须在 `[1, 32767]` 范围内。
+    - 对于 `TileData::layout == pto::Layout::NDC1HWC0 || TileData::layout == pto::Layout::FRACTAL_Z_3D`：
+      - `shape0 * shape1 * shape2 * shape3 * shape4` 必须在 `[1, 32767]` 范围内。
+- **有效区域**：
+  - 对于 `TileType::Vec`：
+    - 该操作在 `dst.GetValidRow()` / `dst.GetValidCol()` 上填充 `dst`。
+  - 对于 `TileType::Mat`：
+    - 对于普通 Tile，该操作在 `TileData::Rows` / `TileData::Cols` 上填充 `dst`。
+    - 对于 ConvTile，该操作在 conv-tile 的 shape 范围内填充 `dst`。
 
 ## 示例
 
@@ -94,10 +82,11 @@ PTO_INST RecordEvent TEXPANDS(TileData &dst, typename TileData::DType scalar, Wa
 
 using namespace pto;
 
-void example_auto() {
-  using TileT = Tile<TileType::Vec, float, 16, 16>;
-  TileT dst;
-  TEXPANDS(dst, 0.0f);
+void example_auto()
+{
+    using TileT = Tile<TileType::Vec, float, 16, 16>;
+    TileT dst;
+    TEXPANDS(dst, 0.0f);
 }
 ```
 
@@ -108,10 +97,38 @@ void example_auto() {
 
 using namespace pto;
 
-void example_manual() {
-  using TileT = Tile<TileType::Vec, float, 16, 16>;
-  TileT dst;
-  TASSIGN(dst, 0x1000);
-  TEXPANDS(dst, 0.0f);
+void example_manual()
+{
+    using TileT = Tile<TileType::Vec, float, 16, 16>;
+    TileT dst;
+    TASSIGN(dst, 0x1000);
+    TEXPANDS(dst, 0.0f);
 }
+```
+
+## 汇编示例（ASM）
+
+### 自动模式
+
+```text
+# 自动模式：由编译器/运行时负责资源放置与调度。
+%dst = pto.texpands %scalar : dtype -> !pto.tile<...>
+```
+
+### 手动模式
+
+```text
+# 手动模式：先显式绑定资源，再发射指令。
+# 可选（当该指令包含 tile 操作数时）：
+# pto.tassign %arg0, @tile(0x1000)
+# pto.tassign %arg1, @tile(0x2000)
+%dst = pto.texpands %scalar : dtype -> !pto.tile<...>
+```
+
+### PTO 汇编形式
+
+```text
+%dst = texpands %scalar : f32, !pto.tile<...>
+# AS Level 2 (DPS)
+pto.texpands ins(%scalar : dtype) outs(%dst : !pto.tile_buf<...>)
 ```
