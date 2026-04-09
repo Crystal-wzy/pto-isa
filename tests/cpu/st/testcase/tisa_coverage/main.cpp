@@ -53,7 +53,7 @@ void AssignTileStorage(TileData &tile, size_t &addr)
 }
 
 template <typename... TileData>
-void AssignTileStorage(size_t &addr, TileData &... tiles)
+void AssignTileStorage(size_t &addr, TileData &...tiles)
 {
     (AssignTileStorage(tiles, addr), ...);
 }
@@ -211,8 +211,7 @@ std::set<std::string> CollectCpuListedCases(const std::filesystem::path &repoRoo
     return listed;
 }
 
-class IsaCoverageTest : public testing::Test {
-};
+class IsaCoverageTest : public testing::Test {};
 
 TEST_F(IsaCoverageTest, RepoWideCoverageTouchesEveryIsaEntryPoint)
 {
@@ -783,13 +782,13 @@ TEST_F(IsaCoverageTest, ThistogramWrapperBuildsCumulativeBins)
     SetValue(src, 0, 6, static_cast<uint16_t>(0x4413u));
     SetValue(src, 0, 7, static_cast<uint16_t>(0x2214u));
 
-    THISTOGRAM<true>(dst, src, idx);
+    THISTOGRAM<HistByte::BYTE_1>(dst, src, idx);
     EXPECT_EQ(GetValue(dst, 0, 0x11), 0u);
     EXPECT_EQ(GetValue(dst, 0, 0x12), 3u);
     EXPECT_EQ(GetValue(dst, 0, 0x33), 6u);
     EXPECT_EQ(GetValue(dst, 0, 0x34), 7u);
 
-    THISTOGRAM<false>(dst, src, idx);
+    THISTOGRAM<HistByte::BYTE_0>(dst, src, idx);
     EXPECT_EQ(GetValue(dst, 0, 0x00), 0u);
     EXPECT_EQ(GetValue(dst, 0, 0x01), 1u);
     EXPECT_EQ(GetValue(dst, 0, 0x02), 2u);
@@ -821,8 +820,8 @@ TEST_F(IsaCoverageTest, TdequantAppliesScaleAndOffset)
 
     for (int r = 0; r < dst.GetValidRow(); ++r) {
         for (int c = 0; c < dst.GetValidCol(); ++c) {
-            const float expected = (static_cast<float>(GetValue(src, r, c)) - GetValue(offset, r, c)) *
-                                   GetValue(scale, r, c);
+            const float expected =
+                (static_cast<float>(GetValue(src, r, c)) - GetValue(offset, r, c)) * GetValue(scale, r, c);
             EXPECT_FLOAT_EQ(GetValue(dst, r, c), expected);
         }
     }

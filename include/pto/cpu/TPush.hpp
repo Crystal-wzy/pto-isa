@@ -152,12 +152,12 @@ struct TPipe {
 
     PTO_INTERNAL static SharedState &GetSharedState()
     {
-        if (auto hook = cpu_sim::ResolveSharedStorageHook(); hook != nullptr) {
-            char key[128] = {};
-            std::snprintf(key, sizeof(key), "pto-pipe-%llu-%u-%u-%u-%u-%u-%u",
-                          static_cast<unsigned long long>(get_task_cookie()), get_block_idx(), FlagID, DirType,
-                          SlotSize, SlotNum, LocalSlotNum);
-            auto *storage = reinterpret_cast<SharedStateStorage *>(hook(key, sizeof(SharedStateStorage)));
+        if (auto hook = cpu_sim::get_pipe_shared_state_hook(); hook != nullptr) {
+            static_assert(SlotNum <= 0xFF && LocalSlotNum <= 0xFF,
+                          "pipe_key packs SlotNum/LocalSlotNum into 8 bits each; values must be <= 255");
+            uint64_t pipe_key = (uint64_t(FlagID) << 56) | (uint64_t(DirType) << 48) | (uint64_t(SlotNum) << 40) |
+                                (uint64_t(LocalSlotNum) << 32) | uint64_t(SlotSize);
+            auto *storage = reinterpret_cast<SharedStateStorage *>(hook(pipe_key, sizeof(SharedStateStorage)));
             EnsureSharedStateInitialized(*storage);
             return *std::launder(reinterpret_cast<SharedState *>(storage->payload));
         }
@@ -392,8 +392,8 @@ PTO_INTERNAL void TPUSH_IMPL(Pipe &pipe, TileProd &tile)
         } else {
             auto &slotStorage = Pipe::GetSharedState().local_slot_storage[slotIndex];
             for (uint32_t splitIndex = 0; splitIndex < cpu_pipe::GetSplitCount<Split>(); ++splitIndex) {
-                auto *slotPtr = reinterpret_cast<T *>(slotStorage.data() +
-                                                      splitIndex * Pipe::RingFiFo::SLOT_SIZE + pipe.prod.entryOffset);
+                auto *slotPtr = reinterpret_cast<T *>(slotStorage.data() + splitIndex * Pipe::RingFiFo::SLOT_SIZE +
+                                                      pipe.prod.entryOffset);
                 const uint32_t rowOffset = (Split == TileSplitAxis::TILE_UP_DOWN) ? splitIndex * consRows : 0;
                 const uint32_t colOffset = (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? splitIndex * consCols : 0;
                 cpu_pipe::CopyTileWindowToLinear(slotPtr, consCols, tile, consRows, rowOffset, colOffset);
