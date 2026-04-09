@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -114,8 +113,8 @@ def generate_test_data(repo_root: Path, build_dir: Path, args: argparse.Namespac
     if args.enable_bf16:
         gen_env["PTO_CPU_SIM_ENABLE_BF16"] = "1"
     for script in sorted(testcase_src_root.glob("*/gen_data.py")):
-        dst = build_dir / "gen_data.py"
-        shutil.copyfile(script, dst)
+        dst = build_dir / f"{script.parent.name}_gen_data.py"
+        dst.write_text(script.read_text(encoding="utf-8"), encoding="utf-8")
         run_command([sys.executable, str(dst.name)], cwd=build_dir, env=gen_env, verbose=args.verbose)
 
 
