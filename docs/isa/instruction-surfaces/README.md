@@ -111,9 +111,9 @@ Use **MUST**, **SHOULD**, and **MAY** only for rules that a test, verifier, or r
 
 ## See Also
 
-- [Instruction set contracts](./instruction-families/README.md) — Group-level contracts
+- [Instruction set contracts](../instruction-families/README.md) — Group-level contracts
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page format standard
-- [Tile ISA reference](./tile/README.md) — Tile instruction per-op reference
-- [Vector ISA reference](./vector/README.md) — Vector instruction per-op reference
-- [Scalar ISA reference](./scalar/README.md) — Scalar instruction per-op reference
-- [Other ISA reference](./other/README.md) — Communication and supporting ops
+- [Tile ISA reference](../tile/README.md) — Tile instruction per-op reference
+- [Vector ISA reference](../vector/README.md) — Vector instruction per-op reference
+- [Scalar ISA reference](../scalar/README.md) — Scalar instruction per-op reference
+- [Other ISA reference](../other/README.md) — Communication and supporting ops

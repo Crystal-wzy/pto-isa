@@ -4,8 +4,8 @@
 
 ## 本章内容
 
-- [通信与运行时](other/communication-and-runtime.md) — 点对点通信、集合操作和运行时支持
-- [非 ISA 与支持操作](other/non-isa-and-supporting-ops.md) — 边界外的支持操作
+- [通信与运行时](communication-and-runtime_zh.md) — 点对点通信、集合操作和运行时支持
+- [非 ISA 与支持操作](non-isa-and-supporting-ops_zh.md) — 边界外的支持操作
 
 ## 章节定位
 

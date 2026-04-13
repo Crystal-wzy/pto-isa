@@ -1,6 +1,6 @@
 # pto.treshape
 
-Standalone reference page for `pto.treshape`. This page belongs to the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.treshape` is part of the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set.
 
 ## Summary
 

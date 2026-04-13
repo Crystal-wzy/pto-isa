@@ -1,6 +1,6 @@
 # pto.vsubc
 
-Standalone reference page for `pto.vsubc`. This page belongs to the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vsubc` is part of the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set.
 
 ## Summary
 

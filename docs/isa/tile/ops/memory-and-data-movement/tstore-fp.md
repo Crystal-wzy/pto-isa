@@ -1,6 +1,6 @@
 # pto.tstore_fp
 
-Standalone reference page for `pto.tstore_fp`. This page belongs to the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set in the PTO ISA manual.
+`pto.tstore_fp` is part of the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set.
 
 ## Summary
 

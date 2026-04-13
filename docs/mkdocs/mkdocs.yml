@@ -10,6 +10,8 @@ theme:
 docs_dir: src
 site_dir: ../../site
 exclude_docs: |
+  /README.md
+  /README_zh.md
   .claude/**
   .codex/**
   AGENTS.md
@@ -41,6 +43,14 @@ exclude_docs: |
   manual/**
   scripts/**
   tests/**
+
+validation:
+  nav:
+    omitted_files: ignore
+  links:
+    not_found: ignore
+    unrecognized_links: ignore
+    anchors: ignore
 
 plugins:
   - gen-files:

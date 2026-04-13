@@ -1,6 +1,6 @@
 # pto.trowargmax
 
-Standalone reference page for `pto.trowargmax`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.trowargmax` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

@@ -1,0 +1,18 @@
+# pto.vgather2_bc
+
+执行带广播行为的 gather 加载。
+
+## 语法
+
+```mlir
+%result = pto.vgather2_bc %source, %offsets, %mask : !pto.ptr<T, ub>, !pto.vreg<NxI>, !pto.mask -> !pto.vreg<NxT>
+```
+
+## 关键约束
+
+- UB 地址空间与对齐要求必须满足。
+- DMA 与向量计算之间的顺序边必须显式建立。
+
+## 相关页面
+
+- [向量加载存储指令集](../../vector-load-store_zh.md)

@@ -1,6 +1,6 @@
 # pto.vaddrelu
 
-Standalone reference page for `pto.vaddrelu`. This page belongs to the [SFU And DSA Instructions](../../sfu-and-dsa-ops.md) instruction set in the PTO ISA manual.
+`pto.vaddrelu` is part of the [SFU And DSA Instructions](../../sfu-and-dsa-ops.md) instruction set.
 
 ## Summary
 

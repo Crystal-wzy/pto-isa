@@ -1,6 +1,6 @@
 # pto.pnot
 
-Standalone reference page for `pto.pnot`. This page belongs to the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set in the PTO ISA manual.
+`pto.pnot` is part of the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set.
 
 ## Summary
 

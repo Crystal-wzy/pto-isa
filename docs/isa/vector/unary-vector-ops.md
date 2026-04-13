@@ -1,6 +1,6 @@
 # Vector Instruction Set: Unary Vector Instructions
 
-This page documents single-input `pto.v*` compute instruction sets. Unless a form states otherwise, the vector-register shape, active-lane mask semantics, and target-profile restrictions below define the portable contract.
+Single-input `pto.v*` compute instruction sets are defined here. Unless a form states otherwise, the vector-register shape, active-lane mask semantics, and target-profile restrictions below define the portable contract.
 
 > **Category:** Single-input vector operations
 > **Pipeline:** PIPE_V (Vector Core)

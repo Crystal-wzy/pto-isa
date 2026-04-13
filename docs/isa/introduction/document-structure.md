@@ -1,6 +1,6 @@
 # PTO: Document Structure
 
-This manual is organized as a layered architecture reference: establish the programming and machine models first, then syntax and types, then memory rules, then the instruction set. The chapter roles stay fixed so readers can locate model rules before opcode detail; the content remains specific to PTO's tile-first Ascend model.
+The manual is organized as a layered architecture reference: establish the programming and machine models first, then syntax and types, then memory rules, then the instruction set. The chapter roles stay fixed so model rules appear before opcode detail, while the content remains specific to PTO's tile-first Ascend model.
 
 ## Chapter Map
 
@@ -9,7 +9,7 @@ This manual is organized into 13 numbered chapters. The navigation sidebar at th
 | Chapter | Sections | What It Covers |
 | --- | --- | --- |
 | **1. Introduction** | What Is PTO VISA, Document Structure, Goals, Version 1.0, Scope | What PTO is, why it exists, version baseline, and specification boundaries |
-| **2. Programming Model** | Tiles & Valid Regions, GlobalTensor & Data Movement, Auto vs Manual | The primary programming objects authors reason about |
+| **2. Programming Model** | Tiles & Valid Regions, GlobalTensor & Data Movement, Auto vs Manual | The primary programming objects in PTO programs |
 | **3. Machine Model** | Execution Agents & Target Profiles, Ordering & Synchronization | Execution hierarchy, pipelines, target profiles, and sync vocabulary |
 | **4. Syntax and Operands** | Assembly Spelling, Operands & Attributes, Common Conventions | Textual spelling, operand shapes, attributes, and naming conventions |
 | **5. State and Types** | Type System, Layout Reference, Data Format Reference, Location Intent | Types, layouts, data formats, tile roles, and legality rules |

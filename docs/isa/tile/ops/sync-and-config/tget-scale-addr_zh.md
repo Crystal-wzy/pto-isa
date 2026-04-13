@@ -2,9 +2,9 @@
 
 ## Tile Operation Diagram
 
-![TGET_SCALE_ADDR tile operation](../figures/isa/TGET_SCALE_ADDR.svg)
+![TGET_SCALE_ADDR tile operation](../../../../figures/isa/TGET_SCALE_ADDR.svg)
 
-## Introduction
+## 简介
 
 将输入Tile的片上地址数值按比例扩展，将其结果数值绑定为输出Tile的片上地址。
 
@@ -16,19 +16,19 @@ Address(`dst`) = Address(`src`) >> `SHIFT_MX_ADDR`
 
 ## 汇编语法
 
-PTO-AS form: see [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS form: see [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
-### IR Level 1 (SSA)
+### IR Level 1（SSA）
 
 TODO
 
-### IR Level 2 (DPS)
+### IR Level 2（DPS）
 
 TODO
 
 ## C++ 内建接口
 
-Declared in `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileDataDst, typename TileDataSrc, typename... WaitEvents>
@@ -76,6 +76,6 @@ TODO
 
 TODO
 
-### PTO Assembly Form
+### PTO 汇编形式
 
 TODO

@@ -1,6 +1,6 @@
 # pto.trowexpandmin
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.trowexpandmin](./tile/ops/reduce-and-expand/trowexpandmin.md).
+Canonical tile-instruction reference: [pto.trowexpandmin](./tile/ops/reduce-and-expand/trowexpandmin.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

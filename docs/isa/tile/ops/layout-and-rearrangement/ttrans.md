@@ -1,6 +1,6 @@
 # pto.ttrans
 
-Standalone reference page for `pto.ttrans`. This page belongs to the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.ttrans` is part of the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.vneg
 
-Standalone reference page for `pto.vneg`. This page belongs to the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vneg` is part of the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set.
 
 ## Summary
 

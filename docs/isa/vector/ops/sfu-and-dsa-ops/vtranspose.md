@@ -1,6 +1,6 @@
 # pto.vtranspose
 
-Standalone reference page for `pto.vtranspose`. This page belongs to the [SFU And DSA Instructions](../../sfu-and-dsa-ops.md) instruction set in the PTO ISA manual.
+`pto.vtranspose` is part of the [SFU And DSA Instructions](../../sfu-and-dsa-ops.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.vstx2
 
-Standalone reference page for `pto.vstx2`. This page belongs to the [Vector Load Store](../../vector-load-store.md) instruction set in the PTO ISA manual.
+`pto.vstx2` is part of the [Vector Load Store](../../vector-load-store.md) instruction set.
 
 ## Summary
 

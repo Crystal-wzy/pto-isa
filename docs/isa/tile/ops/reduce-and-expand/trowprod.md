@@ -1,6 +1,6 @@
 # pto.trowprod
 
-Standalone reference page for `pto.trowprod`. This page belongs to the [Reduce And Expand Instruction Set](../../reduce-and-expand.md) in the PTO ISA manual.
+`pto.trowprod` is part of the [Reduce And Expand Instruction Set](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.vselr
 
-Standalone reference page for `pto.vselr`. This page belongs to the [Compare And Select](../../compare-select.md) instruction set in the PTO ISA manual.
+`pto.vselr` is part of the [Compare And Select](../../compare-select.md) instruction set.
 
 ## Summary
 

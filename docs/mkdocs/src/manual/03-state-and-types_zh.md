@@ -1,6 +1,6 @@
 # 状态与类型
 
-## 本章回答什么
+## 概览
 
 本章解释：在 backend 还没开始“发挥聪明才智”之前，怎么判断一个 PTO 程序是否类型正确、结构正确、并且真的合法。
 
@@ -44,11 +44,11 @@ PTO 明确区分 tile 的物理尺寸和真正承载语义的区域。这也是 
 
 ### location intent
 
-`Mat`、`Left`、`Right`、`Acc`、`Bias`、`Scale` 这些 role 参与合法性判断。它们不是给读者看的注释，而是在告诉工具链：这个 tile 准备进入怎样的 producer/consumer 结构。
+`Mat`、`Left`、`Right`、`Acc`、`Bias`、`Scale` 这些 role 参与合法性判断。它们标识这个 tile 将进入怎样的 producer/consumer 结构，并作为契约的一部分被检查。
 
 ### layout 与对齐
 
-Layout 和对齐属于合法性表面的一部分，同时也是 backend profile 最常收窄支持范围的地方。虚拟 ISA 负责定义“必须检查哪些维度”，profile 文档负责定义“目标实际上支持哪些子集”。
+Layout 和对齐属于合法性约束的一部分，同时也是 backend profile 最常收窄支持范围的地方。虚拟 ISA 负责定义“必须检查哪些维度”，profile 文档负责定义“目标实际上支持哪些子集”。
 
 ## valid region 语义
 

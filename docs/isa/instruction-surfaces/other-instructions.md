@@ -131,7 +131,7 @@ PTO_INST RecordEvent TREDUCE(GroupType& group, GlobalData& src, TileData& stagin
 
 ## See Also
 
-- [Other ISA reference](./other/README.md) — Full communication and supporting ops reference
-- [Other instruction sets](./instruction-families/other-families.md) — Instruction-set-level contracts
-- [Instruction sets](./instruction-families/README.md) — All instruction sets
+- [Other ISA reference](../other/README.md) — Full communication and supporting ops reference
+- [Other instruction sets](../instruction-families/other-families.md) — Instruction-set-level contracts
+- [Instruction sets](../instruction-families/README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard

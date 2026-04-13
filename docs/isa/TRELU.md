@@ -1,6 +1,6 @@
 # pto.trelu
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.trelu](./tile/ops/elementwise-tile-tile/trelu.md).
+Canonical tile-instruction reference: [pto.trelu](./tile/ops/elementwise-tile-tile/trelu.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

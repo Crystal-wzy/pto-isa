@@ -1,6 +1,6 @@
 # pto.vshr
 
-Standalone reference page for `pto.vshr`. This page belongs to the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vshr` is part of the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set.
 
 ## Summary
 

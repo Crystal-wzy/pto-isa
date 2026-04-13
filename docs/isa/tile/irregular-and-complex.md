@@ -19,10 +19,10 @@ Irregular operations cover tile compute that does not fit the standard elementwi
 | [pto.tpartmax](./ops/irregular-and-complex/tpartmax.md) | Partial maximum | Reduce | All |
 | [pto.tpartmin](./ops/irregular-and-complex/tpartmin.md) | Partial minimum | Reduce | All |
 | [pto.tquant](./ops/irregular-and-complex/tquant.md) | Quantize tile to integer format | Quantize | A2/A3, A5 |
-| [pto.tdequant](./ops/irregular-and-complex/tdequant.md) | Dequantize tile to floating-point | Quantize | A2/A3, A5 |
-| [pto.tpack](./ops/irregular-and-complex/tpack.md) | Pack tile data | Pack | A5 only |
-| [pto.trandom](./ops/irregular-and-complex/trandom.md) | Random number generation | Random | A5 only |
-| [pto.thistogram](./ops/irregular-and-complex/thistogram.md) | Histogram computation | Histogram | A5 only |
+| [pto.tdequant](../TDEQUANT.md) | Dequantize tile to floating-point | Quantize | A2/A3, A5 |
+| [pto.tpack](../TPACK.md) | Pack tile data | Pack | A5 only |
+| [pto.trandom](../TRANDOM.md) | Random number generation | Random | A5 only |
+| [pto.thistogram](../THISTOGRAM.md) | Histogram computation | Histogram | A5 only |
 
 ## Mechanism
 

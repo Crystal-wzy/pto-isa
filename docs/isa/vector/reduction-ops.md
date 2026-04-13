@@ -1,6 +1,6 @@
 # Vector Instruction Set: Reduction Instructions
 
-This page documents `pto.v*` reduction instruction sets. Lane grouping, result placement, and inactive-lane rules are part of the visible vector contract and are not left to backend folklore.
+`pto.v*` reduction instruction sets are defined here. Lane grouping, result placement, and inactive-lane rules are part of the visible vector contract and are not left to backend folklore.
 
 > **Category:** Vector reduction operations
 > **Pipeline:** PIPE_V (Vector Core)

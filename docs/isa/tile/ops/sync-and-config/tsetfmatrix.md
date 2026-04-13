@@ -1,6 +1,6 @@
 # pto.tsetfmatrix
 
-Standalone reference page for `pto.tsetfmatrix`. This page belongs to the [Sync And Config](../../sync-and-config.md) instruction set in the PTO ISA manual.
+`pto.tsetfmatrix` is part of the [Sync And Config](../../sync-and-config.md) instruction set.
 
 ## Summary
 

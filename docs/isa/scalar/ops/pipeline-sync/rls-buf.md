@@ -1,6 +1,6 @@
 # pto.rls_buf
 
-Standalone reference page for `pto.rls_buf`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.rls_buf` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

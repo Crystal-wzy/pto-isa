@@ -1,6 +1,6 @@
 # pto.vsqrt
 
-Standalone reference page for `pto.vsqrt`. This page belongs to the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vsqrt` is part of the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set.
 
 ## Summary
 

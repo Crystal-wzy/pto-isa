@@ -1,6 +1,6 @@
 # pto.tpartadd
 
-Standalone reference page for `pto.tpartadd`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tpartadd` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

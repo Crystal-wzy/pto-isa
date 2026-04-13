@@ -6,11 +6,11 @@ Scalar and control instruction set documentation covers the state-setting and co
 
 | Instruction Set | Description | Examples |
 |--------|-------------|----------|
-| [Control and Configuration](./scalar/control-and-configuration.md) | NOP, barrier, yield, and control setup | `nop`, `barrier`, `yield` |
-| [Pipeline Sync](./scalar/pipeline-sync.md) | Event and barrier synchronization between pipelines | `set_flag`, `wait_flag`, `pipe_barrier`, `mem_bar` |
-| [DMA Copy](./scalar/dma-copy.md) | GM↔UB memory transfer configuration and initiation | `copy_gm_to_ubuf`, `copy_ubuf_to_gm`, `set_loop_size_outtoub` |
-| [Predicate Load/Store](./scalar/predicate-load-store.md) | Mask-based scalar memory access | `pld`, `plds`, `pdi`, `pst`, `psts`, `psti`, `pstu` |
-| [Predicate Generation](./scalar/predicate-generation-and-algebra.md) | Predicate construction and algebra | `pset_b8`, `pge_b8`, `plt_b8`, `pand`, `por`, `pxor`, `pnot` |
+| [Control and Configuration](../scalar/control-and-configuration.md) | NOP, barrier, yield, and control setup | `nop`, `barrier`, `yield` |
+| [Pipeline Sync](../scalar/pipeline-sync.md) | Event and barrier synchronization between pipelines | `set_flag`, `wait_flag`, `pipe_barrier`, `mem_bar` |
+| [DMA Copy](../scalar/dma-copy.md) | GM↔UB memory transfer configuration and initiation | `copy_gm_to_ubuf`, `copy_ubuf_to_gm`, `set_loop_size_outtoub` |
+| [Predicate Load/Store](../scalar/predicate-load-store.md) | Mask-based scalar memory access | `pld`, `plds`, `pdi`, `pst`, `psts`, `psti`, `pstu` |
+| [Predicate Generation](../scalar/predicate-generation-and-algebra.md) | Predicate construction and algebra | `pset_b8`, `pge_b8`, `plt_b8`, `pand`, `por`, `pxor`, `pnot` |
 | Shared Arithmetic | Scalar arithmetic ops shared across instruction sets | Scalar integer/float ops |
 | Shared SCF | Scalar structured control flow | Loops, conditionals |
 
@@ -50,10 +50,10 @@ Waiting on an event that was never established by a matching producer is **illeg
 
 ## Navigation
 
-See the [Scalar ISA reference](./scalar/README.md) for the full per-op reference under `scalar/ops/`.
+See the [Scalar ISA reference](../scalar/README.md) for the full per-op reference under `scalar/ops/`.
 
 ## See Also
 
-- [Scalar and control instruction set](./instruction-surfaces/scalar-and-control-instructions.md) — High-level instruction set description
+- [Scalar and control instruction set](../instruction-surfaces/scalar-and-control-instructions.md) — High-level instruction set description
 - [Instruction sets](./README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard

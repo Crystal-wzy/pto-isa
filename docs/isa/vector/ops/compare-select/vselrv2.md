@@ -1,6 +1,6 @@
 # pto.vselrv2
 
-Standalone reference page for `pto.vselrv2`. This page belongs to the [Compare And Select](../../compare-select.md) instruction set in the PTO ISA manual.
+`pto.vselrv2` is part of the [Compare And Select](../../compare-select.md) instruction set.
 
 ## Summary
 
@@ -30,7 +30,7 @@ This operation has no architectural side effect beyond producing its SSA results
 
 ## Constraints
 
-This page records the instruction set shape only.
+Only the instruction-set shape is recorded here.
   Lowering MUST preserve the exact A5 variant semantics selected for this form.
 
 ## Exceptions

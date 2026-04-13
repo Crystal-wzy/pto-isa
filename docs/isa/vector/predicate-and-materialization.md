@@ -1,6 +1,6 @@
 # Vector Instruction Set: Predicate And Materialization
 
-This page documents the predicate-register and materialization instruction sets used by `pto.v*` code. Predicate load/store, mask generation, and predicate algebra are architecture-visible because they control which lanes participate in later vector operations.
+The predicate-register and materialization instruction sets used by `pto.v*` code are defined here. Predicate load/store, mask generation, and predicate algebra are architecture-visible because they control which lanes participate in later vector operations.
 
 > **Category:** UB ↔ Predicate Register data movement
 > **Pipeline:** PIPE_V (Vector Core)

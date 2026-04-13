@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TCOLMAX tile operation](../figures/isa/TCOLMAX.svg)
+![TCOLMAX tile operation](../../../../figures/isa/TCOLMAX.svg)
 
 ## 简介
 
@@ -16,7 +16,7 @@ $$ \mathrm{dst}_{0,j} = \max_{0 \le i < R} \mathrm{src}_{i,j} $$
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 

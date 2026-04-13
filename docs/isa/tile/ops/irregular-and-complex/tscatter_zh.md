@@ -2,25 +2,36 @@
 
 ## 指令示意图
 
-![TSCATTER tile operation](../figures/isa/TSCATTER.svg)
+![TSCATTER tile operation](../../../../figures/isa/TSCATTER.svg)
 
 ## 简介
 
-使用逐元素行索引将源 Tile 的行散播到目标 Tile 中。
+`TSCATTER` 按索引 Tile 给出的目标偏移，把源 Tile 中的元素分散写入目标 Tile。它适合表达“不规则写回到本地 Tile”这类模式：数据仍然留在 tile 空间里，但目的位置不再由规则的行列映射决定。
+
+和规则搬运不同，`TSCATTER` 的关键输入不是另一个 shape，而是 `indexes`。每个索引元素都表示目标 Tile 在线性存储视角下的一个元素偏移。
 
 ## 数学语义
 
-对每个源元素 `(i, j)`, let `k = idx[i,j]` and write:
+设：
 
-$$ \mathrm{dst\_flat}_{k} = \mathrm{src}_{i,j} $$
+- `R = indexes.GetValidRow()`
+- `C = indexes.GetValidCol()`
 
-Here `dst_flat` denotes the destination tile viewed as a single linear storage sequence. `TSCATTER` does **not** interpret `idx[i,j]` as a destination row selector. On the standard row-major tile layout, this is equivalent to writing the `k`-th flattened destination element.
+当前实现会先把整个 `dst` Tile 清零，然后对 `0 <= i < R`、`0 <= j < C` 执行：
 
-If multiple elements map to the same destination location, the final value is implementation-defined (last writer wins in the current implementation).
+$$ \mathrm{dst\_flat}_{\mathrm{indexes}_{i,j}} = \mathrm{src}_{i,j} $$
+
+其中 `dst_flat` 表示把目标 Tile 按其存储顺序看成一段线性序列。对标准 row-major Tile 来说，这就是“写到扁平化后的第 `k` 个元素”。
+
+这条语义有三个读者容易忽略的点：
+
+- `TSCATTER` 按 `indexes` 的 valid region 遍历，而不是按 `dst` 的 valid region 遍历。
+- 没有被任何索引命中的目标位置，在当前实现里保持为零值，而不是保留调用前的 `dst` 内容。
+- 如果多个源元素落到同一个目标位置，最终值属于实现定义行为；当前实现按行优先顺序遍历，因此后写入的元素会覆盖前值。
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 
@@ -42,7 +53,7 @@ pto.tscatter ins(%src, %idx : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst 
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileDataD, typename TileDataS, typename TileDataI, typename... WaitEvents>
@@ -51,28 +62,36 @@ PTO_INST RecordEvent TSCATTER(TileDataD &dst, TileDataS &src, TileDataI &indexes
 
 ## 约束
 
-- **实现检查 (A2A3)**:
-  - `TileDataD::Loc`, `TileDataS::Loc`, `TileDataI::Loc` must be `TileType::Vec`.
-  - `TileDataD::DType`, `TileDataS::DType` must be one of: `int32_t`, `int16_t`, `int8_t`, `half`, `float32_t`, `uint32_t`, `uint16_t`, `uint8_t`, `bfloat16_t`.
-  - `TileDataI::DType` must be one of: `int16_t`, `int32_t`, `uint16_t` or `uint32_t`.
-  - `indexes` values are interpreted as flattened destination element offsets in destination tile storage order.
-  - No bounds checks are enforced on `indexes` values.
-  - Static valid bounds: `TileDataD::ValidRow <= TileDataD::Rows`, `TileDataD::ValidCol <= TileDataD::Cols`, `TileDataS::ValidRow <= TileDataS::Rows`, `TileDataS::ValidCol <= TileDataS::Cols`, `TileDataI::ValidRow <= TileDataI::Rows`, `TileDataI::ValidCol <= TileDataI::Cols`.
-  - `TileDataD::DType` and `TileDataS::DType` must be the same.
-  - When size of `TileDataD::DType` is 4 bytes, the size of `TileDataI::DType` must be 4 bytes.
-  - When size of `TileDataD::DType` is 2 bytes, the size of `TileDataI::DType` must be 2 bytes.
-  - When size of `TileDataD::DType` is 1 bytes, the size of `TileDataI::DType` must be 2 bytes.
-- **实现检查 (A5)**:
-  - `TileDataD::Loc`, `TileDataS::Loc`, `TileDataI::Loc` must be `TileType::Vec`.
-  - `TileDataD::DType`, `TileDataS::DType` must be one of: `int32_t`, `int16_t`, `int8_t`, `half`, `float32_t`, `uint32_t`, `uint16_t`, `uint8_t`, `bfloat16_t`.
-  - `TileDataI::DType` must be one of: `int16_t`, `int32_t`, `uint16_t` or `uint32_t`.
-  - `indexes` values are interpreted as flattened destination element offsets in destination tile storage order.
-  - No bounds checks are enforced on `indexes` values.
-  - Static valid bounds: `TileDataD::ValidRow <= TileDataD::Rows`, `TileDataD::ValidCol <= TileDataD::Cols`, `TileDataS::ValidRow <= TileDataS::Rows`, `TileDataS::ValidCol <= TileDataS::Cols`, `TileDataI::ValidRow <= TileDataI::Rows`, `TileDataI::ValidCol <= TileDataI::Cols`.
-  - `TileDataD::DType` and `TileDataS::DType` must be the same.
-  - When size of `TileDataD::DType` is 4 bytes, the size of `TileDataI::DType` must be 4 bytes.
-  - When size of `TileDataD::DType` is 2 bytes, the size of `TileDataI::DType` must be 2 bytes.
-  - When size of `TileDataD::DType` is 1 bytes, the size of `TileDataI::DType` must be 2 bytes.
+### 通用约束
+
+- `dst`、`src`、`indexes` 都必须是 `TileType::Vec`。
+- `dst` 与 `src` 的元素类型必须完全一致。
+- `indexes` 必须是整型 Tile，且索引元素宽度必须和数据元素宽度匹配：
+  - 数据为 4 字节时，索引也必须是 4 字节；
+  - 数据为 2 字节时，索引也必须是 2 字节；
+  - 数据为 1 字节时，索引必须是 2 字节。
+- 实现按 `indexes.GetValidRow()` / `indexes.GetValidCol()` 遍历。可移植代码应保证 `src` 在同一坐标域内可读。
+- 当前 backend 不会对索引做越界检查。超出目标 Tile 线性范围的索引不属于合法使用域。
+- 编译期 valid bounds 必须满足：
+  - `TileDataD::ValidRow <= TileDataD::Rows`
+  - `TileDataD::ValidCol <= TileDataD::Cols`
+  - `TileDataS::ValidRow <= TileDataS::Rows`
+  - `TileDataS::ValidCol <= TileDataS::Cols`
+  - `TileDataI::ValidRow <= TileDataI::Rows`
+  - `TileDataI::ValidCol <= TileDataI::Cols`
+
+### A2/A3 实现检查
+
+- `dst/src` 的元素类型必须属于：
+  `int32_t`、`int16_t`、`int8_t`、`uint32_t`、`uint16_t`、`uint8_t`、`half`、`float32_t`、`bfloat16_t`。
+- `indexes` 的元素类型必须属于：
+  `int16_t`、`int32_t`、`uint16_t`、`uint32_t`。
+
+### A5 实现检查
+
+- A5 上的类型限制与 A2/A3 相同：
+  - `dst/src` 支持 `int32_t`、`int16_t`、`int8_t`、`uint32_t`、`uint16_t`、`uint8_t`、`half`、`float32_t`、`bfloat16_t`
+  - `indexes` 支持 `int16_t`、`int32_t`、`uint16_t`、`uint32_t`
 
 ## 示例
 
@@ -110,3 +129,9 @@ void example_manual() {
   TSCATTER(dst, src, idx);
 }
 ```
+
+## 相关页面
+
+- [不规则与复杂指令集](../../irregular-and-complex_zh.md)
+- [布局参考](../../../state-and-types/layout_zh.md)
+- [数据格式](../../../state-and-types/data-format_zh.md)

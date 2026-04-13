@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TPRELU tile operation](../figures/isa/TPRELU.svg)
+![TPRELU tile operation](../../../../figures/isa/TPRELU.svg)
 
 ## 简介
 
@@ -16,7 +16,7 @@ $$ \mathrm{dst}_{i,j} = (\mathrm{src0}_{i,j} > 0) ? \mathrm{src0}_{i,j} : (\math
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
 同步形式：
 
@@ -38,7 +38,7 @@ pto.tprelu ins(%src0, %src1 : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst 
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileDataDst, typename TileDataSrc0, typename TileDataSrc1, typename TileDataTmp,

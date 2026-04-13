@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TABS tile operation](../figures/isa/TABS.svg)
+![TABS tile operation](../../../../figures/isa/TABS.svg)
 
 ## 简介
 
@@ -16,7 +16,7 @@ $$ \mathrm{dst}_{i,j} = \left|\mathrm{src}_{i,j}\right| $$
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
 同步形式：
 
@@ -38,7 +38,7 @@ pto.tabs ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileDataDst, typename TileDataSrc, typename... WaitEvents>

@@ -1,6 +1,6 @@
 # pto.tcolargmin
 
-Standalone reference page for `pto.tcolargmin`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.tcolargmin` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

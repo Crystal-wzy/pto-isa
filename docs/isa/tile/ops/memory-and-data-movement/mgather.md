@@ -1,6 +1,6 @@
 # pto.mgather
 
-Standalone reference page for `pto.mgather`. This page belongs to the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set in the PTO ISA manual.
+`pto.mgather` is part of the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set.
 
 ## Summary
 

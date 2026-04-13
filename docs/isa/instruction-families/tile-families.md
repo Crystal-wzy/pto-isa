@@ -1,19 +1,19 @@
 # Tile Instruction Set
 
-Tile-instruction set documentation explains how `pto.t*` groups behave. Each instruction set describes the shared mechanism, operand model, constraints, and target-profile narrowing before the reader drops into the standalone per-op pages under `tile/ops/`.
+Tile-instruction set documentation explains how `pto.t*` groups behave. Each instruction set describes the shared mechanism, operand model, constraints, and target-profile narrowing before the standalone per-op pages under `tile/ops/`.
 
 ## Overview
 
 | Instruction Set | Prefix | Description |
 |--------|--------|-------------|
-| [Sync and Config](./sync-and-config.md) | `pto.tassign`, `pto.tsync`, `pto.tset*` | Resource binding, event setup, mode control |
-| [Elementwise Tile-Tile](./elementwise-tile-tile.md) | `pto.tadd`, `pto.tmul`, `pto.tcmp`, `pto.tcvt` | Lane-wise binary and unary operations |
-| [Tile-Scalar and Immediate](./tile-scalar-and-immediate.md) | `pto.tadds`, `pto.tmuls`, `pto.tmins` | Tile combined with scalar or immediate operand |
-| [Reduce and Expand](./reduce-and-expand.md) | `pto.trowsum`, `pto.tcolmax`, `pto.trowexpand` | Row/column reductions and expansions |
-| [Memory and Data Movement](./memory-and-data-movement.md) | `pto.tload`, `pto.tstore`, `pto.mgather` | GM↔tile transfer, gather/scatter |
-| [Matrix and Matrix-Vector](./matrix-and-matrix-vector.md) | `pto.tgemv`, `pto.tmatmul`, `pto.tmatmul_bias` | GEMV, matmul, and variants |
-| [Layout and Rearrangement](./layout-and-rearrangement.md) | `pto.tmov`, `pto.ttrans`, `pto.textract` | Reshape, transpose, extract, insert |
-| [Irregular and Complex](./irregular-and-complex.md) | `pto.tmrgsort`, `pto.tquant`, `pto.tprint` | Sort, quantize, histogram, print |
+| [Sync and Config](../tile/sync-and-config.md) | `pto.tassign`, `pto.tsync`, `pto.tset*` | Resource binding, event setup, mode control |
+| [Elementwise Tile-Tile](../tile/elementwise-tile-tile.md) | `pto.tadd`, `pto.tmul`, `pto.tcmp`, `pto.tcvt` | Lane-wise binary and unary operations |
+| [Tile-Scalar and Immediate](../tile/tile-scalar-and-immediate.md) | `pto.tadds`, `pto.tmuls`, `pto.tmins` | Tile combined with scalar or immediate operand |
+| [Reduce and Expand](../tile/reduce-and-expand.md) | `pto.trowsum`, `pto.tcolmax`, `pto.trowexpand` | Row/column reductions and expansions |
+| [Memory and Data Movement](../tile/memory-and-data-movement.md) | `pto.tload`, `pto.tstore`, `pto.mgather` | GM↔tile transfer, gather/scatter |
+| [Matrix and Matrix-Vector](../tile/matrix-and-matrix-vector.md) | `pto.tgemv`, `pto.tmatmul`, `pto.tmatmul_bias` | GEMV, matmul, and variants |
+| [Layout and Rearrangement](../tile/layout-and-rearrangement.md) | `pto.tmov`, `pto.ttrans`, `pto.textract` | Reshape, transpose, extract, insert |
+| [Irregular and Complex](../tile/irregular-and-complex.md) | `pto.tmrgsort`, `pto.tquant`, `pto.tprint` | Sort, quantize, histogram, print |
 
 ## Shared Constraints
 
@@ -66,10 +66,10 @@ Programs MUST NOT assume that `TADDC` and `TADD` produce identical results when 
 
 ## Navigation
 
-See the [Tile ISA reference](./tile/README.md) for the full per-op reference under `tile/ops/`.
+See the [Tile ISA reference](../tile/README.md) for the full per-op reference under `tile/ops/`.
 
 ## See Also
 
-- [Tile instruction set](./instruction-surfaces/tile-instructions.md) — High-level instruction set description
+- [Tile instruction set](../instruction-surfaces/tile-instructions.md) — High-level instruction set description
 - [Instruction sets](./README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard

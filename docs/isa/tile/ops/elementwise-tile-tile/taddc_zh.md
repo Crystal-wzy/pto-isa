@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TADDC tile operation](../figures/isa/TADDC.svg)
+![TADDC tile operation](../../../../figures/isa/TADDC.svg)
 
 ## 简介
 
@@ -16,7 +16,7 @@ $$ \mathrm{dst}_{i,j} = \mathrm{src0}_{i,j} + \mathrm{src1}_{i,j} + \mathrm{src2
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
 同步形式：
 
@@ -38,7 +38,7 @@ pto.taddc ins(%src0, %src1, %src2 : !pto.tile_buf<...>, !pto.tile_buf<...>, !pto
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileData, typename... WaitEvents>

@@ -1,6 +1,6 @@
 # pto.vdup
 
-Standalone reference page for `pto.vdup`. This page belongs to the [Predicate And Materialization](../../predicate-and-materialization.md) instruction set in the PTO ISA manual.
+`pto.vdup` is part of the [Predicate And Materialization](../../predicate-and-materialization.md) instruction set.
 
 ## Summary
 

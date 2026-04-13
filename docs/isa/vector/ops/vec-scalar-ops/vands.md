@@ -1,6 +1,6 @@
 # pto.vands
 
-Standalone reference page for `pto.vands`. This page belongs to the [Vector-Scalar Instructions](../../vec-scalar-ops.md) instruction set in the PTO ISA manual.
+`pto.vands` is part of the [Vector-Scalar Instructions](../../vec-scalar-ops.md) instruction set.
 
 ## Summary
 

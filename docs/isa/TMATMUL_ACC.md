@@ -1,6 +1,6 @@
 # pto.tmatmul_acc
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.tmatmul_acc](./tile/ops/matrix-and-matrix-vector/tmatmul-acc.md).
+Canonical tile-instruction reference: [pto.tmatmul_acc](./tile/ops/matrix-and-matrix-vector/tmatmul-acc.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

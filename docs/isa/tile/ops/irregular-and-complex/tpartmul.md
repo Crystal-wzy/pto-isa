@@ -1,6 +1,6 @@
 # pto.tpartmul
 
-Standalone reference page for `pto.tpartmul`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tpartmul` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

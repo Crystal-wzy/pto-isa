@@ -4,22 +4,22 @@
 
 ## 本章内容
 
-- [指令族总览](instruction-families/README.md) — 完整导航地图和族规范模板
-- [Tile 指令族](instruction-families/tile-families.md) — Tile 表面的 8 个指令族（逐元素、归约、布局等）
-- [Vector 指令族](instruction-families/vector-families.md) — Vector 表面的 9 个指令族
-- [标量与控制指令族](instruction-families/scalar-and-control-families.md) — 标量、控制和配置的 6 个指令族
-- [其他指令族](instruction-families/other-families.md) — 通信和其他支持指令族
+- [指令族总览](README_zh.md) — 完整导航地图和族规范模板
+- [Tile 指令族](tile-families_zh.md) — Tile 指令集下的 8 个指令族（逐元素、归约、布局等）
+- [Vector 指令族](vector-families_zh.md) — Vector 指令集下的 9 个指令族
+- [标量与控制指令族](scalar-and-control-families_zh.md) — 标量、控制和配置的 6 个指令族
+- [其他指令族](other-families_zh.md) — 通信和其他支持指令族
 
-## 族与表面的关系
+## 指令集与指令族的关系
 
-- **表面（Instruction Set）** 按功能角色分类指令（Tile / Vector / Scalar&Control / Other）
+- **指令集（Instruction Set）** 按功能角色分类指令（Tile / Vector / Scalar&Control / Other）
 - **族（Instruction Set）** 共享约束、行为模式和规范语言；同一族的指令共享家族概览页中的共同约束
 
 ## 每个族必须定义的内容
 
 1. **Mechanism** — 族的用途说明
 2. **Shared Operand Model** — 共同的操作数模型和交互方式
-3. **Common Side Effects** — 所有族内操作共享的副作用
+3. **Common 副作用** — 所有族内操作共享的副作用
 4. **Shared Constraints** — 适用于全族的合法性规则
 5. **Cases That Are Not Allowed** — 全族禁止的条件
 6. **Target-Profile Narrowing** — A2/A3 和 A5 的差异

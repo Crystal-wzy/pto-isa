@@ -1,6 +1,6 @@
 # pto.pldi
 
-Standalone reference page for `pto.pldi`. This page belongs to the [Predicate Load Store](../../predicate-load-store.md) instruction set in the PTO ISA manual.
+`pto.pldi` is part of the [Predicate Load Store](../../predicate-load-store.md) instruction set.
 
 ## Summary
 

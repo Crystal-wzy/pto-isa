@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TDIVS tile operation](../figures/isa/TDIVS.svg)
+![TDIVS tile operation](../../../../figures/isa/TDIVS.svg)
 
 ## 简介
 
@@ -22,7 +22,7 @@
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 Tile/标量形式：
 

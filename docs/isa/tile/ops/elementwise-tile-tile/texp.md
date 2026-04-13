@@ -1,6 +1,6 @@
 # pto.texp
 
-Standalone reference page for `pto.texp`. This page belongs to the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set in the PTO ISA manual.
+`pto.texp` is part of the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set.
 
 ## Summary
 

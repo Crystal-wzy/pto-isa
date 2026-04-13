@@ -1,6 +1,6 @@
 # pto.vstur
 
-Standalone reference page for `pto.vstur`. This page belongs to the [Vector Load Store](../../vector-load-store.md) instruction set in the PTO ISA manual.
+`pto.vstur` is part of the [Vector Load Store](../../vector-load-store.md) instruction set.
 
 ## Summary
 

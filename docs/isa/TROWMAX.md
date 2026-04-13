@@ -1,6 +1,6 @@
 # pto.trowmax
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.trowmax](./tile/ops/reduce-and-expand/trowmax.md).
+Canonical tile-instruction reference: [pto.trowmax](./tile/ops/reduce-and-expand/trowmax.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

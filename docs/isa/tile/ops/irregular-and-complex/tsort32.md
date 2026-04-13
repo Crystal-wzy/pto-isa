@@ -1,6 +1,6 @@
 # pto.tsort32
 
-Standalone reference page for `pto.tsort32`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tsort32` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

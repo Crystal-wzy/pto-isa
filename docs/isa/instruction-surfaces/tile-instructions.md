@@ -136,7 +136,7 @@ PTO_INST RecordEvent TMATMUL(TileRes& cMatrix, TileLeft& aMatrix, TileRight& bMa
 
 ## See Also
 
-- [Tile ISA reference](./tile/README.md) — Full tile instruction set reference
-- [Tile Instruction Set](./instruction-families/tile-families.md) — Instruction-set-level contracts
-- [Instruction set contracts](./instruction-families/README.md) — All instruction sets
+- [Tile ISA reference](../tile/README.md) — Full tile instruction set reference
+- [Tile Instruction Set](../instruction-families/tile-families.md) — Instruction-set-level contracts
+- [Instruction set contracts](../instruction-families/README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard

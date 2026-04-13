@@ -1,6 +1,6 @@
 # pto.vsstb
 
-Standalone reference page for `pto.vsstb`. This page belongs to the [Vector Load Store](../../vector-load-store.md) instruction set in the PTO ISA manual.
+`pto.vsstb` is part of the [Vector Load Store](../../vector-load-store.md) instruction set.
 
 ## Summary
 

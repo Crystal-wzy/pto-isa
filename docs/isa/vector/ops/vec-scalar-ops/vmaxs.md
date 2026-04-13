@@ -1,6 +1,6 @@
 # pto.vmaxs
 
-Standalone reference page for `pto.vmaxs`. This page belongs to the [Vector-Scalar Instructions](../../vec-scalar-ops.md) instruction set in the PTO ISA manual.
+`pto.vmaxs` is part of the [Vector-Scalar Instructions](../../vec-scalar-ops.md) instruction set.
 
 ## Summary
 

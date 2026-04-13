@@ -1,6 +1,6 @@
 # Tile ISA Reference
 
-This section documents the `pto.t*` tile instruction set of PTO ISA. Pages are organized by instruction set, with standalone per-op pages under `tile/ops/`.
+The `pto.t*` tile instruction set of PTO ISA is organized by instruction set, with standalone per-op pages under `tile/ops/`.
 
 ## Instruction Sets
 

@@ -1,6 +1,6 @@
 # pto.tshr
 
-Standalone reference page for `pto.tshr`. This page belongs to the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set in the PTO ISA manual.
+`pto.tshr` is part of the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set.
 
 ## Summary
 

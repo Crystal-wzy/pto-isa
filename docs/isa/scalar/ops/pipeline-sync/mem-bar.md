@@ -1,6 +1,6 @@
 # pto.mem_bar
 
-Standalone reference page for `pto.mem_bar`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.mem_bar` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.tfillpad_expand
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.tfillpad_expand](./tile/ops/layout-and-rearrangement/tfillpad-expand.md).
+Canonical tile-instruction reference: [pto.tfillpad_expand](./tile/ops/layout-and-rearrangement/tfillpad-expand.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

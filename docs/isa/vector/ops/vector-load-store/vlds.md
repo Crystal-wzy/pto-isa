@@ -1,6 +1,6 @@
 # pto.vlds
 
-Standalone reference page for `pto.vlds`. This page belongs to the [Vector Load Store](../../vector-load-store.md) instruction set in the PTO ISA manual.
+`pto.vlds` is part of the [Vector Load Store](../../vector-load-store.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.tmatmul_bias
 
-Standalone reference page for `pto.tmatmul_bias`. This page belongs to the [Matrix And Matrix Vector](../../matrix-and-matrix-vector.md) instruction set in the PTO ISA manual.
+`pto.tmatmul_bias` is part of the [Matrix And Matrix Vector](../../matrix-and-matrix-vector.md) instruction set.
 
 ## Summary
 

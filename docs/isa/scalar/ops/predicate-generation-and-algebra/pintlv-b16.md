@@ -1,6 +1,6 @@
 # pto.pintlv_b16
 
-Standalone reference page for `pto.pintlv_b16`. This page belongs to the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set in the PTO ISA manual.
+`pto.pintlv_b16` is part of the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set.
 
 ## Summary
 

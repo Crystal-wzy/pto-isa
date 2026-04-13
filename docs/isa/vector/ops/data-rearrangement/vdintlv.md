@@ -1,6 +1,6 @@
 # pto.vdintlv
 
-Standalone reference page for `pto.vdintlv`. This page belongs to the [Data Rearrangement](../../data-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.vdintlv` is part of the [Data Rearrangement](../../data-rearrangement.md) instruction set.
 
 ## Summary
 

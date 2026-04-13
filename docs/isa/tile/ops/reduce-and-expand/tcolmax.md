@@ -1,6 +1,6 @@
 # pto.tcolmax
 
-Standalone reference page for `pto.tcolmax`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.tcolmax` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

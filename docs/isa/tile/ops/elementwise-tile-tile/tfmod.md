@@ -1,6 +1,6 @@
 # pto.tfmod
 
-Standalone reference page for `pto.tfmod`. This page belongs to the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set in the PTO ISA manual.
+`pto.tfmod` is part of the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set.
 
 ## Summary
 

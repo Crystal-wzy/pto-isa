@@ -1,6 +1,6 @@
 # pto.tprelu
 
-Standalone reference page for `pto.tprelu`. This page belongs to the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set in the PTO ISA manual.
+`pto.tprelu` is part of the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set.
 
 ## Summary
 

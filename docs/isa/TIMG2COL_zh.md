@@ -14,7 +14,7 @@
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS_zh.md).
 
 ### AS Level 1（SSA）
 
@@ -30,7 +30,7 @@ pto.timg2col ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 PTO_INST RecordEvent TIMG2COL(TileData &dst, ConvTileData &src, uint16_t posM = 0, uint16_t posK = 0,

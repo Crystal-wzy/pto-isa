@@ -1,6 +1,6 @@
 # pto.tfmods
 
-Standalone reference page for `pto.tfmods`. This page belongs to the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set in the PTO ISA manual.
+`pto.tfmods` is part of the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.por
 
-Standalone reference page for `pto.por`. This page belongs to the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set in the PTO ISA manual.
+`pto.por` is part of the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set.
 
 ## Summary
 

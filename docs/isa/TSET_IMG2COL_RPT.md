@@ -1,6 +1,6 @@
 # pto.tset_img2col_rpt
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.tset_img2col_rpt](./tile/ops/sync-and-config/tset-img2col-rpt.md).
+Canonical tile-instruction reference: [pto.tset_img2col_rpt](./tile/ops/sync-and-config/tset-img2col-rpt.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

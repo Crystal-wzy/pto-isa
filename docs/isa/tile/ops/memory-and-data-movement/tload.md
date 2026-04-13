@@ -1,6 +1,6 @@
 # pto.tload
 
-Standalone reference page for `pto.tload`. This page belongs to the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set in the PTO ISA manual.
+`pto.tload` is part of the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set.
 
 ## Summary
 

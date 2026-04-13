@@ -4,8 +4,8 @@
 
 ## 本章内容
 
-- [汇编模型](syntax-and-operands/assembly-model.md) — PTO-AS 三层语法（Assembly / SSA / DPS）BNF 定义、操作数修饰符、立即数编码规则
-- [操作数与属性](syntax-and-operands/operands-and-attributes.md) — 七类操作数（Tile / GlobalTensor / Scalar / Predicate / Event / UB Pointer / GM Pointer）的 SSA 类型表、属性完整列表（Compare / Rounding / Atomic / Transform / Distribution / Mask）、操作数约束规则
+- [汇编模型](assembly-model_zh.md) — PTO-AS 三层语法（Assembly / SSA / DPS）BNF 定义、操作数修饰符、立即数编码规则
+- [操作数与属性](operands-and-attributes_zh.md) — 七类操作数（Tile / GlobalTensor / Scalar / Predicate / Event / UB Pointer / GM Pointer）的 SSA 类型表、属性完整列表（Compare / Rounding / Atomic / Transform / Distribution / Mask）、操作数约束规则
 
 ## 阅读建议
 

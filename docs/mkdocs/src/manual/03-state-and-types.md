@@ -44,7 +44,7 @@ Why not force every tile to be fully valid? Because real kernels would immediate
 
 ### Location Intent
 
-Roles such as `Mat`, `Left`, `Right`, `Acc`, `Bias`, and `Scale` participate in legality. They are not comments for the reader. They tell the toolchain what kind of producer/consumer structure the tile is meant to enter.
+Roles such as `Mat`, `Left`, `Right`, `Acc`, `Bias`, and `Scale` participate in legality. They identify what kind of producer/consumer structure the tile is meant to enter, and they are checked as part of the contract.
 
 ### Layout And Alignment
 

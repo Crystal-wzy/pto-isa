@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TTRANS tile operation](../figures/isa/TTRANS.svg)
+![TTRANS tile operation](../../../../figures/isa/TTRANS.svg)
 
 ## 简介
 
@@ -18,7 +18,7 @@ $$ \mathrm{dst}_{i,j} = \mathrm{src}_{j,i} $$
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 

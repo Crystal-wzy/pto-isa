@@ -1,6 +1,6 @@
 # pto.vcmax
 
-Standalone reference page for `pto.vcmax`. This page belongs to the [Reduction Instructions](../../reduction-ops.md) instruction set in the PTO ISA manual.
+`pto.vcmax` is part of the [Reduction Instructions](../../reduction-ops.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.tlog
 
-Standalone reference page for `pto.tlog`. This page belongs to the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set in the PTO ISA manual.
+`pto.tlog` is part of the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set.
 
 ## Summary
 

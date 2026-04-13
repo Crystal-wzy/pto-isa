@@ -1,6 +1,6 @@
 # pto.wait_flag_dev
 
-Standalone reference page for `pto.wait_flag_dev`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.wait_flag_dev` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

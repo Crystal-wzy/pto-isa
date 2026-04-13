@@ -1,6 +1,6 @@
 # pto.trsqrt
 
-Standalone reference page for `pto.trsqrt`. This page belongs to the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set in the PTO ISA manual.
+`pto.trsqrt` is part of the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set.
 
 ## Summary
 

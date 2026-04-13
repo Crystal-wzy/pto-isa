@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import posixpath
 import re
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -852,7 +853,7 @@ def _write_missing_zh_wrapper(en_rel: str, zh_rel: str) -> None:
     title = _extract_first_heading(REPO_ROOT / en_rel)
     with mkdocs_gen_files.open(zh_rel, "w") as f:
         f.write(f"# {title}\n\n")
-        f.write("本页为自动生成的中文入口页，用于保证中文导航保持在中文路径下。\n\n")
+        f.write("自动生成的中文入口页，用于保证中文导航保持在中文路径下。\n\n")
         f.write("## 当前状态\n\n")
         f.write(
             f"- [对应英文页面]({_rel_md_link(zh_rel, en_rel)})\n"
@@ -916,6 +917,18 @@ def main() -> None:
     copied_md: list[str] = []
 
     mkdocs_src = REPO_ROOT / "docs" / "mkdocs" / "src"
+    generated_docs_root = mkdocs_src / "docs"
+
+    # `docs/` under docs_dir is a generated mirror of published repo docs.
+    # When source files move or are deleted, stale mirrored pages can survive
+    # on disk and get re-validated by MkDocs on the next build. Remove the
+    # ignored mirror up front so each build starts from the real source tree.
+    if generated_docs_root.exists():
+        shutil.rmtree(generated_docs_root)
+    for stale_root_file in ("README.md", "README_zh.md"):
+        stale_path = mkdocs_src / stale_root_file
+        if stale_path.exists():
+            stale_path.unlink()
 
     # Step 1: Process hand-written files under docs/mkdocs/src/.
     # These files use root-absolute links (e.g. /docs/isa/tile/ops/elementwise-tile-tile/tadd.md) so they
@@ -932,6 +945,8 @@ def main() -> None:
         # from previous builds (mkdocs_gen_files writes to a temp dir, but the
         # docs_dir itself may have leftover files if docs_dir == src/).
         if virtual_path.startswith("docs/mkdocs/"):
+            continue
+        if virtual_path in {"README.md", "README_zh.md"}:
             continue
         text = src.read_text(encoding="utf-8-sig", errors="replace")
         # Strip any stale "Generated from" header left by a previous build.
@@ -952,6 +967,8 @@ def main() -> None:
     for src in REPO_ROOT.rglob("*.md"):
         rel = src.relative_to(REPO_ROOT).as_posix()
         if _should_skip(rel):
+            continue
+        if rel in {"README.md", "README_zh.md"}:
             continue
         # Use utf-8-sig to automatically remove BOM if present
         text = src.read_text(encoding="utf-8-sig", errors="replace")
@@ -1006,7 +1023,7 @@ def main() -> None:
             isa_pages=isa_pages_en,
             heading="# Instruction Reference Pages",
             preamble=(
-                "This page is generated at build time.\n\n"
+                "Instruction reference index for the current build.\n\n"
                 "- Instruction index: `docs/isa/README.md`\n"
                 "- ISA conventions: `docs/isa/conventions.md`\n\n"
             ),
@@ -1021,7 +1038,7 @@ def main() -> None:
             isa_pages=isa_pages_zh,
             heading="# 指令参考页面（全量）",
             preamble=(
-                "本页在构建站点时自动生成。\n\n"
+                "当前构建的指令参考索引。\n\n"
                 "- 指令索引：`docs/isa/README_zh.md`\n"
                 "- ISA 通用约定：`docs/isa/conventions_zh.md`\n\n"
             ),
@@ -1046,7 +1063,7 @@ def main() -> None:
         out_path="all-pages.md",
         sections=sections,
         heading="# All Markdown Pages",
-        preamble="This page is generated at build time and lists markdown files mirrored into the site.\n\n",
+        preamble="Markdown pages mirrored into the site for the current build are listed below.\n\n",
         empty_msg="",
     )
 
@@ -1054,7 +1071,7 @@ def main() -> None:
         out_path="all-pages_zh.md",
         sections=sections_zh,
         heading="# 所有 Markdown 页面",
-        preamble="本页面在构建时自动生成，列出了站点中镜像的所有中文 markdown 文件。\n\n",
+        preamble="当前构建中镜像到站点的全部中文 markdown 页面如下。\n\n",
         empty_msg="未找到中文页面。\n",
     )
 

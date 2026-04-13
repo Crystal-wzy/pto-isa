@@ -157,8 +157,8 @@ PTO_INST void copy_ubuf_to_gm(gm_ptr dst, ub_ptr src, uint64_t sid,
 
 ## See Also
 
-- [Scalar ISA reference](./scalar/README.md) — Full scalar instruction set reference
-- [Scalar instruction sets](./instruction-families/scalar-and-control-families.md) — Instruction-set-level contracts
-- [Instruction sets](./instruction-families/README.md) — All instruction sets
+- [Scalar ISA reference](../scalar/README.md) — Full scalar instruction set reference
+- [Scalar instruction sets](../instruction-families/scalar-and-control-families.md) — Instruction-set-level contracts
+- [Instruction sets](../instruction-families/README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard
 - [Ordering and Synchronization](../machine-model/ordering-and-synchronization.md) — PTO memory and execution ordering model

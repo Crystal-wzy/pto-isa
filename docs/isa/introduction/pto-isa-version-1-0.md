@@ -1,6 +1,6 @@
 # PTO ISA Version 1.0
 
-This page records the instruction inventory and architecture instruction set defined for PTO ISA Version 1.0. It is the release baseline for this manual and is intended to serve as the reference point for future release notes.
+PTO ISA Version 1.0 defines the instruction inventory and architecture instruction sets recorded below. This release baseline serves as the reference point for future release notes.
 
 ## Version 1.0 Scope
 

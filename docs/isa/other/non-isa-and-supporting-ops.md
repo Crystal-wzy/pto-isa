@@ -6,17 +6,17 @@ Supporting operations provide convenience semantics over tile sequences, memory 
 
 | Operation | Description | Category |
 |-----------|-------------|----------|
-| [TALIAS](./TALIAS.md) | Create an alias view of a tile without copying data | Alias |
-| [TAXPY](./TAXPY.md) | Fused multiply-add: `dst = src0 * scalar + src1` | Fused compute |
-| [TCONCAT](./TCONCAT.md) | Concatenate two tiles along a specified dimension | Tile sequence |
-| [TDEQUANT](./TDEQUANT.md) | Dequantize a tile from quantized format | Quantize |
-| [TFREE](./TFREE.md) | Free a previously allocated tile or buffer | Memory |
-| [THISTOGRAM](./THISTOGRAM.md) | Compute histogram of tile values | Statistics |
-| [TPACK](./TPACK.md) | Pack multiple tiles into a single tile buffer | Tile sequence |
-| [TPOP](./TPOP.md) | Population count of predicate mask | Predicate |
-| [TPUSH](./TPUSH.md) | Push count of predicate mask | Predicate |
-| [TRANDOM](./TRANDOM.md) | Fill tile with random values | Generation |
-| [TQUANT](./TQUANT.md) | Quantize a tile to integer format | Quantize |
+| [TALIAS](../TALIAS.md) | Create an alias view of a tile without copying data | Alias |
+| [TAXPY](../TAXPY.md) | Fused multiply-add: `dst = src0 * scalar + src1` | Fused compute |
+| [TCONCAT](../TCONCAT.md) | Concatenate two tiles along a specified dimension | Tile sequence |
+| [TDEQUANT](../TDEQUANT.md) | Dequantize a tile from quantized format | Quantize |
+| [TFREE](../TFREE.md) | Free a previously allocated tile or buffer | Memory |
+| [THISTOGRAM](../THISTOGRAM.md) | Compute histogram of tile values | Statistics |
+| [TPACK](../TPACK.md) | Pack multiple tiles into a single tile buffer | Tile sequence |
+| [TPOP](../TPOP.md) | Population count of predicate mask | Predicate |
+| [TPUSH](../TPUSH.md) | Push count of predicate mask | Predicate |
+| [TRANDOM](../TRANDOM.md) | Fill tile with random values | Generation |
+| [TQUANT](../TQUANT.md) | Quantize a tile to integer format | Quantize |
 
 ## Mechanism
 

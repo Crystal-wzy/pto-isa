@@ -1,6 +1,6 @@
 # pto.trowexpandmul
 
-Standalone reference page for `pto.trowexpandmul`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.trowexpandmul` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

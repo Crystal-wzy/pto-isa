@@ -1,6 +1,6 @@
 # pto.tscatter
 
-Standalone reference page for `pto.tscatter`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tscatter` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

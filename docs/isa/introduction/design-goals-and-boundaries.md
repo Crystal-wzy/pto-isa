@@ -1,6 +1,6 @@
 # PTO: Scope And Boundaries
 
-This page defines the scope of the PTO ISA specification and the boundary between core ISA guarantees and neighboring layers.
+The scope of the PTO ISA specification and the boundary between core ISA guarantees and neighboring layers are defined below.
 
 ## What PTO ISA Defines
 

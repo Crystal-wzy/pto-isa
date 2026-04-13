@@ -1,6 +1,6 @@
 # pto.tmov
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.tmov](./tile/ops/layout-and-rearrangement/tmov.md).
+Canonical tile-instruction reference: [pto.tmov](./tile/ops/layout-and-rearrangement/tmov.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

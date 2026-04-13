@@ -1,8 +1,8 @@
 # PTO Virtual ISA Manual
 
->This page is the stable landing page for the PTO ISA manual. The canonical manual now lives under `docs/isa/` as one merged tree. It presents PTO as a multi-target virtual ISA with a clear split between programming model, machine model, memory model, instruction sets, and instruction set contracts.
->
->Use the top-right language icon to switch between English and Chinese. Language switching lands on a counterpart page when one exists; otherwise it falls back to the matching language landing page.
+The stable PTO ISA manual entry points to the merged tree under `docs/isa/`. That tree presents PTO as a multi-target virtual ISA with separate programming-model, machine-model, memory-model, instruction-set, and instruction-contract layers.
+
+The top-right language icon switches between English and Chinese. When a counterpart page exists, the switch lands there; otherwise it returns to the matching language landing page.
 
 ---
 

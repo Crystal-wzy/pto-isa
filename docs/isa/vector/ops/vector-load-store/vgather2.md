@@ -1,6 +1,6 @@
 # pto.vgather2
 
-Standalone reference page for `pto.vgather2`. This page belongs to the [Vector Load Store](../../vector-load-store.md) instruction set in the PTO ISA manual.
+`pto.vgather2` is part of the [Vector Load Store](../../vector-load-store.md) instruction set.
 
 ## Summary
 

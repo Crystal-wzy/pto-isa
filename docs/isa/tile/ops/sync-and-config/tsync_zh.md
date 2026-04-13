@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TSYNC tile operation](../figures/isa/TSYNC.svg)
+![TSYNC tile operation](../../../../figures/isa/TSYNC.svg)
 
 ## 简介
 
@@ -19,7 +19,7 @@
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 Event operand form:
 

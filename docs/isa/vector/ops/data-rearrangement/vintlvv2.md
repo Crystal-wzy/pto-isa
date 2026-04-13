@@ -1,6 +1,6 @@
 # pto.vintlvv2
 
-Standalone reference page for `pto.vintlvv2`. This page belongs to the [Data Rearrangement](../../data-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.vintlvv2` is part of the [Data Rearrangement](../../data-rearrangement.md) instruction set.
 
 ## Summary
 

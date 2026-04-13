@@ -1,21 +1,21 @@
 # Vector Instruction Set
 
-Vector instruction-set documentation follows the PTOAS VPTO grouping used for VPTO. This page covers the complete set of `pto.v*` micro-instructions that operate on vector registers.
+Vector instruction-set documentation follows the PTOAS VPTO grouping used for VPTO. The complete set of `pto.v*` micro-instructions that operate on vector registers is grouped below.
 
 ## Overview
 
 | Instruction Set | Description | Examples |
 |-----------------|-------------|----------|
-| [Vector Load/Store](./vector/vector-load-store.md) | UB↔vector register transfer with distribution modes | `vlds`, `vldas`, `vgather2`, `vsld`, `vsst`, `vscatter` |
-| [Predicate and Materialization](./vector/predicate-and-materialization.md) | Vector broadcast and duplication | `vbr`, `vdup` |
-| [Unary Vector Instructions](./vector/unary-vector-ops.md) | Single-operand lane-wise operations | `vabs`, `vneg`, `vexp`, `vsqrt`, `vrec`, `vrelu`, `vnot` |
-| [Binary Vector Instructions](./vector/binary-vector-ops.md) | Two-operand lane-wise operations | `vadd`, `vsub`, `vmul`, `vdiv`, `vmax`, `vmin` |
-| [Vector-Scalar Instructions](./vector/vec-scalar-ops.md) | Vector combined with scalar operand | `vadds`, `vmuls`, `vshls`, `vlrelu` |
-| [Conversion Ops](./vector/conversion-ops.md) | Type conversion between numeric types | `vci`, `vcvt`, `vtrc` |
-| [Reduction Instructions](./vector/reduction-ops.md) | Cross-lane reductions | `vcadd`, `vcmax`, `vcmin`, `vcgadd`, `vcgmax` |
-| [Compare and Select](./vector/compare-select.md) | Comparison and conditional lane selection | `vcmp`, `vcmps`, `vsel`, `vselr`, `vselrv2` |
-| [Data Rearrangement](./vector/data-rearrangement.md) | Lane permutation, interleaving, packing | `vintlv`, `vdintlv`, `vslide`, `vshift`, `vpack`, `vzunpack` |
-| [SFU and DSA Instructions](./vector/sfu-and-dsa-ops.md) | Special function units and DSA-style operations | `vprelu`, `vexpdiff`, `vaxpy`, `vtranspose`, `vsort32` |
+| [Vector Load/Store](../vector/vector-load-store.md) | UB↔vector register transfer with distribution modes | `vlds`, `vldas`, `vgather2`, `vsld`, `vsst`, `vscatter` |
+| [Predicate and Materialization](../vector/predicate-and-materialization.md) | Vector broadcast and duplication | `vbr`, `vdup` |
+| [Unary Vector Instructions](../vector/unary-vector-ops.md) | Single-operand lane-wise operations | `vabs`, `vneg`, `vexp`, `vsqrt`, `vrec`, `vrelu`, `vnot` |
+| [Binary Vector Instructions](../vector/binary-vector-ops.md) | Two-operand lane-wise operations | `vadd`, `vsub`, `vmul`, `vdiv`, `vmax`, `vmin` |
+| [Vector-Scalar Instructions](../vector/vec-scalar-ops.md) | Vector combined with scalar operand | `vadds`, `vmuls`, `vshls`, `vlrelu` |
+| [Conversion Ops](../vector/conversion-ops.md) | Type conversion between numeric types | `vci`, `vcvt`, `vtrc` |
+| [Reduction Instructions](../vector/reduction-ops.md) | Cross-lane reductions | `vcadd`, `vcmax`, `vcmin`, `vcgadd`, `vcgmax` |
+| [Compare and Select](../vector/compare-select.md) | Comparison and conditional lane selection | `vcmp`, `vcmps`, `vsel`, `vselr`, `vselrv2` |
+| [Data Rearrangement](../vector/data-rearrangement.md) | Lane permutation, interleaving, packing | `vintlv`, `vdintlv`, `vslide`, `vshift`, `vpack`, `vzunpack` |
+| [SFU and DSA Instructions](../vector/sfu-and-dsa-ops.md) | Special function units and DSA-style operations | `vprelu`, `vexpdiff`, `vaxpy`, `vtranspose`, `vsort32` |
 
 ## Shared Constraints
 
@@ -65,10 +65,10 @@ The following ops require A5 profile:
 
 ## Navigation
 
-See the [Vector ISA reference](./vector/README.md) for the full per-op reference under `vector/ops/`.
+See the [Vector ISA reference](../vector/README.md) for the full per-op reference under `vector/ops/`.
 
 ## See Also
 
-- [Vector instructions](./instruction-surfaces/vector-instructions.md) — High-level instruction overview
+- [Vector instructions](../instruction-surfaces/vector-instructions.md) — High-level instruction overview
 - [Instruction set contracts](./README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard

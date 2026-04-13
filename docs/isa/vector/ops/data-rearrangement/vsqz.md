@@ -1,6 +1,6 @@
 # pto.vsqz
 
-Standalone reference page for `pto.vsqz`. This page belongs to the [Data Rearrangement](../../data-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.vsqz` is part of the [Data Rearrangement](../../data-rearrangement.md) instruction set.
 
 ## Summary
 

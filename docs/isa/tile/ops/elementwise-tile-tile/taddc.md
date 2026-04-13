@@ -1,6 +1,6 @@
 # pto.taddc
 
-Standalone reference page for `pto.taddc`. This page belongs to the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set in the PTO ISA manual.
+`pto.taddc` is part of the [Elementwise Tile Tile](../../elementwise-tile-tile.md) instruction set.
 
 ## Summary
 

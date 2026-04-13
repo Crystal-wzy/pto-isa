@@ -1,6 +1,6 @@
 # pto.vpack
 
-Standalone reference page for `pto.vpack`. This page belongs to the [Data Rearrangement](../../data-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.vpack` is part of the [Data Rearrangement](../../data-rearrangement.md) instruction set.
 
 ## Summary
 

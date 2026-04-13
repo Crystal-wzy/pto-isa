@@ -1,6 +1,6 @@
 # pto.tgatherb
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.tgatherb](./tile/ops/irregular-and-complex/tgatherb.md).
+Canonical tile-instruction reference: [pto.tgatherb](./tile/ops/irregular-and-complex/tgatherb.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

@@ -1,6 +1,6 @@
 # Assembly Spelling And Operands
 
-PTO ISA includes a textual assembly spelling — PTO-AS — but the architecture contract stays in the PTO ISA manual itself. This page defines the syntax rules, including the BNF grammar for all three forms, operand modifier rules, and attribute syntax. Per-instruction syntax pages add instruction-specific variants.
+PTO ISA includes a textual assembly spelling — PTO-AS — but the architecture contract stays in the PTO ISA manual itself. The syntax rules below cover the BNF grammar for all three forms, operand modifier rules, and attribute syntax. Per-instruction syntax pages add instruction-specific variants.
 
 ## Three-Level Syntax System
 

@@ -1,6 +1,6 @@
 # Scalar And Control Instruction Set: Control And Configuration
 
-This page is the control-shell overview for the `pto.*` instruction set. It explains how PTO programs establish ordering, configure DMA, and manipulate predicate-visible state around tile and vector payload work.
+The control-shell overview for the `pto.*` instruction set explains how PTO programs establish ordering, configure DMA, and manipulate predicate-visible state around tile and vector payload work.
 
 ## Summary
 

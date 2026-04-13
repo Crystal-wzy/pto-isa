@@ -1,6 +1,6 @@
 # Vector Instruction Set: Vector-Scalar Instructions
 
-This page documents the `pto.v*` instruction sets that combine one vector register with one scalar operand. Scalar broadcasting, carry-chain rules, and active-lane behavior are architecture-visible and therefore documented here.
+`pto.v*` instruction sets that combine one vector register with one scalar operand are defined here. Scalar broadcasting, carry-chain rules, and active-lane behavior are architecture-visible constraints.
 
 > **Category:** Vector-scalar operations
 > **Pipeline:** PIPE_V (Vector Core)

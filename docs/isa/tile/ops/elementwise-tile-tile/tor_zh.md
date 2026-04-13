@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TOR tile operation](../figures/isa/TOR.svg)
+![TOR tile operation](../../../../figures/isa/TOR.svg)
 
 ## 简介
 
@@ -16,7 +16,7 @@ $$ \mathrm{dst}_{i,j} = \mathrm{src0}_{i,j} \;|\; \mathrm{src1}_{i,j} $$
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 

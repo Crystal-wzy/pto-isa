@@ -2,21 +2,30 @@
 
 ## 指令示意图
 
-![TROWARGMIN tile operation](../figures/isa/TROWARGMIN.svg)
+![TROWARGMIN tile operation](../../../../figures/isa/TROWARGMIN.svg)
 
 ## 简介
 
-获取每行最小值对应列索引。
+`TROWARGMIN` 对输入 Tile 的每一行做“取最小值位置”的归约，结果返回**列索引**。它通常用在后续仍然需要知道“最优元素落在哪一列”的场景里，而不是只要最小值本身的场景。
+
+输出 Tile 只保留一列，因此第 `i` 行的结果 `dst[i, 0]` 表示：源 Tile 第 `i` 行的最小元素位于哪一列。
 
 ## 数学语义
 
-设 `R = src.GetValidRow()`，`C = src.GetValidCol()`。对 `0 <= i < R`：
+设：
+
+- `R = src.GetValidRow()`
+- `C = src.GetValidCol()`
+
+对 `0 <= i < R`：
 
 $$ \mathrm{dst}_{i,0} = \underset{0 \le j < C}{\operatorname{argmin}} \; \mathrm{src}_{i,j} $$
 
+如果一行里有多个相同的最小值，具体选择哪一个索引由实现决定。可移植代码不应依赖某个固定的 tie-breaking 结果。
+
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 
@@ -24,15 +33,15 @@ PTO-AS 形式：参见 [PTO-AS 规范](../../assembly/PTO-AS_zh.md)。
 %dst = trowargmin %src : !pto.tile<...> -> !pto.tile<...>
 ```
 
-Lowering may introduce internal scratch tiles; the C++ intrinsic requires an explicit `tmp` operand.
+在 lowering 过程中，backend 可能会引入临时 scratch Tile；C++ 内建接口因此显式接收 `tmp` 操作数。
 
-### IR Level 1（SSA）
+### AS Level 1（SSA）
 
 ```text
 %dst = pto.trowargmin %src, %tmp : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
 ```
 
-### IR Level 2（DPS）
+### AS Level 2（DPS）
 
 ```text
 pto.trowargmin ins(%src, %tmp : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
@@ -40,7 +49,7 @@ pto.trowargmin ins(%src, %tmp : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%ds
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileDataOut, typename TileDataIn, typename TileDataTmp, typename... WaitEvents>
@@ -49,38 +58,33 @@ PTO_INST RecordEvent TROWARGMIN(TileDataOut& dst, TileDataIn& src, TileDataTmp& 
 
 ## 约束
 
-### 通用约束或检查
+### 通用约束
 
-- `dst` 和 `src` 必须为 `TileType::Vec`。
-- 支持的源元素类型：`half`、`float`。
-- 支持的目标元素类型：`uint32_t`、`int32_t`。
-- 运行时检查遵循共享的行归约检查路径：
+- `src` 和 `dst` 都必须是 `TileType::Vec`。
+- `src` 必须是标准 ND 布局：row-major 且非分形（`BLayout::RowMajor`、`SLayout::NoneBox`）。
+- `dst` 必须是以下两类之一：
+  - ND 布局，或
+  - 单列 DN 布局（`Cols == 1`）。
+- `dst` 的元素类型必须是 `uint32_t` 或 `int32_t`。
+- `src` 的元素类型必须属于：
+  `half`、`float`、`int32_t`、`int16_t`。
+- 运行时要求：
   - `src.GetValidRow() != 0`
   - `src.GetValidCol() != 0`
-  - `src.GetValidRow() == dst.GetValidRow()`
+  - `dst.GetValidRow() == src.GetValidRow()`
 
-### A2A3 实现检查
+### A2/A3 实现检查
 
-- `src` 必须使用标准 ND 布局：行主且非分形（`BLayout::RowMajor`、`SLayout::NoneBox`）。
-- `dst` 通过共享的行归约索引检查路径约束，可使用以下任一非分形布局：
-  - 单列 DN 布局（`BLayout::ColMajor`、`Cols == 1`），或
-  - 有效列数为 1 的 ND 布局。
+- 当 `src.GetValidCol() <= elementPerRepeat` 时，A2/A3 可以直接完成行内索引归约，此时 `tmp` 不参与计算。
+- 当 `src.GetValidCol() > elementPerRepeat` 时，A2/A3 会使用 `tmp` 做分阶段归约：
+  - `validCol <= elementPerRepeat^2` 时走一阶段暂存；
+  - `validCol > elementPerRepeat^2` 时走两阶段暂存。
+- 因为暂存是按“每一行”展开的，`tmp` 至少应覆盖与 `src` 同样的有效行数。
 
-### A5 实现检查
+### A5 与 CPU 实现
 
-- `dst` 和 `src` 必须满足 `TRowArgMin` 使用的共享行归约索引检查路径。
-- 在已检查到的 A5 实现路径中，接口仍接收 `tmp`，但 `TROWARGMIN_IMPL` 实际并不使用它。
-
-### A3 `tmp`临时Tile相关说明
-
-- `tmp`临时Tile在`srcValidCol <= ElementPerRepeat`时不使用，`srcValidCol > ElementPerRepeat`时需要使用。
-- `tmp` tile的行数和`src` tile的行数相同。
-- 按以下公式根据`src` tile的`validCol`算出`tmp` tile所需stride：
-
-```text
-repeats = ceil(validCol / elementPerRepeat)
-stride = ceil(repeats * 2 / elementPerBlock) * elementPerBlock + ceil(repeats / elementPerBlock) * elementPerBlock
-```
+- A5 和 CPU 的接口也保留了 `tmp` 参数，但当前实现并不会实际使用它。
+- 这意味着 `tmp` 在这些 profile 里主要是接口兼容用，而不是算法必需输入。
 
 ## 示例
 
@@ -93,7 +97,7 @@ using namespace pto;
 
 void example_auto() {
   using SrcT = Tile<TileType::Vec, float, 16, 16>;
-  using DstT = Tile<TileType::Vec, float, 16, 1, BLayout::ColMajor>;
+  using DstT = Tile<TileType::Vec, uint32_t, 16, 1, BLayout::ColMajor>;
   using TmpT = Tile<TileType::Vec, float, 16, 16>;
   SrcT src;
   DstT dst;
@@ -111,7 +115,7 @@ using namespace pto;
 
 void example_manual() {
   using SrcT = Tile<TileType::Vec, float, 16, 16>;
-  using DstT = Tile<TileType::Vec, float, 16, 1, BLayout::ColMajor>;
+  using DstT = Tile<TileType::Vec, uint32_t, 16, 1, BLayout::ColMajor>;
   using TmpT = Tile<TileType::Vec, float, 16, 16>;
   SrcT src;
   DstT dst;
@@ -123,29 +127,8 @@ void example_manual() {
 }
 ```
 
-## 汇编示例（ASM）
+## 相关页面
 
-### 自动模式
-
-```text
-# 自动模式：由编译器/运行时负责资源放置与调度。
-%dst = pto.trowargmin %src, %tmp : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### 手动模式
-
-```text
-# 手动模式：先显式绑定资源，再发射指令。
-# 可选（当该指令包含 tile 操作数时）：
-# pto.tassign %arg0, @tile(0x1000)
-# pto.tassign %arg1, @tile(0x2000)
-%dst = pto.trowargmin %src, %tmp : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### PTO 汇编形式
-
-```text
-%dst = trowargmin %src : !pto.tile<...> -> !pto.tile<...>
-# IR Level 2 (DPS)
-pto.trowargmin ins(%src, %tmp : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
+- [归约与扩展指令集](../../reduce-and-expand_zh.md)
+- [TROWMIN](./trowmin_zh.md)
+- [布局参考](../../../state-and-types/layout_zh.md)

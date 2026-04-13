@@ -1,6 +1,6 @@
 # pto.timg2col
 
-Standalone reference page for `pto.timg2col`. This page belongs to the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.timg2col` is part of the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set.
 
 ## Summary
 

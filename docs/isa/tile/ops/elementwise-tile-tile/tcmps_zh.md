@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TCMPS tile operation](../figures/isa/TCMPS.svg)
+![TCMPS tile operation](../../../../figures/isa/TCMPS.svg)
 
 ## 简介
 
@@ -18,7 +18,7 @@ The encoding/type of `dst` is implementation-defined (often a mask-like tile).
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
 同步形式：
 

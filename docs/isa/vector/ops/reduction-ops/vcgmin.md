@@ -1,6 +1,6 @@
 # pto.vcgmin
 
-Standalone reference page for `pto.vcgmin`. This page belongs to the [Reduction Instructions](../../reduction-ops.md) instruction set in the PTO ISA manual.
+`pto.vcgmin` is part of the [Reduction Instructions](../../reduction-ops.md) instruction set.
 
 ## Summary
 

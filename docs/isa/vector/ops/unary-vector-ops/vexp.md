@@ -1,6 +1,6 @@
 # pto.vexp
 
-Standalone reference page for `pto.vexp`. This page belongs to the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vexp` is part of the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set.
 
 ## Summary
 
@@ -175,5 +175,5 @@ For numerically stable softmax, prefer computing `exp(x - max(x))` rather than `
 - Instruction set overview: [Unary Vector Instructions](../../unary-vector-ops.md)
 - Previous op in instruction set: [pto.vneg](./vneg.md)
 - Next op in instruction set: [pto.vln](./vln.md)
-- Vector instruction overview: [Vector Instructions](../../instruction-surfaces/vector-instructions.md)
-- Type system: [Type System](../../state-and-types/type-system.md)
+- Vector instruction overview: [Vector Instructions](../../../instruction-surfaces/vector-instructions.md)
+- Type system: [Type System](../../../state-and-types/type-system.md)

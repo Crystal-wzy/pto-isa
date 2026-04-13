@@ -1,6 +1,6 @@
 # pto.tsync
 
-Standalone reference page for `pto.tsync`. This page belongs to the [Sync And Config](../../sync-and-config.md) instruction set in the PTO ISA manual.
+`pto.tsync` is part of the [Sync And Config](../../sync-and-config.md) instruction set.
 
 ## Summary
 

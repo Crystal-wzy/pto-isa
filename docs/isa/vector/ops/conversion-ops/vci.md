@@ -1,6 +1,6 @@
 # pto.vci
 
-Standalone reference page for `pto.vci`. This page belongs to the [Conversion Ops](../../conversion-ops.md) instruction set in the PTO ISA manual.
+`pto.vci` is part of the [Conversion Ops](../../conversion-ops.md) instruction set.
 
 ## Summary
 
@@ -81,7 +81,7 @@ This operation has no architectural side effect beyond producing its SSA results
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- On the current documented A5 surface, `pto.vci` maps to hardware trace with no vector `RV_*` in sampled `veccore0` trace.
+- Under the current documented A5 profile contract, `pto.vci` maps to hardware trace with no vector `RV_*` in sampled `veccore0` trace.
 
 ## Performance
 

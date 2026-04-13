@@ -1,6 +1,6 @@
 # pto.tfillpad_inplace
 
-Standalone reference page for `pto.tfillpad_inplace`. This page belongs to the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.tfillpad_inplace` is part of the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set.
 
 ## Summary
 

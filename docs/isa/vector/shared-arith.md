@@ -1,6 +1,6 @@
 # Vector Instruction Set: Shared Scalar Arithmetic
 
-Vector programs in PTO rely on the shared MLIR `arith` instruction set for scalar setup around `pto.v*` regions. This page keeps that relationship explicit without pretending that scalar bookkeeping is itself a vector payload instruction set.
+Vector programs in PTO rely on the shared MLIR `arith` instruction set for scalar setup around `pto.v*` regions. The relationship is kept explicit here without treating scalar bookkeeping as a vector payload instruction set.
 
 ## Summary
 
@@ -15,7 +15,7 @@ Around vector code, `arith` is used to:
 - build scalar values broadcast or materialized into vector state
 - compare scalar loop/control values that guard vector regions
 
-The canonical scalar-side explanation lives in [Scalar And Control Instruction Set: Shared Scalar Arithmetic](../scalar/shared-arith.md). This page exists so the vector reference stays self-contained about what surrounds `pto.v*` execution.
+The canonical scalar-side explanation lives in [Scalar And Control Instruction Set: Shared Scalar Arithmetic](../scalar/shared-arith.md). This vector reference keeps the surrounding scalar setup visible without duplicating the scalar-side contract.
 
 ## Inputs
 

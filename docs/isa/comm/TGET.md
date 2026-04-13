@@ -137,7 +137,7 @@ comm::TGET(dstG, srcG, pingTile, pongTile);
 
 ## See Also
 
-- [Communication And Runtime](../communication-and-runtime.md) — Instruction set overview
+- [Communication And Runtime](../other/communication-and-runtime.md) — Instruction set overview
 - [TPUT](./TPUT.md) — Remote write (inverse operation)
 - [TBROADCAST](./TBROADCAST.md) — Broadcast from one NPU to all
 - [TGATHER](./TGATHER.md) — Gather from all NPUs to one

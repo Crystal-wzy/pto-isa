@@ -1,6 +1,6 @@
 # pto.taddsc
 
-Standalone reference page for `pto.taddsc`. This page belongs to the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set in the PTO ISA manual.
+`pto.taddsc` is part of the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set.
 
 ## Summary
 

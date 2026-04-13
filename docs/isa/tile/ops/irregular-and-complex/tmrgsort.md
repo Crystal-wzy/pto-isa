@@ -1,6 +1,6 @@
 # pto.tmrgsort
 
-Standalone reference page for `pto.tmrgsort`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tmrgsort` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

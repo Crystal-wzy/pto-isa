@@ -1,6 +1,6 @@
 # Format Of Instruction Descriptions
 
-This section defines how **per-instruction** and **instruction set** pages in this manual are written. Readers should know what to expect from every opcode page, and authors should keep pages comparable across instruction sets.
+Per-instruction and instruction-set pages in this manual follow a common structure so opcode contracts remain easy to compare across instruction sets.
 
 PTO is **tile-first** and **valid-region-first**. Instruction text always means what happens in the declared valid region unless the page explicitly defines behavior outside it.
 
@@ -26,7 +26,7 @@ Each `pto.*` operation page should make the following easy to find. Section titl
 
 4. **Syntax** — Reference to PTO-AS spelling where relevant; optional **AS** and **IR** patterns when they help interchange and tooling (many pages use SSA and DPS-style examples).
 
-5. **C++ intrinsic** — When the public C++ API is normative for authors, the `pto_instr.hpp` declaration is cited.
+5. **C++ intrinsic** — When the public C++ API is normative, cite the corresponding declaration from `pto_instr.hpp`.
 
 6. **Inputs and outputs** — Operands, including tile roles and immediate operands.
 
@@ -34,7 +34,7 @@ Each `pto.*` operation page should make the following easy to find. Section titl
 
 8. **Constraints and illegal cases** — What verifiers and backends reject; target-profile narrowing may be called out here or under a dedicated subsection.
 
-9. **Examples** — At least one concrete snippet or pseudocode where it clarifies use.
+9. **Examples** — Include at least one concrete snippet or pseudocode when it makes an abstract rule materially clearer.
 
 10. **Related links** — Instruction set overview, neighbors in the nav, and cross-links to the programming or memory model when ordering matters.
 

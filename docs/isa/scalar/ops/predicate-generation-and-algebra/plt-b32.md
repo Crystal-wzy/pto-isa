@@ -1,6 +1,6 @@
 # pto.plt_b32
 
-Standalone reference page for `pto.plt_b32`. This page belongs to the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set in the PTO ISA manual.
+`pto.plt_b32` is part of the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set.
 
 ## Summary
 

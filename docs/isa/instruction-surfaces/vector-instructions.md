@@ -162,7 +162,7 @@ PTO_INST void VLDS(VecData& dst, PtrType addr, MaskType pred);
 
 ## See Also
 
-- [Vector ISA reference](./vector/README.md) — Full vector instruction set reference
-- [Vector Instruction Set](./instruction-families/vector-families.md) — Instruction-set-level contracts
-- [Instruction set contracts](./instruction-families/README.md) — All instruction sets
+- [Vector ISA reference](../vector/README.md) — Full vector instruction set reference
+- [Vector Instruction Set](../instruction-families/vector-families.md) — Instruction-set-level contracts
+- [Instruction set contracts](../instruction-families/README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard

@@ -1,6 +1,6 @@
 # pto.tinsert_fp
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.tinsert_fp](./tile/ops/layout-and-rearrangement/tinsert-fp.md).
+Canonical tile-instruction reference: [pto.tinsert_fp](./tile/ops/layout-and-rearrangement/tinsert-fp.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

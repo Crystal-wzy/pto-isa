@@ -1,6 +1,6 @@
 # pto.set_cross_core
 
-Standalone reference page for `pto.set_cross_core`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.set_cross_core` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

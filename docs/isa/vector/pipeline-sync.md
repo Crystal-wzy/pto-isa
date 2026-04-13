@@ -1,6 +1,6 @@
 # Vector Instruction Set: Pipeline Sync
 
-This page documents the `pto.v*` synchronization instruction sets inside PTO ISA. The operation forms below describe the vector-pipe contract and the current A5-oriented target-profile details that backends must preserve when lowering legal PTO programs.
+The `pto.v*` synchronization instruction sets inside PTO ISA are defined below. The operation forms describe the vector-pipe contract and the current A5-oriented target-profile details that backends must preserve when lowering legal PTO programs.
 
 > **Category:** Synchronization primitives for coordinating pipeline execution
 > **Pipelines:** MTE2 (GM→UB), PIPE_V (Vector), MTE3 (UB→GM)

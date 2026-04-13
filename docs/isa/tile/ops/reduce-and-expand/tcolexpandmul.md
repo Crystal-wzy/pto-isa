@@ -1,6 +1,6 @@
 # pto.tcolexpandmul
 
-Standalone reference page for `pto.tcolexpandmul`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.tcolexpandmul` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

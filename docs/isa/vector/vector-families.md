@@ -1,6 +1,6 @@
 # Vector Instruction Set
 
-Vector-instruction set documentation explains how `pto.v*` groups behave. Each instruction set describes the shared mechanism, operand model, constraints, and target-profile narrowing before the reader drops into the standalone per-op pages under `vector/ops/`.
+Vector-instruction set documentation explains how `pto.v*` groups behave. Each instruction set describes the shared mechanism, operand model, constraints, and target-profile narrowing before the standalone per-op pages under `vector/ops/`.
 
 ## Overview
 

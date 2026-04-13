@@ -1,6 +1,6 @@
 # pto.mscatter
 
-Standalone reference page for `pto.mscatter`. This page belongs to the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set in the PTO ISA manual.
+`pto.mscatter` is part of the [Memory And Data Movement](../../memory-and-data-movement.md) instruction set.
 
 ## Summary
 

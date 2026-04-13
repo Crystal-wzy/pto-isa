@@ -1,6 +1,6 @@
 # pto.tgemv_bias
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.tgemv_bias](./tile/ops/matrix-and-matrix-vector/tgemv-bias.md).
+Canonical tile-instruction reference: [pto.tgemv_bias](./tile/ops/matrix-and-matrix-vector/tgemv-bias.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

@@ -1,6 +1,6 @@
 # pto.tget_scale_addr
 
-Standalone reference page for `pto.tget_scale_addr`. This page belongs to the [Sync And Config](../../sync-and-config.md) instruction set in the PTO ISA manual.
+`pto.tget_scale_addr` is part of the [Sync And Config](../../sync-and-config.md) instruction set.
 
 ## Summary
 

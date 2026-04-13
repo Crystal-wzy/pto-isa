@@ -10,13 +10,13 @@
 
 ## 数学语义
 
-No direct tensor arithmetic is produced by this instruction. It updates target mode state used by subsequent instructions.
+该指令本身不产生直接的张量算术结果，而是更新供后续指令使用的目标模式状态。
 
 ## 汇编语法
 
-PTO-AS 形式：参见 `docs/assembly/PTO-AS.md`.
+PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
 
-Schematic form:
+示意形式：
 
 ```text
 tsethf32mode {enable = true, mode = ...}
@@ -36,7 +36,7 @@ pto.tsethf32mode ins({enable = true, mode = ...}) outs()
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <bool isEnable, RoundMode hf32TransMode = RoundMode::CAST_ROUND, typename... WaitEvents>
@@ -45,9 +45,9 @@ PTO_INST RecordEvent TSETHF32MODE(WaitEvents &... events);
 
 ## 约束
 
-- Available only when the corresponding backend capability macro is enabled.
-- Exact mode values and hardware behavior are target-defined.
-- This instruction has control-state side effects and should be ordered appropriately relative to dependent compute instructions.
+- 仅在对应 backend capability macro 启用时可用。
+- 精确模式取值和硬件行为由目标实现定义。
+- 该指令具有控制状态副作用，应与依赖它的计算指令建立正确顺序。
 
 ## 示例
 

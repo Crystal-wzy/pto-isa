@@ -1,6 +1,6 @@
 # Data Format Reference
 
-This page describes the **physical data format** — how tiles, vectors, and scalars are represented in memory and in hardware registers. It covers memory spaces, element packing, address alignment, VLane architecture, and the relationship between the PTO logical view and the underlying storage.
+The **physical data format** defines how tiles, vectors, and scalars are represented in memory and in hardware registers. It covers memory spaces, element packing, address alignment, VLane architecture, and the relationship between the PTO logical view and the underlying storage.
 
 ## Memory Spaces
 

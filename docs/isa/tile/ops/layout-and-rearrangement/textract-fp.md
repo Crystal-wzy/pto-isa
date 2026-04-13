@@ -1,6 +1,6 @@
 # pto.textract_fp
 
-Standalone reference page for `pto.textract_fp`. This page belongs to the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.textract_fp` is part of the [Layout And Rearrangement](../../layout-and-rearrangement.md) instruction set.
 
 ## Summary
 

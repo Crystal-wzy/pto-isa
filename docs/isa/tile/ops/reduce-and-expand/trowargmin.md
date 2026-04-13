@@ -1,6 +1,6 @@
 # pto.trowargmin
 
-Standalone reference page for `pto.trowargmin`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.trowargmin` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

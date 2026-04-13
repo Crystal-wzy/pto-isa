@@ -1,6 +1,6 @@
 # GlobalTensor And Data Movement
 
-PTO does not hide movement between global memory and local execution state. `GlobalTensor` is the architecture-visible GM-facing object, and movement operations define when data enters or leaves the local payload instruction sets. This page describes the GM-facing types and the complete data paths to tile buffers and vector registers.
+PTO does not hide movement between global memory and local execution state. `GlobalTensor` is the architecture-visible GM-facing object, and movement operations define when data enters or leaves the local payload instruction sets. The GM-facing types and the complete data paths to tile buffers and vector registers are described below.
 
 ## GlobalTensor
 

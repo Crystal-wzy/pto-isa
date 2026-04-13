@@ -1,6 +1,6 @@
 # pto.set_loop_size_outtoub
 
-Standalone reference page for `pto.set_loop_size_outtoub`. This page belongs to the [DMA Copy](../../dma-copy.md) instruction set in the PTO ISA manual.
+`pto.set_loop_size_outtoub` is part of the [DMA Copy](../../dma-copy.md) instruction set.
 
 ## Summary
 

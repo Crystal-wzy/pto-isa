@@ -1,6 +1,6 @@
 # pto.pstu
 
-Standalone reference page for `pto.pstu`. This page belongs to the [Predicate Load Store](../../predicate-load-store.md) instruction set in the PTO ISA manual.
+`pto.pstu` is part of the [Predicate Load Store](../../predicate-load-store.md) instruction set.
 
 ## Summary
 

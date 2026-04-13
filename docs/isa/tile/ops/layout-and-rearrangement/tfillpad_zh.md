@@ -2,38 +2,45 @@
 
 ## 指令示意图
 
-![TFILLPAD tile operation](../figures/isa/TFILLPAD.svg)
+![TFILLPAD tile operation](../../../../figures/isa/TFILLPAD.svg)
 
 ## 简介
 
-复制 Tile 并在有效区域外使用编译时填充值进行填充。
+`TFILLPAD` 复制源 Tile，并把源 valid region 之外的部分用一个**编译期确定的 pad 值**补满。它最常见的用途，是把“运行时有效矩形”扩成“可安全继续参与后续计算的完整静态 Tile”。
 
-Copy a source tile into a destination tile and fill the remaining (padded) elements with a compile-time pad value
-selected by `TileDataDst::PadVal` (e.g., `PadValue::Min`/`PadValue::Max`).
-
-This is commonly used to materialize deterministic values outside the runtime valid region so that subsequent ops can
-operate on a full static tile shape.
+如果后续操作不想显式处理边界，就需要有人把边界外的位置先变成确定值。`TFILLPAD` 做的正是这件事。
 
 ## 数学语义
 
-Let `VR = src.GetValidRow()` and `VC = src.GetValidCol()`. 对每个 destination element `(i, j)`:
+设：
+
+- `VR = src.GetValidRow()`
+- `VC = src.GetValidCol()`
+
+对 `dst` 的每个元素 `(i, j)`：
 
 $$
 \mathrm{dst}_{i,j} =
 \begin{cases}
-\mathrm{src}_{i,j} & \text{if } i < VR \text{ and } j < VC \\
-\mathrm{pad}       & \text{otherwise}
+\mathrm{src}_{i,j} & \text{当 } i < VR \text{ 且 } j < VC \\
+\mathrm{pad} & \text{否则}
 \end{cases}
 $$
 
-`pad` is determined by `TileDataDst::PadVal` and the element type (e.g., `+inf/-inf` for floating types when available,
-otherwise `std::numeric_limits<T>::max()/min()`).
+其中 `pad` 来自 `TileDataDst::PadVal`。常见取值有：
+
+- `PadValue::Zero`
+- `PadValue::Min`
+- `PadValue::Max`
+- 通过 `PadValueCustom(...)` 指定的自定义常量
+
+对浮点类型，`Min/Max` 往往会映射到 `-inf/+inf` 一类“适合做极值归约”的值；对整数类型则映射到对应类型的最小值 / 最大值。
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
-Synchronous form (conceptual):
+同步形式：
 
 ```text
 %dst = tfillpad %src : !pto.tile<...> -> !pto.tile<...>
@@ -53,7 +60,7 @@ pto.tfillpad ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 
 ## C++ 内建接口
 
-Implemented in the backend headers pulled in by `include/pto/common/pto_instr_impl.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileData, PadValue PadVal = PadValue::Zero, typename... WaitEvents>
@@ -63,34 +70,73 @@ template <typename DstTileData, typename SrcTileData, typename... WaitEvents>
 PTO_INST RecordEvent TFILLPAD(DstTileData &dst, SrcTileData &src, WaitEvents &... events);
 ```
 
+相关的同族接口还有：
+
+- `TFILLPAD_INPLACE(dst, src)`：原位填充
+- `TFILLPAD_EXPAND(dst, src)`：允许 `dst` 比 `src` 更大
+
 ## 约束
 
-- `TileDataDst::PadVal != PadValue::Null`.
-- `sizeof(TileDataDst::DType) == sizeof(TileDataSrc::DType)` and element size must be `1`, `2`, or `4` bytes.
-- `TFILLPAD`: `TileDataDst::Rows/Cols` must match `TileDataSrc::Rows/Cols`.
-- `TFILLPAD_EXPAND`: `TileDataDst::Rows >= TileDataSrc::Rows` and `TileDataDst::Cols >= TileDataSrc::Cols`.
-- `TFILLPAD(TileData &dst, TileData &src)`:`if TileData::TileType is Mat, layout only support (!TileData::isRowMajor && TileData::Slayout::RowMajor), and PadVal only support PadValue::Zero`
+### 通用约束
+
+- Vec Tile 版本要求 `TileDataDst::PadVal != PadValue::Null`。
+- `src` 和 `dst` 的元素大小必须一致，并且当前实现只接受 `1`、`2` 或 `4` 字节元素。
+- 如果 `dst.GetValidRow() == 0` 或 `dst.GetValidCol() == 0`，当前 backend 会直接返回，不执行填充。
+
+### 形状约束
+
+- `TFILLPAD(dst, src)`：`dst.Rows/Cols` 必须与 `src.Rows/Cols` 相同。
+- `TFILLPAD_INPLACE(dst, src)`：`dst.Rows/Cols` 也必须与 `src.Rows/Cols` 相同。
+- `TFILLPAD_EXPAND(dst, src)`：`dst.Rows >= src.Rows` 且 `dst.Cols >= src.Cols`。
+
+### Mat Tile 特化
+
+- 单类型重载 `TFILLPAD(TileData &dst, TileData &src)` 还支持一条 Mat Tile 特化路径。
+- 这条路径当前只支持：
+  - NZ 形态的 Mat Tile（非 row-major，`SLayout::RowMajor`）
+  - `TileData::PadVal` 为 `PadValue::Zero` 或 `PadValue::Null`
+- 这条 Mat 特化更像“把矩阵 Tile 的未覆盖区域置成可接受的默认值”，而不是通用的 Vec copy+pad。
 
 ## 示例
+
+### Vec Tile
 
 ```cpp
 #include <pto/pto-inst.hpp>
 
 using namespace pto;
 
-void example1() {
+void example_vec() {
   using SrcT = Tile<TileType::Vec, float, 16, 16>;
-  using DstT = Tile<TileType::Vec, float, 16, 16, BLayout::RowMajor, 16, 16, SLayout::NoneBox, TileConfig::fractalABSize, PadValue::Min>;
+  using DstT = Tile<TileType::Vec, float, 16, 16,
+                    BLayout::RowMajor, 16, 16, SLayout::NoneBox,
+                    TileConfig::fractalABSize, PadValue::Min>;
 
   SrcT src;
   DstT dst;
   TFILLPAD(dst, src);
 }
+```
 
-void example2() {
-  using TileMatData = Tile<TileType::Mat, float, 16, 256, BLayout::ColMajor, 1, 224, SLayout::RowMajor, 512>;
+### Mat Tile
+
+```cpp
+#include <pto/pto-inst.hpp>
+
+using namespace pto;
+
+void example_mat() {
+  using TileMatData = Tile<TileType::Mat, float, 16, 256,
+                           BLayout::ColMajor, 1, 224,
+                           SLayout::RowMajor, 512>;
 
   TileMatData matTile;
   TFILLPAD(matTile, matTile);
 }
 ```
+
+## 相关页面
+
+- [布局与重排指令集](../../layout-and-rearrangement_zh.md)
+- [布局参考](../../../state-and-types/layout_zh.md)
+- [Tiles 与有效区域](../../../programming-model/tiles-and-valid-regions_zh.md)

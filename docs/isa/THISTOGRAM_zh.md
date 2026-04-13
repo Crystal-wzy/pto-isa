@@ -10,11 +10,11 @@
 
 ## 数学语义
 
-语义随指令而变化。 Unless stated otherwise, behavior is defined over the destination valid region.
+语义随指令而变化。 除非另有说明，行为都按目标 valid region 定义。
 
 ## 汇编语法
 
-PTO-AS 形式：参见 `docs/assembly/PTO-AS.md`.
+PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
 
 ### AS Level 1（SSA）
 
@@ -34,8 +34,8 @@ pto.thistogram ins(...) outs(%dst : !pto.tile_buf<...>)
 
 ## 约束
 
-Refer to backend-specific legality checks for data type/layout/location/shape constraints.
+数据类型、layout、location 和 shape 的进一步限制以对应 backend 的合法性检查为准。
 
 ## 示例
 
-See related instruction pages in `docs/isa/` for concrete Auto/Manual usage patterns.
+具体的 Auto / Manual 使用方式见 `docs/isa/` 下的相关指令页。

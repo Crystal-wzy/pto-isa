@@ -1,6 +1,6 @@
 # Vector Instruction Set: DMA Copy
 
-This page documents the vector DMA instructions inside PTO ISA. These operations stage data between GM and vector-visible UB state and are part of the architecture-visible setup required before `pto.v*` compute can execute.
+The vector DMA instructions inside PTO ISA stage data between GM and vector-visible UB state and form part of the architecture-visible setup required before `pto.v*` compute can execute.
 
 > **Category:** DMA transfer configuration and execution
 > **Pipelines:** MTE2 (GM→UB), MTE3 (UB→GM)

@@ -1,6 +1,6 @@
 # Vector Instruction Set: Compare And Select
 
-This page documents `pto.v*` compare and select instruction sets. Predicate production and selection behavior are specified here because later vector and control operations depend on those exact mask semantics.
+`pto.v*` compare and select instruction sets are defined here. Predicate production and selection behavior are specified explicitly because later vector and control operations depend on those exact mask semantics.
 
 > **Category:** Comparison and conditional selection operations
 > **Pipeline:** PIPE_V (Vector Core)
@@ -135,7 +135,7 @@ for (int i = 0; i < N; i++)
 - **semantics:** Variant select form with the same current two-vector operand shape.
 - **inputs:** `%src0` and `%src1` are the source vectors.
 - **outputs:** `%result` is the selected vector.
-- **constraints and limitations:** This page records the instruction set shape only.
+- **constraints and limitations:** Only the instruction-set shape is recorded here.
   Lowering MUST preserve the exact A5 variant semantics selected for this form.
 
 ---

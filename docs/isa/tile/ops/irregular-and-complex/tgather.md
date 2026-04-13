@@ -1,6 +1,6 @@
 # pto.tgather
 
-Standalone reference page for `pto.tgather`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tgather` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

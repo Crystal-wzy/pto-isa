@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TGEMV_ACC tile operation](../figures/isa/TGEMV_ACC.svg)
+![TGEMV_ACC tile operation](../../../../figures/isa/TGEMV_ACC.svg)
 
 ## 简介
 
@@ -41,7 +41,7 @@ $$ \mathrm{C}_{0,j} \gets \mathrm{C}_{0,j} + \sum_{k=0}^{K-1} \mathrm{A}_{0,k} \
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 

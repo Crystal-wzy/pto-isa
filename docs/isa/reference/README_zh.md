@@ -4,11 +4,11 @@
 
 ## 本章内容
 
-- [指令描述格式](reference/format-of-instruction-descriptions.md) — per-op 页面的标准格式规范
-- [术语表](reference/glossary.md) — PTO ISA 中的关键术语定义
-- [诊断与非法情况](reference/diagnostics-and-illegal-cases.md) — 操作失败和非法情况的处理
-- [可移植性与目标 Profile](reference/portability-and-target-profiles.md) — PTO 在不同目标 Profile 之间的可移植性
-- [规范来源](reference/source-of-truth.md) — PTO ISA 规范的权威来源与优先级
+- [指令描述格式](format-of-instruction-descriptions_zh.md) — per-op 页面的标准格式规范
+- [术语表](glossary_zh.md) — PTO ISA 中的关键术语定义
+- [诊断与非法情况](diagnostics-and-illegal-cases_zh.md) — 操作失败和非法情况的处理
+- [可移植性与目标 Profile](portability-and-target-profiles_zh.md) — PTO 在不同目标 Profile 之间的可移植性
+- [规范来源](source-of-truth_zh.md) — PTO ISA 规范的权威来源与优先级
 
 ## 章节定位
 

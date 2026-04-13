@@ -1,6 +1,6 @@
 # pto.set_loop_size_ubtoout
 
-Standalone reference page for `pto.set_loop_size_ubtoout`. This page belongs to the [DMA Copy](../../dma-copy.md) instruction set in the PTO ISA manual.
+`pto.set_loop_size_ubtoout` is part of the [DMA Copy](../../dma-copy.md) instruction set.
 
 ## Summary
 

@@ -2,21 +2,27 @@
 
 ## 指令示意图
 
-![TASSIGN tile operation](../figures/isa/TASSIGN.svg)
+![TASSIGN tile operation](../../../../figures/isa/TASSIGN.svg)
 
 ## 简介
 
-将 Tile 对象绑定到实现定义的片上地址（手动放置）。
+`TASSIGN` 把一个 Tile 或 `GlobalTensor` 对象绑定到具体存储地址。它不做算术，也不搬运数据；它做的是“把抽象对象落到某个物理或模拟地址上”。
 
-## 数学语义
+这条指令主要服务于手动放置和手动调度场景。很多自动流程也会在 lowering 过程中显式插入它，用来把 SSA 层的 tile 名称映射到真实缓冲。
 
-Not applicable.
+## 机制
+
+对 Tile 来说，`TASSIGN` 的作用是把内部数据指针指向某个片上地址；对 `GlobalTensor` 来说，则是把对象绑定到一段外部指针地址。
+
+它本身没有独立的数学语义。真正重要的是：
+
+- 绑定的是哪类对象
+- 地址是在运行时给出，还是在编译期给出
+- 当前目标是否允许这种地址落点
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
-
-`TASSIGN` is typically introduced by bufferization/lowering when mapping SSA tiles to physical storage.
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 
@@ -38,72 +44,50 @@ pto.tassign ins(%tile, %addr : !pto.tile_buf<...>, dtype)
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`.
+声明于 `include/pto/common/pto_instr.hpp`。
 
-### Form 1: Runtime address
+### 运行时地址形式
 
 ```cpp
 template <typename T, typename AddrType>
 PTO_INST void TASSIGN(T& obj, AddrType addr);
 ```
 
-Binds `obj` to the on-chip address `addr`. No compile-time bounds checking is
-performed (the address value is not available at compile time).
-
-### Form 2: Compile-time address (with static bounds check)
+### 编译期地址形式
 
 ```cpp
 template <std::size_t Addr, typename T>
-PTO_INST void TASSIGN(T& obj);
+PTO_INST std::enable_if_t<is_tile_data_v<T> || is_conv_tile_v<T>> TASSIGN(T& obj);
 ```
 
-Binds `obj` to the on-chip address `Addr`. Because `Addr` is a non-type
-template parameter, the compiler performs the following **compile-time** checks
-via `static_assert`:
-
-| Check | Condition | Assertion ID | Error message |
-|-------|-----------|--------------|---------------|
-| Memory space exists | `capacity > 0` | SA-0351 | Memory space is not available on this architecture. |
-| Tile fits in memory | `tile_size <= capacity` | SA-0352 | Tile storage size exceeds memory space capacity. |
-| Address in bounds | `Addr + tile_size <= capacity` | SA-0353 | addr + tile_size exceeds memory space capacity (out of bounds). |
-| Address aligned | `Addr % alignment == 0` | SA-0354 | addr is not properly aligned for the target memory space. |
-
-See `docs/coding/debug.md` (fix recipe `FIX-A12`) for suggested remedies.
-
-The memory space, capacity, and alignment are determined automatically from the
-Tile's `TileType` (i.e. `Loc` template parameter):
-
-| TileType | Memory | Capacity (A2A3) | Capacity (A5) | Capacity (Kirin9030) | Capacity (KirinX90) | Alignment |
-|----------|--------|-----------------|---------------|----------------------|---------------------|-----------|
-| Vec | UB | 192 KB | 256 KB | 128 KB | 128 KB | 32 B |
-| Mat | L1 | 512 KB | 512 KB | 512 KB | 1024 KB | 32 B |
-| Left | L0A | 64 KB | 64 KB | 32 KB | 64 KB | 32 B |
-| Right | L0B | 64 KB | 64 KB | 32 KB | 64 KB | 32 B |
-| Acc | L0C | 128 KB | 256 KB | 64 KB | 128 KB | 32 B |
-| Bias | Bias | 1 KB | 4 KB | 1 KB | 1 KB | 32 B |
-| Scaling | FBuffer | 2 KB | 4 KB | 7 KB | 6 KB | 32 B |
-| ScaleLeft | L0A | N/A | 4 KB | N/A | N/A | 32 B |
-| ScaleRight | L0B | N/A | 4 KB | N/A | N/A | 32 B |
-
-Capacities can be overridden at build time via `-D` flags (e.g.
-`-DPTO_UBUF_SIZE_BYTES=262144`). See `include/pto/common/buffer_limits.hpp`.
-
-**Note:** This overload is only available for `Tile` and `ConvTile` types. For
-`GlobalTensor`, use `TASSIGN(obj, pointer)` (Form 1).
+第二种写法会在编译期执行静态边界与对齐检查，因此更适合固定地址的手动布局。
 
 ## 约束
 
-- **实现检查**:
-    - If `obj` is a Tile:
-    - In manual mode (when `__PTO_AUTO__` is not defined), `addr` must be an integral type and is reinterpreted as the tile's storage address.
-    - In auto mode (when `__PTO_AUTO__` is defined), `TASSIGN(tile, addr)` is a no-op.
-    - If `obj` is a `GlobalTensor`:
-    - `addr` must be a pointer type.
-    - The pointed-to element type must match `GlobalTensor::DType`.
+### Tile / ConvTile
+
+- 运行时地址形式要求 `addr` 是整型地址。
+- 在 NPU manual 模式下，这个地址会被直接解释成 tile 存储地址。
+- 在 `__PTO_AUTO__` 打开的自动模式下，NPU backend 中的 `TASSIGN(tile, addr)` 当前是 no-op。
+- CPU 模拟器不会直接把整型当裸地址使用，而是通过 `NPUMemoryModel` 把它解析到对应架构的模拟缓冲区。
+
+### GlobalTensor
+
+- `addr` 必须是指针类型。
+- 指针指向的元素类型必须和 `GlobalTensor::DType` 一致。
+
+### 编译期地址检查
+
+`TASSIGN<Addr>(tile)` 会根据 Tile 的 `Loc` 自动推导对应内存空间，并检查：
+
+- 该内存空间在当前架构上是否存在
+- Tile 是否能放得下
+- `Addr + tile_size` 是否越界
+- 地址是否满足对齐要求
 
 ## 示例
 
-### Runtime address (no compile-time check)
+### 运行时地址
 
 ```cpp
 #include <pto/pto-inst.hpp>
@@ -120,7 +104,7 @@ void example_runtime() {
 }
 ```
 
-### Compile-time address (with static bounds check)
+### 编译期地址
 
 ```cpp
 #include <pto/pto-inst.hpp>
@@ -131,50 +115,15 @@ void example_checked() {
   using TileT = Tile<TileType::Vec, float, 16, 16>;
   TileT a, b, c;
 
-  TASSIGN<0x0000>(a);   // OK: 0x0000 + 1024 <= 192KB
-  TASSIGN<0x0400>(b);   // OK: 0x0400 + 1024 <= 192KB
-  TASSIGN<0x0800>(c);   // OK: 0x0800 + 1024 <= 192KB
+  TASSIGN<0x0000>(a);
+  TASSIGN<0x0400>(b);
+  TASSIGN<0x0800>(c);
   TADD(c, a, b);
 }
 ```
 
-The following triggers a compile error:
+## 相关页面
 
-```cpp
-void example_oob() {
-  // Tile<Vec, float, 256, 256> occupies 256*256*4 = 256KB
-  using BigTile = Tile<TileType::Vec, float, 256, 256>;
-  BigTile t;
-
-  // static_assert fires: tile_size (256KB) > UB capacity (192KB on A2A3)
-  TASSIGN<0x0>(t);
-}
-```
-
-```cpp
-void example_oob_addr() {
-  using TileT = Tile<TileType::Vec, float, 128, 128>;  // 64KB
-  TileT t;
-
-  // static_assert fires: 0x20000 (128KB) + 64KB = 192KB,
-  //                       but 0x20001 + 64KB > 192KB
-  TASSIGN<0x20001>(t);
-}
-```
-
-### Ping-pong L0 buffer allocation
-
-```cpp
-void example_pingpong() {
-  using L0ATile = TileLeft<half, 64, 128>;   // L0A tile
-  using L0BTile = TileRight<half, 128, 64>;  // L0B tile
-
-  L0ATile a0, a1;
-  L0BTile b0, b1;
-
-  TASSIGN<0x0000>(a0);   // L0A ping
-  TASSIGN<0x8000>(a1);   // L0A pong
-  TASSIGN<0x0000>(b0);   // L0B ping  (separate physical memory from L0A)
-  TASSIGN<0x8000>(b1);   // L0B pong
-}
-```
+- [TSUBVIEW](./tsubview_zh.md)
+- [TALIAS](../../../TALIAS_zh.md)
+- [同步与配置指令集](../../sync-and-config_zh.md)

@@ -73,6 +73,6 @@ Instruction set pages use **MUST**, **SHOULD**, and **MAY** only for rules that 
 
 ## See Also
 
-- [Instruction overview](./instruction-surfaces/README.md) — High-level instruction-set descriptions
+- [Instruction overview](../instruction-surfaces/README.md) — High-level instruction-set descriptions
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page format standard
 - [Diagnostics and illegal cases](../reference/diagnostics-and-illegal-cases.md) — What makes a PTO program illegal

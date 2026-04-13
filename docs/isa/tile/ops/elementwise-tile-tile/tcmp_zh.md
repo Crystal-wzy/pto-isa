@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TCMP tile operation](../figures/isa/TCMP.svg)
+![TCMP tile operation](../../../../figures/isa/TCMP.svg)
 
 ## 简介
 
@@ -18,7 +18,7 @@ The predicate mask is stored in `dst` using an implementation-defined packed lay
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
 同步形式：
 

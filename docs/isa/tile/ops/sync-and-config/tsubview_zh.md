@@ -2,7 +2,7 @@
 
 ## Tile操作图例
 
-![TSUBVIEW tile operation](../figures/isa/TSUBVIEW.svg)
+![TSUBVIEW tile operation](../../../../figures/isa/TSUBVIEW.svg)
 
 ## 简介
 
@@ -19,13 +19,13 @@ $$ \mathrm{dst}_{i,j} = \mathrm{src}_{\mathrm{rowIdx} + i,\mathrm{colIdx} + j} $
 
 ## 汇编语法
 
-PTO-AS form: 详见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS form: 详见 [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
-### IR Level 1 (SSA)
+### IR Level 1（SSA）
 
 TODO
 
-### IR Level 2 (DPS)
+### IR Level 2（DPS）
 
 TODO
 

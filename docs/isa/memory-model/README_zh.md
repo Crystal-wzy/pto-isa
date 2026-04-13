@@ -4,15 +4,15 @@
 
 ## 本章内容
 
-- [一致性基线](memory-model/consistency-baseline.md) — GM / UB / Tile Buffer 三层内存空间、Program Order / Event Order / Barrier Order 三级 Ordering 分类表、未定义/未指明/实现定义行为的精确区分
-- [生产者-消费者排序](memory-model/producer-consumer-ordering.md) — 完整状态机图（IDLE → IN_PROGRESS → COMPLETE）、Tile Instructions 和 Vector Instructions 的 Ordering 链、跨表面传递规则
+- [一致性基线](consistency-baseline_zh.md) — GM / UB / Tile Buffer 三层内存空间、Program Order / Event Order / Barrier Order 三级 Ordering 分类表、未定义/未指明/实现定义行为的精确区分
+- [生产者-消费者排序](producer-consumer-ordering_zh.md) — 完整状态机图（IDLE → IN_PROGRESS → COMPLETE）、Tile Instructions 和 Vector Instructions 的 Ordering 链、跨指令集传递规则
 
 ## 阅读建议
 
 建议按以下顺序阅读：
 
-1. 先读 [一致性基线](memory-model/consistency-baseline.md)，理解 PTO 的三层内存空间和三 level Ordering
-2. 再读 [生产者-消费者排序](memory-model/producer-consumer-ordering.md)，理解 Tile Instructions（RecordEvent / TSYNC）和 Vector Instructions（set_flag / wait_flag）的具体排序机制
+1. 先读 [一致性基线](consistency-baseline_zh.md)，理解 PTO 的三层内存空间和三 level Ordering
+2. 再读 [生产者-消费者排序](producer-consumer-ordering_zh.md)，理解 Tile Instructions（RecordEvent / TSYNC）和 Vector Instructions（set_flag / wait_flag）的具体排序机制
 
 ## 章节定位
 

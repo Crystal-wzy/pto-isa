@@ -1,6 +1,6 @@
 # Vector Instruction Set: SFU And DSA Instructions
 
-This page documents special-function, fused, and domain-specific `pto.v*` instruction sets. These forms are narrower than generic arithmetic and must carry explicit target-profile restrictions.
+Special-function, fused, and domain-specific `pto.v*` instruction sets are defined here. These forms are narrower than generic arithmetic and therefore carry explicit target-profile restrictions.
 
 > **Category:** Domain-specific accelerator and special function unit operations
 > **Pipeline:** PIPE_V (Vector Core) / SFU
@@ -13,7 +13,7 @@ Fused operations, special functions, and UB-to-UB operations that leverage hardw
   roles are called out per instruction.
 - `%mask` is the predicate operand `Pg` when present.
 - `%result` is the destination SSA value.
-- This page mixes three different backend shapes: pure `vreg -> vreg` ops,
+- This instruction-set page mixes three different backend shapes: pure `vreg -> vreg` ops,
   conversion/fusion ops, and UB-to-UB helpers. Each instruction section calls
   out which storage model it uses.
 
@@ -237,7 +237,7 @@ for (int i = 0; i < N; i++)
 
 - **inputs:** `%index` is the scalar seed/base index.
 - **outputs:** `%result` is the generated index vector.
-- **constraints and limitations:** This page documents the arithmetic/indexing
+- **constraints and limitations:** The arithmetic/indexing
   use of the instruction set; the conversion page also records the same opcode for
   completeness.
 
@@ -294,7 +294,7 @@ for (int i = 0; i < N; i++)
   is the operation control word.
 - **outputs:** This op writes UB memory and returns no SSA value.
 - **constraints and limitations:** Inputs MUST already be sorted according to
-  the sort order encoded by `%config`. This page uses the shorter mnemonic
+  the sort order encoded by `%config`. The discussion below uses the shorter mnemonic
   `pto.vmrgsort`, while the current implementation summary still refers to
   `pto.vmrgsort4`.
 

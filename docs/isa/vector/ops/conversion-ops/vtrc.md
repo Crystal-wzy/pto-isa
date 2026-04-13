@@ -1,6 +1,6 @@
 # pto.vtrc
 
-Standalone reference page for `pto.vtrc`. This page belongs to the [Conversion Ops](../../conversion-ops.md) instruction set in the PTO ISA manual.
+`pto.vtrc` is part of the [Conversion Ops](../../conversion-ops.md) instruction set.
 
 ## Summary
 

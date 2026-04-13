@@ -1,6 +1,6 @@
 # pto.vcls
 
-Standalone reference page for `pto.vcls`. This page belongs to the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vcls` is part of the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # Vector Instruction Set: Vector Load/Store
 
-This page documents UB-to-vector-register data movement inside PTO ISA. The detailed forms below describe how `pto.v*` kernels move payloads between vector-visible UB storage and vector registers without crossing back into the tile instructions.
+UB-to-vector-register data movement inside PTO ISA is defined here. The detailed forms below describe how `pto.v*` kernels move payloads between vector-visible UB storage and vector registers without crossing back into the tile instructions.
 
 > **Category:** UB ↔ Vector Register data movement
 > **Pipeline:** PIPE_V (Vector Core)

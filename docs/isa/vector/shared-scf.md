@@ -1,6 +1,6 @@
 # Vector Instruction Set: Shared Structured Control Flow
 
-Vector code in PTO is surrounded by structured control, not by hidden launch magic. This page explains the control shell that wraps `pto.v*` execution without claiming that `scf` is itself a vector mnemonic instruction set.
+Vector code in PTO is surrounded by structured control, not by hidden launch magic. The control shell that wraps `pto.v*` execution is described here without treating `scf` as a vector mnemonic instruction set.
 
 ## Summary
 
@@ -15,7 +15,7 @@ Around vector regions, `scf` is used to:
 - branch around target-specific vector paths
 - model vector execution scopes using structured regions instead of opaque launch syntax
 
-The canonical scalar-side explanation lives in [Scalar And Control Instruction Set: Shared Structured Control Flow](../scalar/shared-scf.md). This vector page keeps the relationship visible for readers following the `pto.v*` path.
+The canonical scalar-side explanation lives in [Scalar And Control Instruction Set: Shared Structured Control Flow](../scalar/shared-scf.md). The vector-side reference keeps that relationship visible along the `pto.v*` path.
 
 ## Inputs
 

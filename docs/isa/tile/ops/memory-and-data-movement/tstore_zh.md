@@ -2,21 +2,23 @@
 
 ## 指令示意图
 
-![TSTORE tile operation](../figures/isa/TSTORE.svg)
+![TSTORE tile operation](../../../../figures/isa/TSTORE.svg)
 
 ## 简介
 
-将 Tile 中的数据存储到 GlobalTensor (GM)，可选使用原子写入或量化参数。
+`TSTORE` 把 Tile 中的数据写回 `GlobalTensor`（GM）。在普通写回之外，它还支持原子写入，以及当前实现中仅针对 `TileType::Acc` 暴露的量化写回重载。
 
 ## 数学语义
 
-Notation depends on the `GlobalTensor` shape/stride and the `Tile` layout. Conceptually (2D view, with a base offset):
+地址计算取决于 `GlobalTensor` 的 shape / stride 和 Tile 布局。用带基址偏移的二维视角表示时：
 
 $$ \mathrm{dst}_{r_0 + i,\; c_0 + j} = \mathrm{src}_{i,j} $$
 
+真正的写回范围由源 Tile 的 valid region 决定。
+
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 
@@ -38,7 +40,7 @@ pto.tstore ins(%src : !pto.tile_buf<...>) outs(%mem : !pto.partition_tensor_view
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp` and `include/pto/common/constants.hpp`:
+声明于 `include/pto/common/pto_instr.hpp` 和 `include/pto/common/constants.hpp`：
 
 ```cpp
 template <typename TileData, typename GlobalData, AtomicType atomicType = AtomicType::AtomicNone,
@@ -54,38 +56,53 @@ template <typename TileData, typename GlobalData, typename FpTileData, AtomicTyp
 PTO_INST RecordEvent TSTORE_FP(GlobalData &dst, TileData &src, FpTileData &fp, WaitEvents &... events);
 ```
 
-The `preQuantScalar` and `TSTORE_FP` quantized-store overloads are only legal for `TileType::Acc` on current A2/A3 and A5 backends. They do not provide a native vec-tile quantized store contract.
+`preQuantScalar` 和 `TSTORE_FP` 这两类量化写回重载，在当前 A2/A3 与 A5 backend 上只对 `TileType::Acc` 合法；它们不是通用 vec-tile 量化写回接口。
 
 ## 约束
 
-- **实现检查 (A2A3)**:
-  - Source tile location must be one of: `TileType::Vec`, `TileType::Mat`, `TileType::Acc`.
-  - Runtime: all `dst.GetShape(dim)` values and `src.GetValidRow()/GetValidCol()` must be `> 0`.
-  - For `TileType::Vec` / `TileType::Mat`:
-    - `TileData::DType` must be one of: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `half`, `bfloat16_t`, `float`.
-    - `sizeof(TileData::DType) == sizeof(GlobalData::DType)`.
-    - Layouts must match ND/DN/NZ (or a special case where `TileData::Rows == 1` or `TileData::Cols == 1`).
-    - For `int64_t/uint64_t`, only ND->ND or DN->DN are supported.
-    - A2/A3 does not expose a native vec quantized-store path. Frontends that need `vec -> GM` dtype conversion or quantization MUST first materialize the converted vec tile (for example via `TCVT`) and then issue a same-dtype `TSTORE`.
-  - For `TileType::Acc` (including quantized/atomic variants):
-    - Destination layout must be ND or NZ.
-    - Source dtype must be `int32_t` or `float`.
-    - When not using quantization, destination dtype must be `__gm__ int32_t/float/half/bfloat16_t`.
-    - Static shape constraints: `1 <= TileData::Cols <= 4095`; if ND then `1 <= TileData::Rows <= 8192`; if NZ then `1 <= TileData::Rows <= 65535` and `TileData::Cols % 16 == 0`.
-    - Runtime: `1 <= src.GetValidCol() <= 4095`.
-- **实现检查 (A5)**:
-  - Source tile location must be `TileType::Vec` or `TileType::Acc` (no `Mat` store on this target).
-  - For `TileType::Vec`:
-    - `sizeof(TileData::DType) == sizeof(GlobalData::DType)`.
-    - `TileData::DType` must be one of: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `half`, `bfloat16_t`, `float`, `float8_e4m3_t`, `float8_e5m2_t`, `hifloat8_t`, `float4_e1m2x2_t`, `float4_e2m1x2_t`.
-    - Layouts must match ND/DN/NZ (or a special case where `TileData::Rows == 1` or `TileData::Cols == 1`).
-    - Additional alignment constraints are enforced (e.g., for ND the row-major width in bytes must be a multiple of 32; for DN the column-major height in bytes must be a multiple of 32, with special-case exceptions).
-  - For `TileType::Acc`:
-    - Destination layout must be ND or NZ; source dtype must be `int32_t` or `float`.
-    - When not using quantization, destination dtype must be `__gm__ int32_t/float/half/bfloat16_t`.
-    - Static shape constraints match A2A3 for rows/cols; `AtomicAdd` additionally restricts destination dtype to supported atomic types.
-- **有效区域**:
-  - The implementation uses `src.GetValidRow()` / `src.GetValidCol()` as the transfer size.
+### 通用约束
+
+- 写回大小由 `src.GetValidRow()` / `src.GetValidCol()` 决定。
+- 目标 `GlobalTensor` 的 shape 必须足以容纳这次写回。
+
+### A2/A3 实现检查
+
+- 源 Tile 的位置类型必须是 `TileType::Vec`、`TileType::Mat` 或 `TileType::Acc`。
+- 运行时要求：所有 `dst.GetShape(dim)` 以及 `src.GetValidRow()/GetValidCol()` 都必须大于 `0`。
+- 对 `TileType::Vec` / `TileType::Mat`：
+  - `TileData::DType` 必须属于：
+    `int8_t`、`uint8_t`、`int16_t`、`uint16_t`、`int32_t`、`uint32_t`、`int64_t`、`uint64_t`、`half`、`bfloat16_t`、`float`
+  - `sizeof(TileData::DType)` 必须等于 `sizeof(GlobalData::DType)`
+  - 布局必须匹配 ND / DN / NZ，或满足单行 / 单列特殊情形
+  - 对 `int64_t/uint64_t`，仅支持 `ND -> ND` 与 `DN -> DN`
+  - A2/A3 不提供原生的 vec 量化写回路径；若要做 `vec -> GM` 的类型转换或量化，应先显式生成转换后的 vec Tile，再执行同 dtype 的 `TSTORE`
+- 对 `TileType::Acc`：
+  - 目标布局必须为 ND 或 NZ
+  - 源 dtype 必须为 `int32_t` 或 `float`
+  - 不量化时，目标 dtype 必须为 `__gm__ int32_t/float/half/bfloat16_t`
+  - 静态 shape 约束：
+    `1 <= TileData::Cols <= 4095`
+    若为 ND，`1 <= TileData::Rows <= 8192`
+    若为 NZ，`1 <= TileData::Rows <= 65535` 且 `TileData::Cols % 16 == 0`
+  - 运行时要求：`1 <= src.GetValidCol() <= 4095`
+
+### A5 实现检查
+
+- 源 Tile 的位置类型必须为 `TileType::Vec` 或 `TileType::Acc`（A5 不支持 `Mat` store）。
+- 对 `TileType::Vec`：
+  - `sizeof(TileData::DType)` 必须等于 `sizeof(GlobalData::DType)`
+  - `TileData::DType` 必须属于：
+    `int8_t`、`uint8_t`、`int16_t`、`uint16_t`、`int32_t`、`uint32_t`、`int64_t`、`uint64_t`、
+    `half`、`bfloat16_t`、`float`、`float8_e4m3_t`、`float8_e5m2_t`、`hifloat8_t`、
+    `float4_e1m2x2_t`、`float4_e2m1x2_t`
+  - 布局必须匹配 ND / DN / NZ，或满足单行 / 单列特殊情形
+  - 还存在额外的对齐要求，例如 ND 时 row-major 宽度字节数应为 32 的倍数；DN 时 column-major 高度字节数应为 32 的倍数
+- 对 `TileType::Acc`：
+  - 目标布局必须为 ND 或 NZ
+  - 源 dtype 必须为 `int32_t` 或 `float`
+  - 不量化时，目标 dtype 必须为 `__gm__ int32_t/float/half/bfloat16_t`
+  - 静态 shape 约束与 A2/A3 一致
+  - `AtomicAdd` 还会进一步限制目标 dtype 必须属于支持的原子类型
 
 ## 示例
 
@@ -129,3 +146,9 @@ void example_manual(__gm__ T* out) {
   TSTORE<TileT, GTensor, AtomicType::AtomicAdd>(gout, t);
 }
 ```
+
+## 相关页面
+
+- [内存与数据搬运指令集](../../memory-and-data-movement_zh.md)
+- [一致性基线](../../../memory-model/consistency-baseline_zh.md)
+- [布局参考](../../../state-and-types/layout_zh.md)

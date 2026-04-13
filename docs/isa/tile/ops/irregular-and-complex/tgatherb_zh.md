@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TGATHERB tile operation](../figures/isa/TGATHERB.svg)
+![TGATHERB tile operation](../../../../figures/isa/TGATHERB.svg)
 
 ## 简介
 
@@ -18,7 +18,7 @@ Exact bounds behavior is implementation-defined.
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS Specification](../../../../assembly/PTO-AS_zh.md).
 
 同步形式：
 
@@ -40,7 +40,7 @@ pto.tgatherb ins(%src, %offsets : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileDataDst, typename TileDataSrc, typename TileDataOffset, typename... WaitEvents>

@@ -1,6 +1,6 @@
 # pto.vperm
 
-Standalone reference page for `pto.vperm`. This page belongs to the [Data Rearrangement](../../data-rearrangement.md) instruction set in the PTO ISA manual.
+`pto.vperm` is part of the [Data Rearrangement](../../data-rearrangement.md) instruction set.
 
 ## Summary
 

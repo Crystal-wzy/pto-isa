@@ -1,6 +1,6 @@
 # pto.vbr
 
-Standalone reference page for `pto.vbr`. This page belongs to the [Predicate And Materialization](../../predicate-and-materialization.md) instruction set in the PTO ISA manual.
+`pto.vbr` is part of the [Predicate And Materialization](../../predicate-and-materialization.md) instruction set.
 
 ## Summary
 

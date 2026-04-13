@@ -1,6 +1,6 @@
 # pto.tcolmin
 
-Standalone reference page for `pto.tcolmin`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.tcolmin` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

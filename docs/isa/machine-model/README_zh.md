@@ -4,15 +4,15 @@
 
 ## 本章内容
 
-- [执行代理](machine-model/execution-agents.md) — Host-Device-Core 三层执行架构、各 Profile 差异表、执行单元规格
-- [排序与同步](machine-model/ordering-and-synchronization.md) — Tile/Vector/DMA/Communication 四类同步原语、事件模型、流水线依赖图
+- [执行代理](execution-agents_zh.md) — Host-Device-Core 三层执行架构、各 Profile 差异表、执行单元规格
+- [排序与同步](ordering-and-synchronization_zh.md) — Tile/Vector/DMA/Communication 四类同步原语、事件模型、流水线依赖图
 
 ## 阅读建议
 
 建议按以下顺序阅读：
 
-1. 先读 [执行代理](machine-model/execution-agents.md)，理解 PTO 的三层执行层次（Host / Device / Core）和 Target Profile 差异
-2. 再读 [排序与同步](machine-model/ordering-and-synchronization.md)，理解同步原语、事件链和 Producer-Consumer 依赖图
+1. 先读 [执行代理](execution-agents_zh.md)，理解 PTO 的三层执行层次（Host / Device / Core）和 Target Profile 差异
+2. 再读 [排序与同步](ordering-and-synchronization_zh.md)，理解同步原语、事件链和 Producer-Consumer 依赖图
 
 ## 章节定位
 

@@ -1,6 +1,6 @@
 # pto.pset_b8
 
-Standalone reference page for `pto.pset_b8`. This page belongs to the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set in the PTO ISA manual.
+`pto.pset_b8` is part of the [Predicate Generation And Algebra](../../predicate-generation-and-algebra.md) instruction set.
 
 ## Summary
 

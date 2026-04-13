@@ -1,6 +1,6 @@
 # pto.trowmax
 
-Standalone reference page for `pto.trowmax`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.trowmax` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # Layout Reference
 
-This page is the canonical reference for **BLayout**, **SLayout**, **Fractal Layout**, **GlobalTensor Layout**, and **Compact Mode** in PTO. For the programming model context and valid-region semantics, see [Tiles and Valid Regions](../programming-model/tiles-and-valid-regions.md).
+**BLayout**, **SLayout**, **Fractal Layout**, **GlobalTensor Layout**, and **Compact Mode** are the canonical PTO layout references. For programming-model context and valid-region semantics, see [Tiles and Valid Regions](../programming-model/tiles-and-valid-regions.md).
 
 ## Two Layout Dimensions
 

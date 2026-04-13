@@ -1,6 +1,6 @@
 # pto.tgatherb
 
-Standalone reference page for `pto.tgatherb`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tgatherb` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

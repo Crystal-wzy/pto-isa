@@ -1,6 +1,6 @@
 # pto.vlrelu
 
-Standalone reference page for `pto.vlrelu`. This page belongs to the [Vector-Scalar Instructions](../../vec-scalar-ops.md) instruction set in the PTO ISA manual.
+`pto.vlrelu` is part of the [Vector-Scalar Instructions](../../vec-scalar-ops.md) instruction set.
 
 ## Summary
 

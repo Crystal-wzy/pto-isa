@@ -10,13 +10,13 @@
 
 ## 数学语义
 
-Let `R = src.GetValidRow()` and `C = src.GetValidCol()`. For `0 <= j < C`:
+设 `R = src.GetValidRow()` 且 `C = src.GetValidCol()`。对 `0 <= j < C`：
 
 $$ \mathrm{dst}_{0,j} = \underset{0 \le i < R}{\operatorname{argmax}} \; \mathrm{src}_{i,j} $$
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
 
 同步形式：
 
@@ -24,7 +24,7 @@ PTO-AS 形式：参见 [PTO-AS 规范](../../assembly/PTO-AS_zh.md)。
 %dst = tcolargmax %src : !pto.tile<...> -> !pto.tile<...>
 ```
 
-Lowering may introduce internal scratch tiles; the C++ intrinsic requires an explicit `tmp` operand.
+lowering 过程中可能引入内部 scratch tile；C++ intrinsic 接口要求显式传入 `tmp` 操作数。
 
 ### IR Level 1（SSA）
 
@@ -40,7 +40,7 @@ pto.tcolargmax ins(%src, %tmp : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%ds
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileDataOut, typename TileDataIn, typename TileDataTmp, typename... WaitEvents>

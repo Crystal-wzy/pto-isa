@@ -1,6 +1,6 @@
 # Vector Instruction Set: Binary Vector Instructions
 
-This page documents two-input `pto.v*` compute instruction sets. The detailed per-op sections below are imported into the PTO ISA manual because vector micro-instruction legality and operand discipline are part of the PTO architecture contract, not external notes.
+Two-input `pto.v*` compute instruction sets are defined here. The detailed per-op sections below are part of the PTO ISA manual because vector micro-instruction legality and operand discipline belong to the PTO architecture contract rather than to external notes.
 
 > **Category:** Two-input vector operations
 > **Pipeline:** PIPE_V (Vector Core)

@@ -1,6 +1,6 @@
 # pto.tcolexpanddiv
 
-Standalone reference page for `pto.tcolexpanddiv`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.tcolexpanddiv` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

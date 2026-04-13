@@ -2,21 +2,30 @@
 
 ## 指令示意图
 
-![TSTORE_FP tile operation](../figures/isa/TSTORE_FP.svg)
+![TSTORE_FP tile operation](../../../../figures/isa/TSTORE_FP.svg)
 
 ## 简介
 
-使用缩放 (`fp`) Tile 作为向量量化参数，将累加器 Tile 存储到全局内存。
+`TSTORE_FP` 是带向量量化参数的累加器写回指令。它把 `Acc` Tile 写回 `GlobalTensor`，同时使用额外的 `fp` Tile 提供向量量化或反量化所需的参数。
+
+如果普通 `TSTORE` 足够表达你的写回，就不需要这条指令；只有当写回过程本身依赖一组外部缩放参数时，才使用 `TSTORE_FP`。
 
 ## 数学语义
 
-Let `R = src.GetValidRow()` and `C = src.GetValidCol()`. Conceptually (2D view, with a base offset), for `0 <= i < R` and `0 <= j < C`:
+设：
+
+- `R = src.GetValidRow()`
+- `C = src.GetValidCol()`
+
+从二维视角写回时，可概念化为：
 
 $$ \mathrm{dst}_{r_0 + i,\; c_0 + j} = \mathrm{Convert}\!\left(\mathrm{src}_{i,j};\ \mathrm{fp}\right) $$
 
+其中 `Convert` 表示“结合 `fp` 参数完成的向量量化 / 反量化写回”。地址计算规则与普通 `TSTORE` 一致，仍由 `GlobalTensor` 的 shape / stride 决定。
+
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS Specification](../assembly/PTO-AS.md).
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 
@@ -38,7 +47,7 @@ pto.tstore.fp ins(%src, %fp : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%mem 
 
 ## C++ 内建接口
 
-声明于 `include/pto/common/pto_instr.hpp` and `include/pto/common/constants.hpp`:
+声明于 `include/pto/common/pto_instr.hpp`：
 
 ```cpp
 template <typename TileData, typename GlobalData, typename FpTileData, AtomicType atomicType = AtomicType::AtomicNone,
@@ -48,16 +57,44 @@ PTO_INST RecordEvent TSTORE_FP(GlobalData &dst, TileData &src, FpTileData &fp, W
 
 ## 约束
 
-- **实现检查 (A2A3)**:
-    - The fp store path is implemented via `TSTORE_IMPL(dst, src, fp)` and uses the same accumulator-to-GM legality checks as quantized accumulator stores:
-    - Destination layout must be ND or NZ.
-    - Source dtype must be `int32_t` or `float`.
-    - Static shape constraints: `1 <= TileData::Cols <= 4095`; if ND then `1 <= TileData::Rows <= 8192`; if NZ then `1 <= TileData::Rows <= 65535` and `TileData::Cols % 16 == 0`.
-    - Runtime: `1 <= src.GetValidCol() <= 4095`.
-    - No explicit `static_assert` is enforced on `FpTileData` (the implementation uses `fp` to set FPC state).
-- **实现检查 (A5)**:
-    - Implemented via `TSTORE_IMPL(dst, src, fp)` and validated by `CheckStaticAcc<..., true>()` for the accumulator path (ND/NZ only, `int32_t/float` source dtype, rows/cols ranges).
-    - No explicit `static_assert` is enforced on `FpTileData` (the implementation uses `fp` to set FPC state).
+### 通用约束
+
+- `src` 必须是 `Acc` Tile。
+- `TSTORE_FP` 复用累加器到 GM 的量化写回检查，因此目标布局、行列范围和 dtype 合法域都沿用对应 backend 的 quantized `Acc -> GM` 路径。
+- 当前实现不会对 `FpTileData::Loc` 做直接 `static_assert`，但可移植代码应将 `fp` 建成 `TileType::Scaling`。
+
+### A2/A3 实现检查
+
+- 目标 `GlobalTensor` 布局必须是 `ND`、`NZ` 或 `NC1HWC0`。
+- 源累加器类型必须是 `float` 或 `int32_t`。
+- 静态范围：
+  - `1 <= TileData::Cols <= 4095`
+  - 若目标为 `ND`，则 `1 <= TileData::Rows <= 8192`
+  - 若目标为 `NZ` 或 `NC1HWC0`，则 `1 <= TileData::Rows <= 65535` 且 `TileData::Cols % 16 == 0`
+- 运行时要求：
+  - `1 <= src.GetValidCol() <= 4095`
+  - 目标 shape 各维与源 valid region 都必须大于 `0`
+- 量化支持集为：
+  - `float Acc -> __gm__ int8_t / __gm__ uint8_t`
+  - `int32_t Acc -> __gm__ int8_t / __gm__ uint8_t / __gm__ half`
+
+### A5 实现检查
+
+- 目标 `GlobalTensor` 布局必须是 `ND`、`NZ`、`NHWC`、`NCHW` 或 `NCDHW`。
+- 源累加器类型必须是 `float` 或 `int32_t`。
+- 静态范围：
+  - `1 <= TileData::Cols <= 4095`
+  - 若目标为 `ND`，则 `1 <= TileData::Rows <= 8192`
+  - 若目标为 `NZ/NHWC/NCHW/NCDHW`，则 `1 <= TileData::Rows <= 65535` 且 `TileData::Cols % 16 == 0`
+- 量化支持集为：
+  - `float Acc -> __gm__ int8_t / __gm__ uint8_t / __gm__ bfloat16_t / __gm__ half / __gm__ hifloat8_t / __gm__ float8_e4m3_t / __gm__ float`
+  - `int32_t Acc -> __gm__ int8_t / __gm__ uint8_t / __gm__ bfloat16_t / __gm__ half`
+- 若启用 `AtomicAdd`，目标 dtype 还必须属于 backend 允许的原子类型集合。
+
+### CPU 模拟器说明
+
+- 当前 CPU 模拟器会接受 `TSTORE_FP` 接口，但不会真正消费 `fp` 参数，而是退化为普通 `TSTORE`。
+- 因而依赖 `fp` 具体数值的量化效果，应以 NPU backend 为准。
 
 ## 示例
 
@@ -100,7 +137,13 @@ void example_manual(__gm__ int8_t* out) {
   AccT acc;
   FpT fp(16);
   TASSIGN(acc, 0x1000);
-  TASSIGN(fp,  0x2000);
+  TASSIGN(fp, 0x2000);
   TSTORE_FP(gout, acc, fp);
 }
 ```
+
+## 相关页面
+
+- [TSTORE](./tstore_zh.md)
+- [TMOV_FP](../layout-and-rearrangement/tmov-fp_zh.md)
+- [内存与数据搬运指令集](../../memory-and-data-movement_zh.md)

@@ -1,6 +1,6 @@
 # pto.tsubview
 
-Standalone reference page for `pto.tsubview`. This page belongs to the [Sync And Config](../../sync-and-config.md) instruction set in the PTO ISA manual.
+`pto.tsubview` is part of the [Sync And Config](../../sync-and-config.md) instruction set.
 
 ## Summary
 

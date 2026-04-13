@@ -1,6 +1,6 @@
 # pto.tands
 
-Standalone reference page for `pto.tands`. This page belongs to the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set in the PTO ISA manual.
+`pto.tands` is part of the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set.
 
 ## Summary
 

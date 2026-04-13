@@ -1,6 +1,6 @@
 # pto.tset_img2col_padding
 
-Standalone reference page for `pto.tset_img2col_padding`. This page belongs to the [Sync And Config](../../sync-and-config.md) instruction set in the PTO ISA manual.
+`pto.tset_img2col_padding` is part of the [Sync And Config](../../sync-and-config.md) instruction set.
 
 ## Summary
 

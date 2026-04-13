@@ -1,6 +1,6 @@
 # pto.tcolsum
 
-Standalone reference page for `pto.tcolsum`. This page belongs to the [Reduce And Expand](../../reduce-and-expand.md) instruction set in the PTO ISA manual.
+`pto.tcolsum` is part of the [Reduce And Expand](../../reduce-and-expand.md) instruction set.
 
 ## Summary
 

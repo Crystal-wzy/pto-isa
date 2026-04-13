@@ -1,6 +1,6 @@
 # pto.tgemv_acc
 
-Standalone reference page for `pto.tgemv_acc`. This page belongs to the [Matrix And Matrix Vector](../../matrix-and-matrix-vector.md) instruction set in the PTO ISA manual.
+`pto.tgemv_acc` is part of the [Matrix And Matrix Vector](../../matrix-and-matrix-vector.md) instruction set.
 
 ## Summary
 

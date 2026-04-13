@@ -1,6 +1,6 @@
 # Vector Instruction Set: Data Rearrangement
 
-This page documents `pto.v*` rearrangement instruction sets. These operations permute or repack vector-visible data without turning into tile movement or DMA, so they stay in the vector instructions.
+`pto.v*` rearrangement instruction sets are defined here. These operations permute or repack vector-visible data without turning into tile movement or DMA, so they remain part of the vector instructions.
 
 > **Category:** In-register data movement and permutation
 > **Pipeline:** PIPE_V (Vector Core)
@@ -181,7 +181,7 @@ for (int i = 0; i < N; i++)
 
 - **inputs:** `%src0` and `%src1` are source vectors.
 - **outputs:** `%result` is the selected vector.
-- **constraints and limitations:** This page records the rearrangement use of
+- **constraints and limitations:** The rearrangement use of
   the instruction set; the compare/select page documents the same name from the predicate
   selection perspective.
 

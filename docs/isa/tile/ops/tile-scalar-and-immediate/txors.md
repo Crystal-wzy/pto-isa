@@ -1,6 +1,6 @@
 # pto.txors
 
-Standalone reference page for `pto.txors`. This page belongs to the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set in the PTO ISA manual.
+`pto.txors` is part of the [Tile Scalar And Immediate](../../tile-scalar-and-immediate.md) instruction set.
 
 ## Summary
 

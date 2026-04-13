@@ -1,6 +1,6 @@
 # PTO: Goals
 
-This page lists what PTO is trying to achieve in the Ascend stack. It complements the narrative introduction in [What Is PTO VISA](./what-is-pto-visa.md) and the normative scope statement in [Scope And Boundaries](./design-goals-and-boundaries.md).
+PTO in the Ascend stack pursues the goals listed below. They complement the narrative introduction in [What Is PTO VISA](./what-is-pto-visa.md) and the normative scope statement in [Scope And Boundaries](./design-goals-and-boundaries.md).
 
 ## Core Objectives
 

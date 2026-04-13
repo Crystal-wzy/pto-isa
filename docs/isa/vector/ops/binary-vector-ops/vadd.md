@@ -1,6 +1,6 @@
 # pto.vadd
 
-Standalone reference page for `pto.vadd`. This page belongs to the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vadd` is part of the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set.
 
 ## Summary
 
@@ -173,5 +173,5 @@ void vector_add(Ptr<ub_space_t, ub_t> ub_a, Ptr<ub_space_t, ub_t> ub_b,
 
 - Instruction set overview: [Binary Vector Instructions](../../binary-vector-ops.md)
 - Next op in instruction set: [pto.vsub](./vsub.md)
-- Vector instruction overview: [Vector Instructions](../../instruction-surfaces/vector-instructions.md)
-- Type system: [Type System](../../state-and-types/type-system.md)
+- Vector instruction overview: [Vector Instructions](../../../instruction-surfaces/vector-instructions.md)
+- Type system: [Type System](../../../state-and-types/type-system.md)

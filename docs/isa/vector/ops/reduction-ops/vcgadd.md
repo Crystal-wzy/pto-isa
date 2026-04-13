@@ -1,6 +1,6 @@
 # pto.vcgadd
 
-Standalone reference page for `pto.vcgadd`. This page belongs to the [Reduction Instructions](../../reduction-ops.md) instruction set in the PTO ISA manual.
+`pto.vcgadd` is part of the [Reduction Instructions](../../reduction-ops.md) instruction set.
 
 ## Summary
 

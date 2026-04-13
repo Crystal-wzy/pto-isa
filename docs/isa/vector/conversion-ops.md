@@ -1,6 +1,6 @@
 # Vector Instruction Set: Conversion Ops
 
-This page documents `pto.v*` conversion and index-generation instruction sets. Width changes, rounding rules, saturation, and part selection are target-visible constraints and must stay aligned with the PTO ISA verifier and lowering contracts.
+`pto.v*` conversion and index-generation instruction sets are defined here. Width changes, rounding rules, saturation, and part selection are target-visible constraints and must stay aligned with the PTO ISA verifier and lowering contracts.
 
 > **Category:** Type conversion operations
 > **Pipeline:** PIPE_V (Vector Core)

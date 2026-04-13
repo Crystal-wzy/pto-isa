@@ -1,6 +1,6 @@
 # pto.tpartmax
 
-Standalone reference page for `pto.tpartmax`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tpartmax` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

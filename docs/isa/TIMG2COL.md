@@ -1,6 +1,6 @@
 # pto.timg2col
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.timg2col](./tile/ops/layout-and-rearrangement/timg2col.md).
+Canonical tile-instruction reference: [pto.timg2col](./tile/ops/layout-and-rearrangement/timg2col.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

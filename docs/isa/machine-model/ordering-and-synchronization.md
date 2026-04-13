@@ -1,6 +1,6 @@
 # Ordering And Synchronization
 
-PTO does not assume that all execution resources are implicitly serialized. The machine model makes ordering visible where data or state moves across instruction sets, pipelines, or shared resources. This page describes the synchronization primitives, the event model, and the producer-consumer ordering contracts.
+PTO does not assume that all execution resources are implicitly serialized. The machine model makes ordering visible where data or state moves across instruction sets, pipelines, or shared resources. The synchronization primitives, event model, and producer-consumer ordering contracts are described below.
 
 ## Synchronization Primitives
 

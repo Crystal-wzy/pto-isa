@@ -1,6 +1,6 @@
 # pto.copy_ubuf_to_ubuf
 
-Standalone reference page for `pto.copy_ubuf_to_ubuf`. This page belongs to the [DMA Copy](../../dma-copy.md) instruction set in the PTO ISA manual.
+`pto.copy_ubuf_to_ubuf` is part of the [DMA Copy](../../dma-copy.md) instruction set.
 
 ## Summary
 

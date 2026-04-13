@@ -8,17 +8,17 @@ Communication operations span multiple NPUs in a parallel group. They express in
 
 | Operation | Description | Collective Type | IR Spelling | C++ Spelling |
 |-----------|-------------|----------------|-------------|--------------|
-| [TBROADCAST](./TBROADCAST.md) | Broadcast data from root NPU to all ranks | One-to-all | `pto.tbroadcast` | `TBROADCAST` |
-| [TGET](./TGET.md) | Get data from a remote NPU | Point-to-point | `pto.tget` | `TGET` |
-| [TGET_ASYNC](./TGET_ASYNC.md) | Asynchronous variant of TGET | Point-to-point | `pto.tget_async` | `TGET_ASYNC` |
-| [TNOTIFY](./TNOTIFY.md) | Notify other ranks of an event | Synchronization | `pto.tnotify` | `TNOTIFY` |
-| [TPUT](./TPUT.md) | Put data to a remote NPU | Point-to-point | `pto.tput` | `TPUT` |
-| [TPUT_ASYNC](./TPUT_ASYNC.md) | Asynchronous variant of TPUT | Point-to-point | `pto.tput_async` | `TPUT_ASYNC` |
-| [TREDUCE](./TREDUCE.md) | Collective reduction across all ranks | All-to-one | `pto.treduce` | `TREDUCE` |
-| [TSCATTER](./TSCATTER.md) | Scatter data from root to all ranks | One-to-all | `pto.tscatter` | `TSCATTER` |
-| [TGATHER](./TGATHER.md) | Gather data from all ranks to root | All-to-one | `pto.tgather` | `TGATHER` |
-| [TTEST](./TTEST.md) | Test if a notification has been received | Synchronization | `pto.ttest` | `TTEST` |
-| [TWAIT](./TWAIT.md) | Wait for a notification | Synchronization | `pto.twait` | `TWAIT` |
+| [TBROADCAST](../comm/TBROADCAST.md) | Broadcast data from root NPU to all ranks | One-to-all | `pto.tbroadcast` | `TBROADCAST` |
+| [TGET](../comm/TGET.md) | Get data from a remote NPU | Point-to-point | `pto.tget` | `TGET` |
+| [TGET_ASYNC](../comm/TGET_ASYNC.md) | Asynchronous variant of TGET | Point-to-point | `pto.tget_async` | `TGET_ASYNC` |
+| [TNOTIFY](../comm/TNOTIFY.md) | Notify other ranks of an event | Synchronization | `pto.tnotify` | `TNOTIFY` |
+| [TPUT](../comm/TPUT.md) | Put data to a remote NPU | Point-to-point | `pto.tput` | `TPUT` |
+| [TPUT_ASYNC](../comm/TPUT_ASYNC.md) | Asynchronous variant of TPUT | Point-to-point | `pto.tput_async` | `TPUT_ASYNC` |
+| [TREDUCE](../comm/TREDUCE.md) | Collective reduction across all ranks | All-to-one | `pto.treduce` | `TREDUCE` |
+| [TSCATTER](../comm/TSCATTER.md) | Scatter data from root to all ranks | One-to-all | `pto.tscatter` | `TSCATTER` |
+| [TGATHER](../comm/TGATHER.md) | Gather data from all ranks to root | All-to-one | `pto.tgather` | `TGATHER` |
+| [TTEST](../comm/TTEST.md) | Test if a notification has been received | Synchronization | `pto.ttest` | `TTEST` |
+| [TWAIT](../comm/TWAIT.md) | Wait for a notification | Synchronization | `pto.twait` | `TWAIT` |
 
 ## Mechanism
 

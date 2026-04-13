@@ -6,8 +6,8 @@ Other-instruction set documentation covers communication and residual supporting
 
 | Instruction Set | Description | Availability |
 |--------|-------------|------------|
-| [Communication and Runtime](./other/communication-and-runtime.md) | Inter-NPU collective communication | A2/A3, A5 |
-| [Non-ISA Supporting Ops](./other/non-isa-and-supporting-ops.md) | Convenience operations over tile sequences | All profiles |
+| [Communication and Runtime](../other/communication-and-runtime.md) | Inter-NPU collective communication | A2/A3, A5 |
+| [Non-ISA Supporting Ops](../other/non-isa-and-supporting-ops.md) | Convenience operations over tile sequences | All profiles |
 
 ### Communication and Runtime
 
@@ -42,10 +42,10 @@ These provide higher-level semantics over tile sequences or memory management. S
 
 ## Navigation
 
-See the [Other ISA reference](./other/README.md) for the full per-op reference.
+See the [Other ISA reference](../other/README.md) for the full per-op reference.
 
 ## See Also
 
-- [Other instruction set](./instruction-surfaces/other-instructions.md) — High-level instruction set description
+- [Other instruction set](../instruction-surfaces/other-instructions.md) — High-level instruction set description
 - [Instruction sets](./README.md) — All instruction sets
 - [Format of instruction descriptions](../reference/format-of-instruction-descriptions.md) — Per-op page standard

@@ -1,6 +1,6 @@
 # pto.vnot
 
-Standalone reference page for `pto.vnot`. This page belongs to the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set in the PTO ISA manual.
+`pto.vnot` is part of the [Unary Vector Instructions](../../unary-vector-ops.md) instruction set.
 
 ## Summary
 

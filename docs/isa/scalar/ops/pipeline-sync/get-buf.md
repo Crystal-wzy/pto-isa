@@ -1,6 +1,6 @@
 # pto.get_buf
 
-Standalone reference page for `pto.get_buf`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.get_buf` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

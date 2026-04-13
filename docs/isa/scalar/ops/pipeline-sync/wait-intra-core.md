@@ -1,6 +1,6 @@
 # pto.wait_intra_core
 
-Standalone reference page for `pto.wait_intra_core`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.wait_intra_core` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.ttri
 
-This compatibility page points to the canonical tile-instruction reference page for [pto.ttri](./tile/ops/irregular-and-complex/ttri.md).
+Canonical tile-instruction reference: [pto.ttri](./tile/ops/irregular-and-complex/ttri.md).
 
 The PTO ISA manual now treats tile, vector, and scalar/control operations consistently: the canonical per-op pages live under `docs/isa/tile/ops/`, `docs/isa/vector/ops/`, and `docs/isa/scalar/ops/`.
 

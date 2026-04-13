@@ -2,7 +2,7 @@
 
 ## 指令示意图
 
-![TSEL tile operation](../figures/isa/TSEL.svg)
+![TSEL tile operation](../../../../figures/isa/TSEL.svg)
 
 ## 简介
 
@@ -22,7 +22,7 @@ $$
 
 ## 汇编语法
 
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
+PTO-AS 形式：参见 [PTO-AS 规范](../../../../assembly/PTO-AS_zh.md)。
 
 同步形式：
 

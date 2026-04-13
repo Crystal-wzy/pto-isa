@@ -1,6 +1,6 @@
 # pto.set_flag
 
-Standalone reference page for `pto.set_flag`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.set_flag` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

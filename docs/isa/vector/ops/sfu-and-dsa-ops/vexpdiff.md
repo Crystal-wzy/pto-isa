@@ -1,6 +1,6 @@
 # pto.vexpdiff
 
-Standalone reference page for `pto.vexpdiff`. This page belongs to the [SFU And DSA Instructions](../../sfu-and-dsa-ops.md) instruction set in the PTO ISA manual.
+`pto.vexpdiff` is part of the [SFU And DSA Instructions](../../sfu-and-dsa-ops.md) instruction set.
 
 ## Summary
 

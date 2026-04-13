@@ -1,6 +1,6 @@
 # pto.tsethf32mode
 
-Standalone reference page for `pto.tsethf32mode`. This page belongs to the [Sync And Config](../../sync-and-config.md) instruction set in the PTO ISA manual.
+`pto.tsethf32mode` is part of the [Sync And Config](../../sync-and-config.md) instruction set.
 
 ## Summary
 

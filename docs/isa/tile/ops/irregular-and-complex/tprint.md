@@ -1,6 +1,6 @@
 # pto.tprint
 
-Standalone reference page for `pto.tprint`. This page belongs to the [Irregular And Complex](../../irregular-and-complex.md) instruction set in the PTO ISA manual.
+`pto.tprint` is part of the [Irregular And Complex](../../irregular-and-complex.md) instruction set.
 
 ## Summary
 

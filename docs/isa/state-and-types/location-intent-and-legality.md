@@ -1,6 +1,6 @@
 # Location Intent And Legality
 
-PTO legality depends on more than element type and shape. Many operations also care about where a value is intended to live or what role it plays in the selected instruction set. This page defines the location intent taxonomy and the legality checking pipeline.
+PTO legality depends on more than element type and shape. Many operations also care about where a value is intended to live or what role it plays in the selected instruction set. The location-intent taxonomy and the legality checking pipeline are defined below.
 
 ## Location Intent Taxonomy
 

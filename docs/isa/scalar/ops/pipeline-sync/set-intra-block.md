@@ -1,6 +1,6 @@
 # pto.set_intra_block
 
-Standalone reference page for `pto.set_intra_block`. This page belongs to the [Pipeline Sync](../../pipeline-sync.md) instruction set in the PTO ISA manual.
+`pto.set_intra_block` is part of the [Pipeline Sync](../../pipeline-sync.md) instruction set.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # pto.vcmps
 
-Standalone reference page for `pto.vcmps`. This page belongs to the [Compare And Select](../../compare-select.md) instruction set in the PTO ISA manual.
+`pto.vcmps` is part of the [Compare And Select](../../compare-select.md) instruction set.
 
 ## Summary
 
