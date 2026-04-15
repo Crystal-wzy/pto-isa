@@ -17,7 +17,7 @@ $$\mathrm{dst}^{(r)}_{d_0, d_1, d_2,\; i,\; j} = \mathrm{src}^{\mathrm{local}}_{
 
 ## Assembly Syntax
 
-Textual spelling is defined by the PTO ISA syntax-and-operands pages.
+PTO-AS form: see [PTO-AS Specification](../../assembly/PTO-AS.md).
 
 Synchronous form:
 

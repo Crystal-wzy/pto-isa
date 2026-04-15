@@ -23,7 +23,7 @@ where `cmp` ∈ {`EQ`, `NE`, `GT`, `GE`, `LT`, `LE`}
 
 ## Assembly Syntax
 
-Textual spelling is defined by the PTO ISA syntax-and-operands pages.
+PTO-AS form: see [PTO-AS Specification](../../assembly/PTO-AS.md).
 
 ```text
 twait %signal, %cmp_value {cmp = #pto.cmp<EQ>} : (!pto.memref<i32>, i32)

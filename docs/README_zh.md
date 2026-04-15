@@ -2,62 +2,80 @@
   <img src="figures/pto_logo.svg" alt="PTO Tile Lib" width="200" />
 </p>
 
-# PTO ISA 指南
+# PTO ISA 文档导航
 
-本文档目录包含权威的 PTO ISA 手册和支持性指令参考。建议阅读路径为合并后的 `docs/isa/` 文档树，将 PTO 作为一个内聚的多目标虚拟 ISA 来呈现，而非在概念手册与参考文档之间割裂。
+这里是 PTO Tile Lib 的文档入口页，用于帮助读者按主题快速定位文档，而不是逐个目录查找。
 
-## 从这里开始
+PTO 相关文档主要覆盖以下几类内容：
 
-手册页面是 PTO ISA 的稳定着陆页，提供完整阅读路径和指令参考入口。
+- ISA 基础概念与整体阅读路径
+- 指令索引与逐条指令参考
+- PTO 汇编语法与 PTO-AS 规范
+- Tile 编程模型、事件同步与性能优化
+- 快速开始、测试运行与文档构建说明
 
-- [手册入口](PTO-Virtual-ISA-Manual_zh.md)
-- [什么是 PTO 虚拟 ISA](isa/introduction/what-is-pto-visa.md)
-- [文档结构](isa/introduction/document-structure.md)
-- [PTO 的设计目标](isa/introduction/goals-of-pto.md)
-- [PTO ISA 版本 1.0](isa/introduction/pto-isa-version-1-0.md)
-- [范围与边界](isa/introduction/design-goals-and-boundaries.md)
-- [编程模型](isa/programming-model/tiles-and-valid-regions.md)
-- [机器模型](isa/machine-model/execution-agents.md)
-- [语法与操作数](isa/syntax-and-operands/assembly-model.md)
-- [通用约定](isa/conventions.md)
-- [类型系统](isa/state-and-types/type-system.md)
-- [位置意图与合法性](isa/state-and-types/location-intent-and-legality.md)
-- [内存模型](isa/memory-model/consistency-baseline.md)
+## 建议阅读路径
 
-## 快速进入参考文档
+如果您第一次接触 PTO Tile Lib，建议按以下顺序阅读：
 
-如需查阅具体指令，请使用以下参考入口：
+1. [快速开始指南](getting-started_zh.md)：先完成环境准备并运行 CPU Simulator
+2. [ISA 总览](PTOISA_zh.md)：建立对 PTO ISA 的整体认识
+3. [PTO 指令列表](isa/README_zh.md)：按类别浏览已定义的标准操作
+4. [Tile 编程模型](coding/Tile_zh.md)：理解 tile shape、tile mask 与数据组织方式
+5. [事件与同步](coding/Event_zh.md)：理解 set/wait flag 与流水线同步
+6. [性能优化](coding/opt_zh.md)：理解常见瓶颈与调优方向
 
-- [Tile ISA 参考](isa/tile/README.md)
-- [Vector ISA 参考](isa/vector/README.md)
-- [标量与控制参考](isa/scalar/README.md)
-- [其他与通信参考](isa/other/README.md)
-- [通用约定](isa/conventions.md)
+## 文档分类
 
-完整的章节地图请参阅[文档结构](isa/introduction/document-structure.md)。
+### 1. ISA 与指令参考
 
-## PTO ISA 一览
+- [虚拟 ISA 手册入口](PTO-Virtual-ISA-Manual_zh.md)：PTO ISA 手册总入口
+- [ISA 总览](PTOISA_zh.md)：介绍 PTO ISA 的背景、目标与整体结构
+- [PTO 指令列表](isa/README_zh.md)：按类别组织的 PTO 标准操作索引
+- [通用约定](isa/conventions_zh.md)：命名、约束、使用规范等通用规则
 
-PTO 是一个跨越多目标的虚拟 ISA，涵盖 CPU 仿真、A2/A3 类目标和 A5 类目标。PTO 可见 ISA 表面并非一个扁平的指令池：
+### 2. PTO 汇编与表示形式
 
-- `pto.t*` 覆盖以 tile 为导向的计算与数据移动
-- `pto.v*` 覆盖向量微指令行为及其 buffer/register/predicate 模型
-- `pto.*` 覆盖标量、控制、配置和共享支持操作
-- 通信与其他支持操作在需要时补全整个表面
+- [PTO 汇编索引](assembly/README_zh.md)：PTO-AS 文档入口
+- [PTO 汇编语法（PTO-AS）](assembly/PTO-AS_zh.md)：PTO 汇编语法与规范说明
 
-手册阐明了 PTO 自身保证的内容与仅作为目标 profile 限制的内容之间的区别。
+### 3. 编程模型与开发文档
 
-## 权威入口
+- [开发文档索引](coding/README_zh.md)：扩展 PTO Tile Lib 的开发文档入口
+- [Tile 编程模型](coding/Tile_zh.md)：介绍 tile shape、tile mask 与数据布局
+- [事件与同步](coding/Event_zh.md)：介绍事件记录、等待与同步机制
+- [性能优化](coding/opt_zh.md)：介绍性能分析与调优建议
 
-合并后的手册索引位于 [PTO ISA 手册与参考](isa/README_zh.md)。
+### 4. 入门、测试与文档构建
 
-## 文档组织
+- [快速开始指南](getting-started_zh.md)：环境准备、CPU / NPU 运行说明
+- [测试说明](../tests/README_zh.md)：测试入口、测试脚本与常用命令
+- [文档构建说明](mkdocs/README_zh.md)：MkDocs 文档本地构建说明
 
-- `docs/isa/`：权威 PTO ISA 手册与指令表面文档树
-- `docs/isa/tile/`：tile 表面参考与家族分组
-- `docs/isa/vector/`：源自 PTOAS VPTO 结构的 vector 表面参考
-- `docs/isa/scalar/`：标量/控制/配置参考
-- `docs/isa/other/`：通信与残余支持表面
-- `docs/assembly/`：PTO 汇编语法与规范（PTO-AS）
-- `docs/coding/`：扩展 PTO Tile Lib 的开发者说明
-- `docs/reference/`：面向维护者的参考材料与文档流程
+### 5. 其他相关文档
+
+- [Machine 文档](machine/README_zh.md)：抽象机器模型与相关说明
+
+## 目录结构
+
+关键目录如下：
+
+```text
+├── isa/                        # PTO 指令参考与分类索引
+├── assembly/                   # PTO 汇编语法与 PTO-AS 规范
+├── coding/                     # 编程模型、开发与性能优化文档
+├── auto_mode/                  # Auto Mode 相关文档
+├── machine/                    # 抽象机器模型相关文档
+├── mkdocs/                     # 文档站点构建配置与脚本
+├── figures/                    # 文档中使用的图片与图示资源
+├── README*                     # 文档入口页
+├── PTOISA*                     # ISA 总览文档
+└── getting-started*            # 快速开始指南
+```
+
+## 相关入口
+
+- [根目录 README_zh](../README_zh.md)：项目总览、快速开始与仓库入口
+- [kernels 目录说明](../kernels/README_zh.md)：kernel 与算子实现入口
+- [include 目录说明](../include/README_zh.md)：头文件与接口说明
+- [tests 目录说明](../tests/README_zh.md)：测试与运行入口
