@@ -100,7 +100,6 @@ tpartadd
 tpartmul
 tpartmax
 tpartmin
-tpack
 tprefetch
 tprelu
 tpushpop
