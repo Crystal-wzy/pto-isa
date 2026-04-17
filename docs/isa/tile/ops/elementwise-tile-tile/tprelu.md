@@ -8,7 +8,7 @@ Elementwise PReLU (parametric ReLU) with a per-element slope tile.
 
 ## Mechanism
 
-Elementwise PReLU (parametric ReLU) with a per-element slope tile. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Elementwise PReLU (parametric ReLU) with a per-element slope tile.
 
 For each element `(i, j)` in the valid region:
 
@@ -36,18 +36,6 @@ Synchronous form:
 pto.tprelu ins(%src0, %src1 : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.tprelu %src0, %src1 : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.tprelu ins(%src0, %src1 : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`:
@@ -60,15 +48,18 @@ PTO_INST RecordEvent TPRELU(TileDataDst &dst, TileDataSrc0 &src0, TileDataSrc1 &
 
 ## Inputs
 
-- `src0` is the first source tile (left operand).
-- `src1` is the second source tile (right operand).
-- `dst` names the destination tile.
-- `tmp` is a required temporary working tile for PReLU slope selection.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src0` | Left tile | First source tile (value); read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%src1` | Right tile | Second source tile (slope); read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%tmp` | Temporary tile | Required temporary working tile for PReLU slope selection (A3) |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile or updated tile payload produced by the operation.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `(src0[i,j] > 0) ? src0[i,j] : (src0[i,j] * src1[i,j])` after the operation |
 
 ## Side Effects
 
@@ -79,6 +70,21 @@ No architectural side effects beyond producing the destination tile. Does not im
 - The op iterates over `dst.GetValidRow()` / `dst.GetValidCol()`.
 
 - For A3, 2 source Tile, destination Tile, temporary space must in different memory range without overlapping.
+
+## Performance
+
+### A2/A3 Throughput
+
+`TPRELU` compiles to CCE vector instructions via the `TBinOp.hpp` performance model. The throughput is identical to `TADD` (binary arithmetic):
+
+| Metric | Value (FP) | Value (INT) |
+|--------|-------------|-------------|
+| Startup latency | 14 | 14 |
+| Completion latency | 19 | 17 |
+| Per-repeat throughput | 2 | 2 |
+| Pipeline interval | 18 | 18 |
+
+---
 
 ## Exceptions
 

@@ -12,6 +12,14 @@ Unaligned store with residual flush and state update.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vstur %align_out, %align_in, %value, %base, "MODE"
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %align_out = pto.vstur %align_in, %value, %base, "MODE" : !pto.align, !pto.vreg<NxT>, !pto.ptr<T, ub> -> !pto.align
 ```

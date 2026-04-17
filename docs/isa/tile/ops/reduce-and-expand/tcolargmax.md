@@ -8,7 +8,7 @@ Get the row index of the maximum element for each column.
 
 ## Mechanism
 
-Get the row index of the maximum element for each column. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Get the row index of the maximum element for each column.
 
 Let `R = src.GetValidRow()` and `C = src.GetValidCol()`. For `0 <= j < C`:
 

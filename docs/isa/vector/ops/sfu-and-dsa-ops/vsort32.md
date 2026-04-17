@@ -12,6 +12,14 @@ Sort 32 elements in UB.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vsort32 %dest, %src, %config
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vsort32 %dest, %src, %config : !pto.ptr<T, ub>, !pto.ptr<T, ub>, i64
 ```
@@ -63,8 +71,6 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 ```mlir
 pto.vsort32 %dest, %src, %config : !pto.ptr<T, ub>, !pto.ptr<T, ub>, i64
 ```
-
-## Detailed Notes
 
 The instruction set overview carries the remaining shared rules for this operation.
 

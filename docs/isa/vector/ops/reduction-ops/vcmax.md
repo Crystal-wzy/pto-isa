@@ -4,40 +4,48 @@
 
 ## Summary
 
-Find max element with argmax. Result value + index in lane 0.
+Full-vector maximum reduction with argmax information packed into the low result lanes.
 
 ## Mechanism
 
-`pto.vcmax` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+The instruction scans all active lanes and finds the maximum value. The low result lanes carry the maximum and its lane index using the form defined by the selected target profile; the remaining result lanes are zero-filled.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vcmax %dst, %src, %mask : !pto.vreg<NxT>
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vcmax %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
 ```
 
-Documented A5 types or forms: `i16-i32, f16, f32`.
-
 ## Inputs
 
-`%input` is the source vector and `%mask` selects participating
-  lanes.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %input | `!pto.vreg<NxT>` | Source vector register to reduce |
+| %mask | `!pto.mask` | Predicate mask; inactive lanes do not participate |
 
 ## Expected Outputs
 
-`%result` carries the reduction result in the low destination
-  positions.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Low result lanes carry the maximum value and its lane index; other lanes are zero-filled |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This instruction set computes both the extremum and
-  location information, but the exact packing of that information into the
-  destination vector depends on the chosen form. If all predicate bits are zero,
-  the result follows the zero-filled convention.
+- The exact value/index packing MUST follow the selected target profile.
+- If all predicate bits are zero, the result follows the instruction family zero-fill convention.
+- The mask width MUST match `N`.
 
 ## Exceptions
 
@@ -46,9 +54,8 @@ This instruction set computes both the extremum and
 
 ## Target-Profile Restrictions
 
-- Documented A5 coverage: `i16-i32, f16, f32`.
+- Documented A5 coverage: `i16-i32`, `f16`, `f32`.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -67,25 +74,20 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 ## Examples
 
 ```c
-T mx = -INF; int idx = 0;
+T mx = -INF;
+int idx = 0;
 for (int i = 0; i < N; i++)
-    if (src[i] > mx) { mx = src[i]; idx = i; }
-dst_val[0] = mx;
-dst_idx[0] = idx;
+    if (mask[i] && src[i] > mx) { mx = src[i]; idx = i; }
+result_value = mx;
+result_index = idx;
 ```
 
-## Detailed Notes
-
-```c
-T mx = -INF; int idx = 0;
-for (int i = 0; i < N; i++)
-    if (src[i] > mx) { mx = src[i]; idx = i; }
-dst_val[0] = mx;
-dst_idx[0] = idx;
+```mlir
+%result = pto.vcmax %input, %mask : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
 ```
 
 ## Related Ops / Instruction Set Links
 
 - Instruction set overview: [Reduction Instructions](../../reduction-ops.md)
-- Previous op in instruction set: [pto.vcadd](./vcadd.md)
+- Previous op in instruction set: [pto.vcgadd](./vcgadd.md)
 - Next op in instruction set: [pto.vcmin](./vcmin.md)

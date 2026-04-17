@@ -8,7 +8,7 @@ Elementwise exponential.
 
 ## Mechanism
 
-Elementwise exponential. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Elementwise exponential.
 
 For each element `(i, j)` in the valid region:
 
@@ -36,18 +36,6 @@ Synchronous form:
 pto.texp ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.texp %src : !pto.tile<...> -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.texp ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`:
@@ -65,13 +53,17 @@ PTO_INST RecordEvent TEXP(TileDataDst &dst, TileDataSrc &src, WaitEvents &... ev
 
 ## Inputs
 
-- `src` is the source tile.
-- `dst` names the destination tile.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src` | Source tile | Source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%dst` | Destination tile | Destination tile receiving the result |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile or updated tile payload produced by the operation.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `exp(src[i,j])` after the operation |
 
 ## Side Effects
 

@@ -4,13 +4,21 @@
 
 ## Summary
 
-Compress — pack active lanes to front.
+Compress active lanes to the front of the destination vector.
 
 ## Mechanism
 
-`pto.vsqz` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vsqz` packs the lanes selected by `%mask` toward the front of the result while preserving their original lane order. Remaining lanes in the destination are zero-filled.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vsqz %dst, %src, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vsqz %src, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -18,21 +26,26 @@ Compress — pack active lanes to front.
 
 ## Inputs
 
-`%src` is the source vector and `%mask` selects which elements are
-  kept.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %src | `!pto.vreg<NxT>` | Source vector |
+| %mask | `!pto.mask` | Predicate mask selecting which lanes are kept |
 
 ## Expected Outputs
 
-`%result` is the compacted vector.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Compacted vector with selected lanes at the front and zeros in the tail |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This is a reduction-style compaction instruction set.
-  Preserved element order MUST match source lane order.
+- The mask width MUST match `N`.
+- The relative order of surviving lanes MUST match their original lane order.
+- Unselected destination lanes are zero-filled.
 
 ## Exceptions
 
@@ -42,7 +55,7 @@ This is a reduction-style compaction instruction set.
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -66,17 +79,6 @@ for (int i = 0; i < N; i++)
     if (mask[i]) dst[j++] = src[i];
 while (j < N) dst[j++] = 0;
 ```
-
-## Detailed Notes
-
-```c
-int j = 0;
-for (int i = 0; i < N; i++)
-    if (mask[i]) dst[j++] = src[i];
-while (j < N) dst[j++] = 0;
-```
-
-**Use case:** Sparse data compaction, filtering.
 
 ## Related Ops / Instruction Set Links
 

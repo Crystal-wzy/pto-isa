@@ -4,13 +4,21 @@
 
 ## Summary
 
-Zero-extending unpack — narrow to wide (half).
+Unpack one half of a narrow vector with zero extension.
 
 ## Mechanism
 
-`pto.vzunpack` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vzunpack` widens one selected half of the source vector. Each narrow element is zero-extended into the wider destination element type.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vzunpack %dst, %src, %part
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vzunpack %src, %part : !pto.vreg<NxT_narrow>, index -> !pto.vreg<N/2xT_wide>
@@ -18,20 +26,25 @@ Zero-extending unpack — narrow to wide (half).
 
 ## Inputs
 
-`%src` is the packed narrow vector and `%part` selects which half
-  is unpacked.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %src | `!pto.vreg<NxT_narrow>` | Packed narrow source vector |
+| %part | `index` | Selector for which half of the source vector to unpack |
 
 ## Expected Outputs
 
-`%result` is the widened vector.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<N/2xT_wide>` | Widened vector with zero extension |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This is the zero-extending unpack instruction set.
+- The selected half and widening mode MUST be supported by the target profile.
+- The widening behavior is zero-extending.
 
 ## Exceptions
 
@@ -41,80 +54,13 @@ This is the zero-extending unpack instruction set.
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
-
-## Performance
-
-### Timing Disclosure
-
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vzunpack`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
-
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
-
-If software scheduling or performance modeling depends on the exact cost of `pto.vzunpack`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Examples
 
 ```c
 for (int i = 0; i < N/2; i++)
     dst[i] = zero_extend(src[part_offset + i]);
-```
-
-```mlir
-// AoS → SoA conversion using deinterleave
-%even, %odd = pto.vdintlv %interleaved0, %interleaved1
-    : !pto.vreg<64xf32>, !pto.vreg<64xf32> -> !pto.vreg<64xf32>, !pto.vreg<64xf32>
-
-// Filter: keep only elements passing condition
-%pass_mask = pto.vcmps %values, %threshold, %all, "gt"
-    : !pto.vreg<64xf32>, f32, !pto.mask -> !pto.mask
-%compacted = pto.vsqz %values, %pass_mask
-    : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
-
-// Sliding window sum
-%prev_window = pto.vslide %curr, %prev, %c1
-    : !pto.vreg<64xf32>, !pto.vreg<64xf32>, i16 -> !pto.vreg<64xf32>
-%window_sum = pto.vadd %curr, %prev_window, %all
-    : !pto.vreg<64xf32>, !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
-
-// Type narrowing via pack
-%packed_i16 = pto.vpack %wide0_i32, %wide1_i32, %c0
-    : !pto.vreg<64xi32>, !pto.vreg<64xi32>, index -> !pto.vreg<128xi16>
-```
-
-## Detailed Notes
-
-```c
-for (int i = 0; i < N/2; i++)
-    dst[i] = zero_extend(src[part_offset + i]);
-```
-
-## Typical Usage
-
-```mlir
-// AoS → SoA conversion using deinterleave
-%even, %odd = pto.vdintlv %interleaved0, %interleaved1
-    : !pto.vreg<64xf32>, !pto.vreg<64xf32> -> !pto.vreg<64xf32>, !pto.vreg<64xf32>
-
-// Filter: keep only elements passing condition
-%pass_mask = pto.vcmps %values, %threshold, %all, "gt"
-    : !pto.vreg<64xf32>, f32, !pto.mask -> !pto.mask
-%compacted = pto.vsqz %values, %pass_mask
-    : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
-
-// Sliding window sum
-%prev_window = pto.vslide %curr, %prev, %c1
-    : !pto.vreg<64xf32>, !pto.vreg<64xf32>, i16 -> !pto.vreg<64xf32>
-%window_sum = pto.vadd %curr, %prev_window, %all
-    : !pto.vreg<64xf32>, !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
-
-// Type narrowing via pack
-%packed_i16 = pto.vpack %wide0_i32, %wide1_i32, %c0
-    : !pto.vreg<64xi32>, !pto.vreg<64xi32>, index -> !pto.vreg<128xi16>
 ```
 
 ## Related Ops / Instruction Set Links

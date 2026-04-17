@@ -4,13 +4,21 @@
 
 ## Summary
 
-Configure HW loop iteration counts for UB→GM DMA.
+Configure the inner and outer loop counts that the UB→GM DMA engine will use for subsequent transfers.
 
 ## Mechanism
 
-`pto.set_loop_size_ubtoout` is a `pto.*` control/configuration operation. It changes ordering, buffer, event, or DMA-visible state that later payload work depends on. The portable guarantee is the dependency/configuration effect, while concrete pipe/event spaces remain target-profile details.
+This operation programs the UB→GM DMA loop-count registers. Later `pto.copy_ubuf_to_gm` instructions consume these loop counters to build a two-level nested transfer schedule: loop2 surrounds loop1, and loop1 surrounds the per-row burst engine.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+set_loop_size_ubtoout %loop1_count, %loop2_count : i64, i64
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 pto.set_loop_size_ubtoout %loop1_count, %loop2_count : i64, i64
@@ -18,44 +26,42 @@ pto.set_loop_size_ubtoout %loop1_count, %loop2_count : i64, i64
 
 ## Inputs
 
-The inputs are the architecture-visible control operands shown in the syntax: pipe ids, event ids, buffer ids, loop/stride values, pointers, or configuration words used to drive later execution.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %loop1_count | `i64` | Inner hardware-loop iteration count |
+| %loop2_count | `i64` | Outer hardware-loop iteration count |
 
 ## Expected Outputs
 
-This form is primarily defined by the side effect it has on control state, predicate state, or memory. It does not publish a new payload SSA result beyond any explicit state outputs shown in the syntax.
+| Result | Type | Description |
+| --- | --- | --- |
+| None | `—` | This form only updates the UB→GM DMA loop-count configuration state. |
 
 ## Side Effects
 
-This operation updates control, synchronization, or DMA configuration state. Depending on the form, it may stall a stage, establish a producer-consumer edge, reserve or release a buffer token, or configure later copy behavior.
+Programs the loop-count state consumed by subsequent UB→GM DMA copies. The configuration remains in effect until another loop-size operation overrides it.
 
 ## Constraints
 
-This operation inherits the legality and operand-shape rules of its instruction set overview. Any target-specific narrowing of element types, distributions, pipe/event spaces, or configuration tuples must be stated by the selected target profile.
+- Both counts MUST be non-negative and within the width supported by the target profile.
+- When multi-level looping is not needed, both counts SHOULD be set to 1.
+- The configured counts apply only to later UB→GM DMA operations and do not retroactively affect already-issued copies.
 
 ## Exceptions
 
-- It is illegal to use unsupported pipe ids, event ids, buffer ids, or configuration tuples for the selected target profile.
-- Waiting on state that was never established by a matching producer or prior configuration is an illegal PTO program.
+- The verifier rejects illegal operand shapes, unsupported pipe or event identifiers, and attribute combinations that are not valid for the selected instruction set or target profile.
+- Any additional illegality stated in the constraints section is also part of the contract.
 
 ## Target-Profile Restrictions
 
-- CPU simulation preserves the visible dependency/configuration contract, but it may not expose every low-level hazard that motivates the form on hardware targets.
-- A2/A3 and A5 profiles may use different concrete pipe, DMA, predicate, or event spaces. Portable code must rely on the documented PTO contract plus the selected target profile.
+- CPU simulation preserves the visible configuration contract but may not expose all hardware loop hazards.
+- A2/A3 and A5 may use different concrete register widths or reset behavior; portable code must follow the documented PTO contract plus the selected target profile.
 
 ## Examples
 
 ```mlir
 pto.set_loop_size_ubtoout %loop1_count, %loop2_count : i64, i64
 ```
-
-## Detailed Notes
-
-**Parameter Table:**
-
-| Parameter | Width | Description |
-|-----------|-------|-------------|
-| `%loop1_count` | 21 bits | Inner HW loop iteration count |
-| `%loop2_count` | 21 bits | Outer HW loop iteration count |
 
 ## Related Ops / Instruction Set Links
 

@@ -8,7 +8,7 @@ Get the column index of the minimum element for each row.
 
 ## Mechanism
 
-Get the column index of the minimum element for each row. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Get the column index of the minimum element for each row.
 
 Let `R = src.GetValidRow()` and `C = src.GetValidCol()`. For `0 <= i < R`:
 

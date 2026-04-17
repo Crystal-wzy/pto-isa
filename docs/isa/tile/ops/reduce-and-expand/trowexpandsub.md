@@ -8,7 +8,7 @@ Row-wise broadcast subtract: subtract a per-row scalar vector `src1` from each r
 
 ## Mechanism
 
-Row-wise broadcast subtract: subtract a per-row scalar vector `src1` from each row of `src0`. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Row-wise broadcast subtract: subtract a per-row scalar vector `src1` from each row of `src0`.
 
 For each element `(i, j)` in the valid region:
 

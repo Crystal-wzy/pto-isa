@@ -8,7 +8,7 @@ Elementwise ternary add: `src0 + src1 + src2`.
 
 ## Mechanism
 
-Elementwise ternary add: `src0 + src1 + src2`. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Elementwise ternary add: `src0 + src1 + src2`.
 
 For each element `(i, j)` in the valid region:
 
@@ -36,18 +36,6 @@ Synchronous form:
 pto.taddc ins(%src0, %src1, %src2 : !pto.tile_buf<...>, !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.taddc %src0, %src1, %src2 : (!pto.tile<...>, !pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.taddc ins(%src0, %src1, %src2 : !pto.tile_buf<...>, !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`:
@@ -59,14 +47,18 @@ PTO_INST RecordEvent TADDC(TileData &dst, TileData &src0, TileData &src1, TileDa
 
 ## Inputs
 
-- `src0` is the first source tile (left operand).
-- `src1` is the second source tile (right operand).
-- `dst` names the destination tile.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src0` | First source tile | First source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%src1` | Second source tile | Second source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%src2` | Third source tile | Third source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile or updated tile payload produced by the operation.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `src0[i,j] + src1[i,j] + src2[i,j]` after the operation |
 
 ## Side Effects
 
@@ -86,6 +78,21 @@ No architectural side effects beyond producing the destination tile. Does not im
 - `pto.taddc` preserves PTO-visible semantics across CPU simulation, A2/A3-class targets, and A5-class targets, but concrete support subsets may differ by profile.
 
 - Portable code must rely only on the documented type, layout, shape, and mode combinations that the selected target profile guarantees.
+
+## Performance
+
+### A2/A3 Throughput
+
+`TADDC` compiles to CCE vector instructions via the `TBinOp.hpp` performance model. The throughput is identical to `TADD` (binary arithmetic):
+
+| Metric | Value (FP) | Value (INT) |
+|--------|-------------|-------------|
+| Startup latency | 14 | 14 |
+| Completion latency | 19 | 17 |
+| Per-repeat throughput | 2 | 2 |
+| Pipeline interval | 18 | 18 |
+
+---
 
 ## Examples
 

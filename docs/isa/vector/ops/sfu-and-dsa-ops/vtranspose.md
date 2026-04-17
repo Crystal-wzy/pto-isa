@@ -12,6 +12,14 @@ UB-to-UB transpose operation (not vreg-to-vreg).
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vtranspose %dest, %src, %config
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vtranspose %dest, %src, %config : !pto.ptr<T, ub>, !pto.ptr<T, ub>, i64
 ```
@@ -64,8 +72,6 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 ```mlir
 pto.vtranspose %dest, %src, %config : !pto.ptr<T, ub>, !pto.ptr<T, ub>, i64
 ```
-
-## Detailed Notes
 
 **Note:** This operates on UB memory directly, not on vector registers.
 

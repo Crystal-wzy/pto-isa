@@ -4,69 +4,70 @@
 
 ## Summary
 
-DMA transfer from Unified Buffer (`!pto.ptr<T, ub>`) to Global Memory (`!pto.ptr<T, gm>`). MTE3 reads only `len_burst` bytes from each UB row (de-padding).
+Execute a DMA transfer from Unified Buffer into Global Memory using the current UB→GM loop and stride configuration.
 
 ## Mechanism
 
-`pto.copy_ubuf_to_gm` is a `pto.*` control/configuration operation. It changes ordering, buffer, event, or DMA-visible state that later payload work depends on. The portable guarantee is the dependency/configuration effect, while concrete pipe/event spaces remain target-profile details.
+The DMA engine reads `%n_burst` rows from `%ub_src` and writes them to `%gm_dst`. `%len_burst` controls the contiguous byte count copied per row, so padded bytes in the UB row are not written back unless they are part of the burst length. `%src_stride` and `%dst_stride` specify the row-to-row start offsets for this copy invocation.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+copy_ubuf_to_gm %ub_src, %gm_dst, %sid, %n_burst, %len_burst, %reserved, %dst_stride, %src_stride
+```
+
+### AS Level 1 (SSA)
+
+```mlir
+pto.copy_ubuf_to_gm %ub_src, %gm_dst, %sid, %n_burst, %len_burst, %reserved, %dst_stride, %src_stride : !pto.ptr<T, ub>, !pto.ptr<T, gm>, i64, i64, i64, i64, i64, i64
+```
 
 ## Inputs
 
-The inputs are the architecture-visible control operands shown in the syntax: pipe ids, event ids, buffer ids, loop/stride values, pointers, or configuration words used to drive later execution.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %ub_src | `!pto.ptr<T, ub>` | UB source pointer |
+| %gm_dst | `!pto.ptr<T, gm>` | GM destination pointer |
+| %sid | `i64` | DMA stream identifier |
+| %n_burst | `i64` | Number of burst rows to transfer |
+| %len_burst | `i64` | Contiguous byte count transferred per row |
+| %reserved | `i64` | Reserved field; portable code should pass zero unless a target profile documents another meaning |
+| %dst_stride | `i64` | GM row-to-row start offset in bytes |
+| %src_stride | `i64` | UB row-to-row start offset in bytes |
 
 ## Expected Outputs
 
-This form is primarily defined by the side effect it has on control state, predicate state, or memory. It does not publish a new payload SSA result beyond any explicit state outputs shown in the syntax.
+| Result | Type | Description |
+| --- | --- | --- |
+| None | `—` | This form does not return SSA values; it writes data into Global Memory. |
 
 ## Side Effects
 
-This operation updates control, synchronization, or DMA configuration state. Depending on the form, it may stall a stage, establish a producer-consumer edge, reserve or release a buffer token, or configure later copy behavior.
+Reads UB-visible storage, writes GM-visible storage, and consumes the active UB→GM loop and stride configuration.
 
 ## Constraints
 
-This operation inherits the legality and operand-shape rules of its instruction set overview. Any target-specific narrowing of element types, distributions, pipe/event spaces, or configuration tuples must be stated by the selected target profile.
+- `%ub_src` MUST satisfy the UB alignment requirements of the selected target profile.
+- `%len_burst` MUST fit within the configured row stride and DMA limits of the selected target profile.
+- Only the requested burst bytes are copied from each UB row; padded tail bytes remain local to UB.
 
 ## Exceptions
 
-- It is illegal to use unsupported pipe ids, event ids, buffer ids, or configuration tuples for the selected target profile.
-- Waiting on state that was never established by a matching producer or prior configuration is an illegal PTO program.
+- The verifier rejects illegal operand shapes, unsupported pipe or event identifiers, and attribute combinations that are not valid for the selected instruction set or target profile.
+- Any additional illegality stated in the constraints section is also part of the contract.
 
 ## Target-Profile Restrictions
 
-- CPU simulation preserves the visible dependency/configuration contract, but it may not expose every low-level hazard that motivates the form on hardware targets.
-- A2/A3 and A5 profiles may use different concrete pipe, DMA, predicate, or event spaces. Portable code must rely on the documented PTO contract plus the selected target profile.
+- CPU simulation preserves the visible copy contract but may not expose all DMA overlap hazards.
+- A2/A3 and A5 may narrow supported element sizes, row widths, or cache-control semantics.
 
 ## Examples
 
 ```mlir
-pto.copy_ubuf_to_gm %ub_src, %gm_dst,
-    %sid, %n_burst, %len_burst, %reserved, %dst_stride, %src_stride
-    : !pto.ptr<T, ub>, !pto.ptr<T, gm>, i64, i64, i64, i64, i64, i64
+pto.copy_ubuf_to_gm %ub_src, %gm_dst, %sid, %n_burst, %len_burst, %reserved, %dst_stride, %src_stride : !pto.ptr<f32, ub>, !pto.ptr<f32, gm>, i64, i64, i64, i64, i64, i64
 ```
-
-## Detailed Notes
-
-```mlir
-pto.copy_ubuf_to_gm %ub_src, %gm_dst,
-    %sid, %n_burst, %len_burst, %reserved, %dst_stride, %src_stride
-    : !pto.ptr<T, ub>, !pto.ptr<T, gm>, i64, i64, i64, i64, i64, i64
-```
-
-**Parameters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `%ub_src` | UB source pointer (`!pto.ptr<T, ub>`, 32B-aligned) |
-| `%gm_dst` | GM destination pointer (`!pto.ptr<T, gm>`) |
-| `%sid` | Stream ID (usually 0) |
-| `%n_burst` | Number of burst rows |
-| `%len_burst` | Contiguous bytes transferred per burst row |
-| `%reserved` | Reserved field (set to 0) |
-| `%dst_stride` | GM destination stride: start-to-start distance between consecutive burst rows (bytes) |
-| `%src_stride` | UB source stride: start-to-start distance between consecutive burst rows (bytes, 32B-aligned) |
 
 ## Related Ops / Instruction Set Links
 

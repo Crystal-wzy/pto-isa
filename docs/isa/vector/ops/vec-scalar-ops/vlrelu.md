@@ -4,13 +4,21 @@
 
 ## Summary
 
-`%result` is the lane-wise leaky-ReLU result.
+Lane-wise leaky ReLU with a broadcast slope scalar.
 
 ## Mechanism
 
-`pto.vlrelu` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+For each active lane `i`, `dst[i] = (src[i] >= 0) ? src[i] : scalar * src[i]`. The scalar operand supplies the negative-path slope for every active lane. Inactive lanes do not participate in the computation.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vlrelu %dst, %src, %slope, %mask : !pto.vreg<NxT>, T
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vlrelu %input, %scalar, %mask : !pto.vreg<NxT>, T, !pto.mask -> !pto.vreg<NxT>
@@ -18,21 +26,27 @@
 
 ## Inputs
 
-`%input` is the activation vector, `%scalar` is the leaky slope,
-  and `%mask` selects active lanes.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %input | `!pto.vreg<NxT>` | Source activation vector |
+| %scalar | `T` | Negative-path slope broadcast to every active lane |
+| %mask | `!pto.mask` | Predicate mask; only lanes with mask bit 1 participate |
 
 ## Expected Outputs
 
-`%result` is the lane-wise leaky-ReLU result.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Lane-wise leaky-ReLU result on the active lanes |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Only `f16` and `f32` forms are currently
-  documented for `pto.vlrelu`.
+- The current manual documents floating-point forms for `f16` and `f32`.
+- `%input` and `%result` MUST have the same vector width `N` and element type `T`.
+- The mask width MUST match `N`.
 
 ## Exceptions
 
@@ -41,8 +55,8 @@ Only `f16` and `f32` forms are currently
 
 ## Target-Profile Restrictions
 
+- Documented floating-point forms: `f16`, `f32`.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -62,14 +76,12 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 
 ```c
 for (int i = 0; i < N; i++)
-    dst[i] = (src[i] >= 0) ? src[i] : scalar * src[i];
+    if (mask[i])
+        dst[i] = (src[i] >= 0) ? src[i] : scalar * src[i];
 ```
 
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = (src[i] >= 0) ? src[i] : scalar * src[i];
+```mlir
+%result = pto.vlrelu %activations, %alpha, %mask : !pto.vreg<64xf32>, f32, !pto.mask -> !pto.vreg<64xf32>
 ```
 
 ## Related Ops / Instruction Set Links

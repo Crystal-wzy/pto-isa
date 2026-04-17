@@ -4,37 +4,56 @@
 
 ## Summary
 
-AXPY — scalar-vector multiply-add.
+AXPY — scalar-vector multiply-add: computes `a * x + y` in a single fused operation.
 
 ## Mechanism
 
-`pto.vaxpy` is a specialized `pto.v*` operation. It exposes fused, widening, or domain-specific hardware behavior through one stable virtual mnemonic so the instruction set can be reasoned about at the ISA level.
+Fused multiply-add: `dst[i] = a * x[i] + y[i]`. Computes element-wise scaled addition in a single fused operation. This is equivalent to `vmula` with a broadcast scalar. The scalar multiplier `a` is applied to each element of vector `x`, then added to the corresponding element of vector `y`.
 
 ## Syntax
 
-```mlir
-%result = pto.vaxpy %src0, %src1, %alpha : !pto.vreg<NxT>, !pto.vreg<NxT>, T -> !pto.vreg<NxT>
+### PTO Assembly Form
+
+```text
+vaxpy %dst, %x, %y, %alpha, %mask : !pto.vreg<NxT>
 ```
 
-Documented A5 types or forms: `f16, f32`.
+### AS Level 1 (SSA)
+
+```mlir
+%result = pto.vaxpy %x, %y, %alpha, %mask : (!pto.vreg<NxT>, !pto.vreg<NxT>, T, !pto.mask) -> !pto.vreg<NxT>
+```
+
+Documented A5 types: `f16, f32`.
 
 ## Inputs
 
-`%src0` is the scaled vector, `%src1` is the addend vector, and
-  `%alpha` is the scalar multiplier.
+|| Operand | Type | Description |
+||---------|------|-------------|
+|| `%x` | `!pto.vreg<NxT>` | Scaled vector operand |
+|| `%y` | `!pto.vreg<NxT>` | Addend vector operand |
+|| `%alpha` | `T` (scalar) | Scalar multiplier |
+|| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 are active |
+
+Both source vectors MUST have the same element type and the same vector width `N`. The mask width MUST match `N`.
 
 ## Expected Outputs
 
-`%result` is the fused AXPY result.
+|| Result | Type | Description |
+||--------|------|-------------|
+|| `%result` | `!pto.vreg<NxT>` | Fused AXPY result: `dst[i] = alpha * x[i] + y[i]` |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination vector register. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Floating-point element types only on the
-  current documented instruction set.
+- **Type match**: `%x`, `%y`, and `%result` MUST have identical element types.
+- **Width match**: Both vector registers MUST have the same vector width `N`.
+- **Mask width**: `%mask` MUST have width equal to `N`.
+- **Active lanes**: Only lanes where the mask bit is 1 (true) participate in the computation.
+- **Floating-point only**: AXPY is defined for floating-point element types on the current documented instruction set.
 
 ## Exceptions
 
@@ -49,30 +68,47 @@ Floating-point element types only on the
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vaxpy`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+SFU operations have higher latency than standard arithmetic ops. Consult the target profile's performance model for cycle-accurate estimates.
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
+### A2/A3 Throughput
 
-If software scheduling or performance modeling depends on the exact cost of `pto.vaxpy`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+|| Metric | Value | Constant |
+||--------|-------|----------|
+|| Startup latency | 14 | `A2A3_STARTUP_BINARY` |
+|| Completion latency | 26 | `A2A3_COMPL_FP32_EXP` |
+|| Per-repeat throughput | 2 | `A2A3_RPT_2` |
+|| Pipeline interval | 18 | `A2A3_INTERVAL` |
+
+---
 
 ## Examples
+
+### Scalar-vector multiply-add (AXPY)
 
 ```c
 for (int i = 0; i < N; i++)
     dst[i] = alpha * src0[i] + src1[i];
 ```
 
-## Detailed Notes
+### MLIR form
 
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = alpha * src0[i] + src1[i];
+```mlir
+%result = pto.vaxpy %x, %y, %alpha, %mask : (!pto.vreg<64xf32>, !pto.vreg<64xf32>, f32, !pto.mask) -> !pto.vreg<64xf32>
+```
+
+### C++ intrinsic
+
+```cpp
+#include <pto/pto-inst.hpp>
+using namespace pto;
+
+Mask<64> mask;
+mask.set_all(true);
+float alpha = 2.5f;
+
+VAXPY(vdst, vx, vy, alpha, mask);
 ```
 
 ## Related Ops / Instruction Set Links

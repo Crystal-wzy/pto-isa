@@ -4,13 +4,21 @@
 
 ## Summary
 
-Select with reversed mask semantics.
+Per-lane select form with reversed predicate polarity.
 
 ## Mechanism
 
-`pto.vselr` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+The visible result follows the reverse-select contract: when the associated predicate lane is true, the instruction selects `%src1`; otherwise it selects `%src0`. Some lowerings surface the controlling predicate implicitly rather than as an explicit SSA operand, but the result polarity is the architectural difference from `pto.vsel`.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vselr %dst, %src0, %src1 : !pto.vreg<NxT>
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vselr %src0, %src1 : !pto.vreg<NxT>, !pto.vreg<NxT> -> !pto.vreg<NxT>
@@ -18,21 +26,25 @@ Select with reversed mask semantics.
 
 ## Inputs
 
-`%src0` and `%src1` are the source vectors.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %src0 | `!pto.vreg<NxT>` | Default vector value used when the associated predicate lane is false |
+| %src1 | `!pto.vreg<NxT>` | Vector value used when the associated predicate lane is true |
 
 ## Expected Outputs
 
-`%result` is the selected vector.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Selected vector result using the reverse-select polarity |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This instruction set preserves reversed-select
-  semantics. If the concrete lowering uses an implicit predicate source, that
-  predicate source MUST be documented by the surrounding IR pattern.
+- `%src0`, `%src1`, and `%result` MUST have the same vector width `N` and element type `T`.
+- If the controlling predicate is implicit in the lowering, that implicit source MUST be documented by the surrounding IR pattern or target profile.
 
 ## Exceptions
 
@@ -42,7 +54,7 @@ This instruction set preserves reversed-select
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
+- Code that depends on an implicit predicate source or a target-specific encoding variant should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -62,14 +74,11 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 
 ```c
 for (int i = 0; i < N; i++)
-    dst[i] = mask[i] ? src1[i] : src0[i];  // reversed from vsel
+    result[i] = pred[i] ? src1[i] : src0[i];
 ```
 
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = mask[i] ? src1[i] : src0[i];  // reversed from vsel
+```mlir
+%result = pto.vselr %fallback, %preferred : !pto.vreg<64xf32>, !pto.vreg<64xf32> -> !pto.vreg<64xf32>
 ```
 
 ## Related Ops / Instruction Set Links

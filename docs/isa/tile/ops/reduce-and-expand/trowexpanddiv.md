@@ -8,7 +8,7 @@ Row-wise broadcast divide: divide each row of `src0` by a per-row scalar vector 
 
 ## Mechanism
 
-Row-wise broadcast divide: divide each row of `src0` by a per-row scalar vector `src1`. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Row-wise broadcast divide: divide each row of `src0` by a per-row scalar vector `src1`.
 
 For each element `(i, j)` in the valid region:
 

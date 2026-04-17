@@ -8,7 +8,7 @@ Get the column index of the maximum element for each row.
 
 ## Mechanism
 
-Get the column index of the maximum element for each row. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Get the column index of the maximum element for each row.
 
 Let `R = src.GetValidRow()` and `C = src.GetValidCol()`. For `0 <= i < R`:
 
@@ -157,7 +157,7 @@ void example_manual() {
 
 ```text
 # Auto mode: compiler/runtime-managed placement and scheduling.
-%dst = pto.trowmax %src, %tmp : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
+%dst = pto.trowargmax %src, %tmp : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
 ```
 
 ### Manual Mode
@@ -167,15 +167,15 @@ void example_manual() {
 # Optional for tile operands:
 # pto.tassign %arg0, @tile(0x1000)
 # pto.tassign %arg1, @tile(0x2000)
-%dst = pto.trowmax %src, %tmp : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
+%dst = pto.trowargmax %src, %tmp : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
 ```
 
 ### PTO Assembly Form
 
 ```text
-%dst = trowmax %src : !pto.tile<...> -> !pto.tile<...>
+%dst = trowargmax %src : !pto.tile<...> -> !pto.tile<...>
 # IR Level 2 (DPS)
-pto.trowmax ins(%src, %tmp : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
+pto.trowargmax ins(%src, %tmp : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
 ## Related Ops / Instruction Set Links

@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vbcnt` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vbcnt` computes the lane-wise population count: `dst[i] = popcount(src[i])`. This counts the number of set bits (1s) in the binary representation of each element. Integer element types only. Inactive lanes leave the destination unchanged.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vbcnt %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vbcnt %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -20,11 +28,16 @@ Documented A5 types or forms: `all integer types`.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects active lanes.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` holds the population count for each active lane.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise population count: `dst[i] = popcount(src[i])` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 
@@ -61,13 +74,6 @@ For `pto.vbcnt`, those public sources describe the instruction semantics, operan
 If software scheduling or performance modeling depends on the exact cost of `pto.vbcnt`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
 
 ## Examples
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = __builtin_popcount(src[i]);
-```
-
-## Detailed Notes
 
 ```c
 for (int i = 0; i < N; i++)

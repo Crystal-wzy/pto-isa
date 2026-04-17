@@ -38,18 +38,6 @@ Synchronous form:
 pto.tcmp ins(%src0, %src1 {cmpMode = #pto.cmp<EQ>}: !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.tcmp %src0, %src1 {cmpMode = #pto.cmp<EQ>} : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.tcmp ins(%src0, %src1 {cmpMode = #pto.cmp<EQ>}: !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp` and `include/pto/common/type.hpp`:
@@ -73,15 +61,19 @@ PTO_INST RecordEvent TCMP(TileDataDst &dst, TileDataSrc &src0, TileDataSrc &src1
 
 ## Inputs
 
-- `src0` is the first source tile (left-hand side of comparison).
-- `src1` is the second source tile (right-hand side of comparison).
-- `dst` names the destination predicate tile.
-- `cmpMode` specifies the comparison predicate.
-- The operation iterates over `dst`'s valid region; `src0` and `src1` are sampled at the same coordinates.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src0` | Left tile | First source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%src1` | Right tile | Second source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%dst` | Predicate mask tile | Destination tile receiving the packed predicate mask |
+| `cmpMode` | Comparison predicate | One of `EQ`, `NE`, `LT`, `LE`, `GT`, `GE` |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the packed predicate mask tile. The mask encoding is target-defined; programs MUST NOT make assumptions about the bit layout.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination predicate tile; all `(i, j)` in its valid region contain the comparison result as a packed predicate mask after the operation |
 
 ## Side Effects
 

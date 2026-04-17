@@ -4,37 +4,56 @@
 
 ## Summary
 
-Widening multiply with high/low results.
+Multiply-subtract: computes `lhs * rhs - sub` in a single fused operation.
 
 ## Mechanism
 
-`pto.vmull` is a specialized `pto.v*` operation. It exposes fused, widening, or domain-specific hardware behavior through one stable virtual mnemonic so the instruction set can be reasoned about at the ISA level.
+Fused multiply-sub: `dst[i] = lhs[i] * rhs[i] - sub[i]`. Computes per-lane multiplication of two vectors, then subtracts a third vector, in a single fused operation. This combines multiplication and subtraction into one hardware instruction, eliminating an intermediate register write and improving throughput and numerical precision.
 
 ## Syntax
 
-```mlir
-%low, %high = pto.vmull %lhs, %rhs, %mask : !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>, !pto.vreg<NxT>
+### PTO Assembly Form
+
+```text
+vmull %dst, %sub, %lhs, %rhs, %mask : !pto.vreg<NxT>
 ```
 
-Documented A5 types or forms: `i32/u32 (native 32×32→64 widening multiply)`.
+### AS Level 1 (SSA)
+
+```mlir
+%result = pto.vmull %sub, %lhs, %rhs, %mask : (!pto.vreg<NxT>, !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask) -> !pto.vreg<NxT>
+```
+
+Documented A5 types: `i32/u32 (native 32×32→64 widening multiply)`.
 
 ## Inputs
 
-`%lhs` and `%rhs` are the source vectors and `%mask` selects
-  active lanes.
+|| Operand | Type | Description |
+||---------|------|-------------|
+|| `%sub` | `!pto.vreg<NxT>` | Subtrahend input vector |
+|| `%lhs` | `!pto.vreg<NxT>` | Left-hand multiplicand vector |
+|| `%rhs` | `!pto.vreg<NxT>` | Right-hand multiplicand vector |
+|| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 are active |
+
+All four operands MUST have the same element type and the same vector width `N`. The mask width MUST match `N`.
 
 ## Expected Outputs
 
-`%low` and `%high` expose the widened-product low/high parts.
+|| Result | Type | Description |
+||--------|------|-------------|
+|| `%result` | `!pto.vreg<NxT>` | Multiply-subtract result: `dst[i] = sub[i] - lhs[i] * rhs[i]` |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination vector register. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-The current documented A5 form is the native
-  widening 32x32->64 integer multiply instruction set.
+- **Type match**: All four registers MUST have identical element types.
+- **Width match**: All four registers MUST have the same vector width `N`.
+- **Mask width**: `%mask` MUST have width equal to `N`.
+- **Active lanes**: Only lanes where the mask bit is 1 (true) participate in the computation.
+- **Fused semantics**: `pto.vmull` is a fused multiply-subtract operation and is not always interchangeable with separate `vmul` plus `vsub`. The fused form provides better numerical precision and performance.
 
 ## Exceptions
 
@@ -49,36 +68,47 @@ The current documented A5 form is the native
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vmull`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+SFU operations have higher latency than standard arithmetic ops. Consult the target profile's performance model for cycle-accurate estimates.
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
+### A2/A3 Throughput
 
-If software scheduling or performance modeling depends on the exact cost of `pto.vmull`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+|| Metric | Value | Constant |
+||--------|-------|----------|
+|| Startup latency | 14 | `A2A3_STARTUP_BINARY` |
+|| Completion latency | 26 | `A2A3_COMPL_FP32_EXP` |
+|| Per-repeat throughput | 2 | `A2A3_RPT_2` |
+|| Pipeline interval | 18 | `A2A3_INTERVAL` |
+
+---
 
 ## Examples
 
+### Fused multiply-subtract
+
 ```c
-for (int i = 0; i < 64; i++) {
-    int64_t r = (int64_t)src0_i32[i] * (int64_t)src1_i32[i];
-    dst_lo[i] = (int32_t)(r & 0xFFFFFFFF);
-    dst_hi[i] = (int32_t)(r >> 32);
-}
+for (int i = 0; i < N; i++)
+    if (mask[i])
+        dst[i] = sub[i] - lhs[i] * rhs[i];
 ```
 
-## Detailed Notes
+### MLIR form
 
-```c
-for (int i = 0; i < 64; i++) {
-    int64_t r = (int64_t)src0_i32[i] * (int64_t)src1_i32[i];
-    dst_lo[i] = (int32_t)(r & 0xFFFFFFFF);
-    dst_hi[i] = (int32_t)(r >> 32);
-}
+```mlir
+%result = pto.vmull %sub, %lhs, %rhs, %mask : (!pto.vreg<64xi32>, !pto.vreg<64xi32>, !pto.vreg<64xi32>, !pto.mask) -> !pto.vreg<64xi32>
+```
+
+### C++ intrinsic
+
+```cpp
+#include <pto/pto-inst.hpp>
+using namespace pto;
+
+Mask<64> mask;
+mask.set_all(true);
+
+VMULL(vdst, vsub, vlhs, vrhs, mask);
 ```
 
 ## Related Ops / Instruction Set Links

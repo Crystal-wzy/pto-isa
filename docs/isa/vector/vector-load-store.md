@@ -463,33 +463,6 @@ for (int i = 0; i < active_lanes; i++)
 
 ---
 
-### `pto.vstas`
-- **syntax:** `pto.vstas %value, %dest, %offset : !pto.align, !pto.ptr<T, ub>, i32`
-- **semantics:** Scalar-register-offset form of alignment-state flush.
-- **inputs:**
-  `%value` is the pending store-alignment state, `%dest` is the UB base
-  pointer, and `%offset` is the scalar-register style displacement.
-- **outputs:**
-  This op writes buffered tail bytes to UB and returns no SSA value.
-- **constraints and limitations:**
-  This instruction set uses the same buffered-tail semantics as `pto.vsta` but keeps the
-  scalar-offset form explicit.
-
----
-
-### `pto.vstar`
-- **syntax:** `pto.vstar %value, %dest : !pto.align, !pto.ptr<T, ub>`
-- **semantics:** Flush alignment state using the register-update form.
-- **inputs:**
-  `%value` is the pending store-alignment state and `%dest` is the UB base
-  pointer.
-- **outputs:**
-  This op writes buffered tail bytes to UB and returns no SSA value.
-- **constraints and limitations:**
-  The implicit update state consumed by this flush MUST correspond to the same
-  store stream that produced `%value`.
-
----
 
 ### `pto.vstu`
 

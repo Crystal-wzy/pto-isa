@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vrelu` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vrelu` applies the Rectified Linear Unit function lane-wise: `dst[i] = max(src[i], 0)`. For floating-point, negative values map to zero; zero and positive values pass through unchanged. Inactive lanes leave the destination unchanged.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vrelu %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vrelu %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -20,11 +28,16 @@ Documented A5 types or forms: `f16, f32`.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects active lanes.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` holds `max(input[i], 0)` per active lane.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise ReLU: `dst[i] = max(src[i], 0)` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 

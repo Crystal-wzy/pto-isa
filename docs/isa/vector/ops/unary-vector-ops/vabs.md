@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vabs` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vabs` computes the lane-wise absolute value. For each lane `i` where the predicate is true, `dst[i] = abs(src[i])`. Inactive lanes leave the destination unchanged.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vabs %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vabs %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -20,12 +28,16 @@ Documented A5 types or forms: `i8-i32, f16, f32`.
 
 ## Inputs
 
-`%input` supplies the source lanes and `%mask` selects which lanes
-  participate.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` receives the lane-wise absolute values.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise absolute values: `dst[i] = abs(src[i])` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 

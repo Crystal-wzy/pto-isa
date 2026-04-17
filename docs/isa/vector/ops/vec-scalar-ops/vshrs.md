@@ -4,13 +4,21 @@
 
 ## Summary
 
-`%result` is the shifted vector.
+Lane-wise right shift by a broadcast scalar amount.
 
 ## Mechanism
 
-`pto.vshrs` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+For each active lane `i`, `dst[i] = src[i] >> scalar`. The scalar shift count is applied uniformly to every active lane. Inactive lanes do not participate in the operation.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vshrs %dst, %src, %shift, %mask : !pto.vreg<NxT>, T
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vshrs %input, %scalar, %mask : !pto.vreg<NxT>, T, !pto.mask -> !pto.vreg<NxT>
@@ -18,20 +26,27 @@
 
 ## Inputs
 
-`%input` is the value vector, `%scalar` is the uniform shift
-  amount, and `%mask` selects active lanes.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %input | `!pto.vreg<NxT>` | Source vector register |
+| %scalar | `T` | Uniform shift amount broadcast to every active lane |
+| %mask | `!pto.mask` | Predicate mask; only lanes with mask bit 1 participate |
 
 ## Expected Outputs
 
-`%result` is the shifted vector.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Lane-wise right-shift result on the active lanes |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Integer element types only.
+- Shift forms are defined for integer element types only.
+- The exact sign-extension behavior follows the selected element type and target profile.
+- `%input` and `%result` MUST have the same vector width `N` and element type `T`.
 
 ## Exceptions
 
@@ -40,8 +55,8 @@ Integer element types only.
 
 ## Target-Profile Restrictions
 
+- Integer element types only.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -61,14 +76,12 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 
 ```c
 for (int i = 0; i < N; i++)
-    dst[i] = src[i] >> scalar;
+    if (mask[i])
+        dst[i] = src[i] >> scalar;
 ```
 
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = src[i] >> scalar;
+```mlir
+%result = pto.vshrs %values, %shift, %mask : !pto.vreg<64xi32>, i32, !pto.mask -> !pto.vreg<64xi32>
 ```
 
 ## Related Ops / Instruction Set Links

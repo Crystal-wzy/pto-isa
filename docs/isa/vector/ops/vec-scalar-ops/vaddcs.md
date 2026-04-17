@@ -4,13 +4,21 @@
 
 ## Summary
 
-Add with carry-in and carry-out.
+Lane-wise add with explicit carry-in and carry-out masks.
 
 ## Mechanism
 
-`pto.vaddcs` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+For each active lane `i`, `sum = lhs[i] + rhs[i] + carry_in[i]`, `result[i] = low_bits(sum)`, and `carry[i] = carry_out(sum)`. The carry chain is lane-local in the PTO surface: each lane consumes one incoming carry bit and produces one outgoing carry bit.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vaddcs %dst, %carry_out, %lhs, %rhs, %carry_in, %mask : !pto.vreg<NxT>, !pto.mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result, %carry = pto.vaddcs %lhs, %rhs, %carry_in, %mask : !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask, !pto.mask -> !pto.vreg<NxT>, !pto.mask
@@ -18,23 +26,29 @@ Add with carry-in and carry-out.
 
 ## Inputs
 
-`%lhs` and `%rhs` are the value vectors, `%carry_in` is the
-  incoming carry predicate, and `%mask` selects active lanes.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %lhs | `!pto.vreg<NxT>` | Left-hand value vector |
+| %rhs | `!pto.vreg<NxT>` | Right-hand value vector |
+| %carry_in | `!pto.mask` | Incoming carry bit per lane |
+| %mask | `!pto.mask` | Predicate mask; only lanes with mask bit 1 participate |
 
 ## Expected Outputs
 
-`%result` is the arithmetic result and `%carry` is the carry-out
-  predicate.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Lane-wise arithmetic result on the active lanes |
+| %carry | `!pto.mask` | Carry-out bit produced for each active lane |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This is the scalar-extended carry-chain
-  instruction set. Treat it as an unsigned integer operation unless the verifier states a
-  wider legal domain.
+- Carry-chain forms are defined for integer element types.
+- `%lhs`, `%rhs`, and `%result` MUST have the same vector width `N` and element type `T`.
+- `%carry_in`, `%carry`, and `%mask` MUST all have width `N`.
 
 ## Exceptions
 
@@ -43,8 +57,8 @@ This is the scalar-extended carry-chain
 
 ## Target-Profile Restrictions
 
+- Treat this form as an unsigned integer carry-chain unless a target profile documents a wider legal domain.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -64,20 +78,15 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 
 ```c
 for (int i = 0; i < N; i++) {
-    uint64_t r = (uint64_t)src0[i] + src1[i] + carry_in[i];
-    dst[i] = (T)r;
-    carry_out[i] = (r >> bitwidth);
+    if (!mask[i]) continue;
+    uint64_t sum = (uint64_t)lhs[i] + rhs[i] + carry_in[i];
+    result[i] = (T)sum;
+    carry[i] = (sum >> BITWIDTH_T) & 0x1;
 }
 ```
 
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++) {
-    uint64_t r = (uint64_t)src0[i] + src1[i] + carry_in[i];
-    dst[i] = (T)r;
-    carry_out[i] = (r >> bitwidth);
-}
+```mlir
+%result, %carry = pto.vaddcs %lhs, %rhs, %carry_in, %mask : !pto.vreg<64xi32>, !pto.vreg<64xi32>, !pto.mask, !pto.mask -> !pto.vreg<64xi32>, !pto.mask
 ```
 
 ## Related Ops / Instruction Set Links

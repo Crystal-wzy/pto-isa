@@ -12,6 +12,14 @@ Gather with broadcast, conditioned by mask.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vgather2_bc %result, %source, %offsets, %mask
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vgather2_bc %source, %offsets, %mask : !pto.ptr<T, ub>, !pto.vreg<NxI>, !pto.mask -> !pto.vreg<NxT>
 ```

@@ -12,6 +12,14 @@ Byte-granularity indexed gather from UB.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vgatherb %result, %source, %offsets, %active_lanes
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vgatherb %source, %offsets, %active_lanes : !pto.ptr<T, ub>, !pto.vreg<NxI>, index -> !pto.vreg<NxT>
 ```

@@ -12,6 +12,14 @@ Indexed gather from UB.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vgather2 %result, %source, %offsets, %active_lanes
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vgather2 %source, %offsets, %active_lanes : !pto.ptr<T, ub>, !pto.vreg<NxI>, index -> !pto.vreg<NxT>
 ```

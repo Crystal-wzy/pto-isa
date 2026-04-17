@@ -4,34 +4,56 @@
 
 ## Summary
 
-Fused mul + type conversion (HW fusion).
+Fused multiply + ReLU with element-type conversion (hardware fusion).
 
 ## Mechanism
 
-`pto.vmulconv` is a specialized `pto.v*` operation. It exposes fused, widening, or domain-specific hardware behavior through one stable virtual mnemonic so the instruction set can be reasoned about at the ISA level.
+Fused multiply + ReLU conversion: `dst[i] = max(0, lhs[i] * rhs[i])`. Multiplies two vectors and applies ReLU with optional element-type conversion in a single fused operation. Combines multiplication, ReLU, and type conversion into one hardware instruction, eliminating intermediate register writes and improving throughput.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vmulconv %dst, %lhs, %rhs, %mask : !pto.vreg<NxT0>
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
-%result = pto.vmulconv %lhs, %rhs : !pto.vreg<NxT0>, !pto.vreg<NxT0> -> !pto.vreg<MxT1>
+%result = pto.vmulconv %lhs, %rhs, %mask : (!pto.vreg<NxT0>, !pto.vreg<NxT0>, !pto.mask) -> !pto.vreg<MxT1>
 ```
 
 ## Inputs
 
-`%lhs` and `%rhs` are the source vectors.
+|| Operand | Type | Description |
+||---------|------|-------------|
+|| `%lhs` | `!pto.vreg<NxT0>` | Left-hand source vector |
+|| `%rhs` | `!pto.vreg<NxT0>` | Right-hand source vector |
+|| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 are active |
+
+Both source vectors MUST have the same element type `T0` and the same vector width `N`. The mask width MUST match `N`.
 
 ## Expected Outputs
 
-`%result` is the fused mul/convert result.
+|| Result | Type | Description |
+||--------|------|-------------|
+|| `%result` | `!pto.vreg<MxT1>` | Fused multiply/ReLU/convert result |
+
+The destination element type `T1` may differ from the source type `T0`. Only backend-supported source/destination type pairs are legal.
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination vector register. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Only backend-supported source/destination
-  type pairs are legal.
+- **Type match**: Both source vectors MUST have identical element types.
+- **Width match**: Both source vectors MUST have the same vector width `N`.
+- **Mask width**: `%mask` MUST have width equal to `N`.
+- **Active lanes**: Only lanes where the mask bit is 1 (true) participate in the computation.
+- **Type conversion**: Only backend-supported source/destination type pairs are legal.
+- **Rounding/saturation**: Rounding, saturation, and packing rules follow the semantics of this fused operation, not an arbitrary sequence of standalone ops.
 
 ## Exceptions
 
@@ -45,33 +67,40 @@ Only backend-supported source/destination
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vmulconv`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+SFU operations have higher latency than standard arithmetic ops. Consult the target profile's performance model for cycle-accurate estimates.
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
+### A2/A3 Throughput
 
-If software scheduling or performance modeling depends on the exact cost of `pto.vmulconv`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+|| Metric | Value | Constant |
+||--------|-------|----------|
+|| Startup latency | 14 | `A2A3_STARTUP_BINARY` |
+|| Completion latency | 26 | `A2A3_COMPL_FP32_EXP` |
+|| Per-repeat throughput | 2 | `A2A3_RPT_2` |
+|| Pipeline interval | 18 | `A2A3_INTERVAL` |
+
+---
 
 ## Examples
 
-```c
-// f16→i8 variant:
-for (int i = 0; i < 128; i++)
-    dst_i8[i] = f16_to_i8(src0_f16[i] * src1_f16[i]);
-```
-
-## Detailed Notes
+### Fused multiply + ReLU with type conversion
 
 ```c
 // f16→i8 variant:
 for (int i = 0; i < 128; i++)
-    dst_i8[i] = f16_to_i8(src0_f16[i] * src1_f16[i]);
+    dst_i8[i] = f16_to_i8(max(src0_f16[i] * src1_f16[i], 0));
 ```
+
+### MLIR form
+
+```mlir
+%result = pto.vmulconv %lhs, %rhs, %mask : (!pto.vreg<128xf16>, !pto.vreg<128xf16>, !pto.mask) -> !pto.vreg<128xi8>
+```
+
+## Extended Arithmetic
+
+This operation performs element-type conversion as part of the fused sequence. The conversion may involve rounding, saturation, or other type-specific behavior.
 
 ## Related Ops / Instruction Set Links
 

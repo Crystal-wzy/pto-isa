@@ -12,6 +12,14 @@ Vector store with distribution mode.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vsts %value, %dest[%offset], %mask {dist = "DIST"}
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vsts %value, %dest[%offset], %mask {dist = "DIST"} : !pto.vreg<NxT>, !pto.ptr<T, ub>, !pto.mask
 ```

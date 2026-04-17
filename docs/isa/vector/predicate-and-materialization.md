@@ -76,7 +76,7 @@ pto.psts %mask, %ub[%c0] : !pto.mask, !pto.ptr<T, ub>
 
 ---
 
-## Typical Usage Pattern
+## Advanced Usage Pattern
 
 ```mlir
 // Generate comparison mask
@@ -326,7 +326,7 @@ for (int i = 0; i < N; i++)
 
 ---
 
-## Typical Usage
+## Advanced Usage
 
 ```mlir
 // Generate all-active mask for f32 (64 lanes)

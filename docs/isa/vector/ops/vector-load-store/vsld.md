@@ -12,6 +12,14 @@ Strided load with fixed stride pattern.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vsld %result, %source[%offset], "STRIDE"
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vsld %source[%offset], "STRIDE" : !pto.ptr<T, ub> -> !pto.vreg<NxT>
 ```

@@ -8,7 +8,7 @@ Reduce each row by summing across columns.
 
 ## Mechanism
 
-Reduce each row by summing across columns. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Reduce each row by summing across columns.
 
 Let `R = src.GetValidRow()` and `C = src.GetValidCol()`. For `0 <= i < R`:
 

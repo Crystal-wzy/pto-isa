@@ -12,6 +12,14 @@ Unaligned store with scalar offset and state update.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vstus %align_out, %base_out, %align_in, %offset, %value, %base, "MODE"
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %align_out, %base_out = pto.vstus %align_in, %offset, %value, %base, "MODE" : !pto.align, i32, !pto.vreg<NxT>, !pto.ptr<T, ub> -> !pto.align, !pto.ptr<T, ub>
 ```

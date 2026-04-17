@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vrsqrt` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vrsqrt` computes the lane-wise reciprocal square root: `dst[i] = 1 / sqrt(src[i])`. This is commonly used in normalizing vectors. Inactive lanes leave the destination unchanged.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vrsqrt %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vrsqrt %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -20,11 +28,16 @@ Documented A5 types or forms: `f16, f32`.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects active lanes.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` holds reciprocal-square-root values per active lane.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise reciprocal square root: `dst[i] = 1 / sqrt(src[i])` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 
@@ -50,26 +63,25 @@ Only floating-point element types are legal.
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vrsqrt`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+| Element Type | Latency (cycles) | A5 RV |
+|---|---|---|
+| `f32` | 13 | `RV_VMULS` (scalar-mul path) |
+| `f16` | 13 | `RV_VMULS` (scalar-mul path) |
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
+### A2/A3 Throughput
 
-If software scheduling or performance modeling depends on the exact cost of `pto.vrsqrt`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+| Metric | Value | Constant |
+|--------|-------|----------|
+| Startup latency | 14 | `A2A3_STARTUP_BINARY` |
+| Completion latency | 20 (FP) | `A2A3_COMPL_FP_MUL` |
+| Per-repeat throughput | 1 | `A2A3_RPT_1` |
+| Pipeline interval | 18 | `A2A3_INTERVAL` |
+
+---
 
 ## Examples
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = 1.0f / sqrtf(src[i]);
-```
-
-## Detailed Notes
 
 ```c
 for (int i = 0; i < N; i++)

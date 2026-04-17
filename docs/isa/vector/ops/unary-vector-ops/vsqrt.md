@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vsqrt` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vsqrt` computes the lane-wise square root. For each lane `i` where the predicate is true, `dst[i] = sqrt(src[i])`. Domain behavior for negative inputs is target-defined. Inactive lanes leave the destination unchanged.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vsqrt %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vsqrt %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -20,11 +28,16 @@ Documented A5 types or forms: `f16, f32`.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects active lanes.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` holds the square root per active lane.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise square root: `dst[i] = sqrt(src[i])` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 

@@ -4,13 +4,21 @@
 
 ## Summary
 
-`%result` is the selected deinterleave half.
+Variant deinterleave form that returns one selected half of the deinterleaved result.
 
 ## Mechanism
 
-`pto.vdintlvv2` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vdintlvv2` preserves the same deinterleave semantics as `pto.vdintlv`, but returns only one half of the result pair. The `PART` selector chooses which half of the deinterleaved stream is materialized in SSA form.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vdintlvv2 %dst, %lhs, %rhs, "PART"
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vdintlvv2 %lhs, %rhs, "PART" : !pto.vreg<NxT>, !pto.vreg<NxT> -> !pto.vreg<NxT>
@@ -18,21 +26,26 @@
 
 ## Inputs
 
-`%lhs` and `%rhs` are source vectors and `PART` selects the
-  returned half of the V2 deinterleave result.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %lhs | `!pto.vreg<NxT>` | First half of the interleaved source stream |
+| %rhs | `!pto.vreg<NxT>` | Second half of the interleaved source stream |
+| `PART` | enum | Selector for which deinterleave half is returned |
 
 ## Expected Outputs
 
-`%result` is the selected deinterleave half.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Selected half of the deinterleave result |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This op exposes only one half of the V2
-  result in SSA form.
+- The `PART` selector determines which half of the paired deinterleave result is returned.
+- `%lhs`, `%rhs`, and `%result` MUST have the same element type and vector width.
 
 ## Exceptions
 
@@ -42,7 +55,7 @@ This op exposes only one half of the V2
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -64,11 +77,8 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 %result = pto.vdintlvv2 %lhs, %rhs, "PART" : !pto.vreg<NxT>, !pto.vreg<NxT> -> !pto.vreg<NxT>
 ```
 
-## Detailed Notes
-
-The instruction set overview carries the remaining shared rules for this operation.
-
 ## Related Ops / Instruction Set Links
 
 - Instruction set overview: [Data Rearrangement](../../data-rearrangement.md)
 - Previous op in instruction set: [pto.vintlvv2](./vintlvv2.md)
+- Next op in instruction set: (none)

@@ -4,13 +4,21 @@
 
 ## Summary
 
-Single-source slide (shift with zero fill).
+Single-source shift that inserts zero-fill at the vacated lanes.
 
 ## Mechanism
 
-`pto.vshift` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vshift` is the single-source sibling of `pto.vslide`. It shifts the source vector by `%amt` lanes and fills newly uncovered lanes with zero according to the selected element type.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vshift %dst, %src, %amt
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vshift %src, %amt : !pto.vreg<NxT>, i16 -> !pto.vreg<NxT>
@@ -18,21 +26,26 @@ Single-source slide (shift with zero fill).
 
 ## Inputs
 
-`%src` is the source vector and `%amt` is the slide amount.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %src | `!pto.vreg<NxT>` | Source vector |
+| %amt | `i16` | Shift amount in lanes |
 
 ## Expected Outputs
 
-`%result` is the shifted vector.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Shifted vector with zero-filled vacated lanes |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This instruction set represents the single-source
-  slide/shift instruction set. Zero-fill versus other fill behavior MUST match the
-  selected form.
+- `%src` and `%result` MUST have the same element type and vector width.
+- The shift amount MUST satisfy the range supported by the selected target profile.
+- Zero-fill versus any alternative fill behavior MUST match the selected form.
 
 ## Exceptions
 
@@ -42,30 +55,9 @@ This instruction set represents the single-source
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
-
-## Performance
-
-### Timing Disclosure
-
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vshift`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
-
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
-
-If software scheduling or performance modeling depends on the exact cost of `pto.vshift`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Examples
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = (i >= amt) ? src[i - amt] : 0;
-```
-
-## Detailed Notes
 
 ```c
 for (int i = 0; i < N; i++)

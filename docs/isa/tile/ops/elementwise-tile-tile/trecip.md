@@ -8,7 +8,7 @@ Elementwise reciprocal of a tile.
 
 ## Mechanism
 
-Elementwise reciprocal of a tile. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Elementwise reciprocal of a tile.
 
 For each element `(i, j)` in the valid region:
 
@@ -53,13 +53,17 @@ PTO_INST RecordEvent TRECIP(TileDataDst &dst, TileDataSrc &src, WaitEvents &... 
 
 ## Inputs
 
-- `src` is the source tile.
-- `dst` names the destination tile.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src` | Source tile | Source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%dst` | Destination tile | Destination tile receiving the result |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile or updated tile payload produced by the operation.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `1/src[i,j]` after the operation |
 
 ## Side Effects
 
@@ -90,6 +94,21 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 - **High Precision Algorithm**
     - Only available on A5, `PrecisionType` option is ignored on A3.
+
+## Performance
+
+### A2/A3 Throughput
+
+`TRECIP` compiles to CCE vector instructions via the `TUnaryOp.hpp` performance model:
+
+| Metric | Value |
+|--------|-------|
+| Startup latency | 13 |
+| Completion latency | 26 (FP transcendental) |
+| Per-repeat throughput | 1 |
+| Pipeline interval | 18 |
+
+---
 
 ## Examples
 

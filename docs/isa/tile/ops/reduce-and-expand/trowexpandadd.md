@@ -8,7 +8,7 @@ Row-wise broadcast add: add a per-row scalar vector.
 
 ## Mechanism
 
-Row-wise broadcast add: add a per-row scalar vector `src1` to each row of `src0`. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Row-wise broadcast add: add a per-row scalar vector `src1` to each row of `src0`.
 
 Let `R = dst.GetValidRow()` and `C = dst.GetValidCol()`. Let `s_i` be the per-row scalar taken from `src1` (one value per row).
 
@@ -35,18 +35,6 @@ Synchronous form:
 ```
 
 ### AS Level 2 (DPS)
-
-```text
-pto.trowexpandadd ins(%src0, %src1 : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.trowexpandadd %src0, %src1 : !pto.tile<...>, !pto.tile<...> -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
 
 ```text
 pto.trowexpandadd ins(%src0, %src1 : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
@@ -107,7 +95,46 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Examples
 
-See related examples in `docs/isa/` and `docs/coding/tutorials/`.
+### Auto
+
+```cpp
+#include <pto/pto-inst.hpp>
+
+using namespace pto;
+
+void example_auto() {
+  using SrcT = Tile<TileType::Vec, float, 16, 16>;
+  using DstT = Tile<TileType::Vec, float, 16, 16>;
+  using RowVecT = Tile<TileType::Vec, float, 16, 1, BLayout::ColMajor>;
+  SrcT src0;
+  DstT dst;
+  RowVecT src1;
+  // Row-expand-add: each row of dst = src0.row + src1.row_scalar
+  TROWEXPANDADD(dst, src0, src1);
+}
+```
+
+### Manual
+
+```cpp
+#include <pto/pto-inst.hpp>
+
+using namespace pto;
+
+void example_manual() {
+  using SrcT = Tile<TileType::Vec, float, 16, 16>;
+  using DstT = Tile<TileType::Vec, float, 16, 16>;
+  using RowVecT = Tile<TileType::Vec, float, 16, 1, BLayout::ColMajor>;
+  SrcT src0;
+  DstT dst;
+  RowVecT src1;
+  TASSIGN(src0, 0x1000);
+  TASSIGN(dst, 0x2000);
+  TASSIGN(src1, 0x3000);
+  // Row-expand-add in manual mode
+  TROWEXPANDADD(dst, src0, src1);
+}
+```
 
 ### Auto Mode
 

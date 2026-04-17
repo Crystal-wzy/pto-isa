@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vdiv` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vdiv` is a `pto.v*` compute operation.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vdiv %result, %lhs, %rhs, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vdiv %lhs, %rhs, %mask : !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>

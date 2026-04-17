@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vnot` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vnot` computes the lane-wise bitwise inversion: `dst[i] = ~src[i]`. This inverts all bits in each element. Integer element types only. Inactive lanes leave the destination unchanged.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vnot %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vnot %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -20,11 +28,16 @@ Documented A5 types or forms: `all integer types`.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects active lanes.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` holds the lane-wise bitwise inversion.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise bitwise inversion: `dst[i] = ~src[i]` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 
@@ -60,13 +73,6 @@ For `pto.vnot`, those public sources describe the instruction semantics, operand
 If software scheduling or performance modeling depends on the exact cost of `pto.vnot`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
 
 ## Examples
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = ~src[i];
-```
-
-## Detailed Notes
 
 ```c
 for (int i = 0; i < N; i++)

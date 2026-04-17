@@ -4,35 +4,54 @@
 
 ## Summary
 
-Multiply-accumulate.
+Multiply-accumulate: computes `lhs * rhs + add` in a single fused operation.
 
 ## Mechanism
 
-`pto.vmula` is a specialized `pto.v*` operation. It exposes fused, widening, or domain-specific hardware behavior through one stable virtual mnemonic so the instruction set can be reasoned about at the ISA level.
+Fused multiply-add: `dst[i] = lhs[i] * rhs[i] + add[i]`. Computes per-lane multiplication of two vectors, then adds a third vector, in a single fused operation. This combines multiplication and addition into one hardware instruction, eliminating an intermediate register write and improving throughput and numerical precision.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vmula %dst, %add, %lhs, %rhs, %mask : !pto.vreg<NxT>
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
-%result = pto.vmula %acc, %lhs, %rhs, %mask : !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
+%result = pto.vmula %add, %lhs, %rhs, %mask : (!pto.vreg<NxT>, !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask) -> !pto.vreg<NxT>
 ```
 
 ## Inputs
 
-`%acc` is the accumulator input, `%lhs` and `%rhs` are the
-  multiplicands, and `%mask` selects active lanes.
+|| Operand | Type | Description |
+||---------|------|-------------|
+|| `%add` | `!pto.vreg<NxT>` | Accumulator input vector |
+|| `%lhs` | `!pto.vreg<NxT>` | Left-hand multiplicand vector |
+|| `%rhs` | `!pto.vreg<NxT>` | Right-hand multiplicand vector |
+|| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 are active |
+
+All four operands MUST have the same element type and the same vector width `N`. The mask width MUST match `N`.
 
 ## Expected Outputs
 
-`%result` is the multiply-accumulate result.
+|| Result | Type | Description |
+||--------|------|-------------|
+|| `%result` | `!pto.vreg<NxT>` | Multiply-accumulate result: `dst[i] = add[i] + lhs[i] * rhs[i]` |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination vector register. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-`pto.vmula` is a fused multiply-accumulate
-  operation and is not always interchangeable with separate `vmul` plus `vadd`.
+- **Type match**: All four registers MUST have identical element types.
+- **Width match**: All four registers MUST have the same vector width `N`.
+- **Mask width**: `%mask` MUST have width equal to `N`.
+- **Active lanes**: Only lanes where the mask bit is 1 (true) participate in the computation.
+- **Fused semantics**: `pto.vmula` is a fused multiply-accumulate operation and is not always interchangeable with separate `vmul` plus `vadd`. The fused form provides better numerical precision and performance.
 
 ## Exceptions
 
@@ -46,33 +65,52 @@ This operation has no architectural side effect beyond producing its SSA results
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vmula`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+SFU operations have higher latency than standard arithmetic ops. Consult the target profile's performance model for cycle-accurate estimates.
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
+### A2/A3 Throughput
 
-If software scheduling or performance modeling depends on the exact cost of `pto.vmula`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+|| Metric | Value | Constant |
+||--------|-------|----------|
+|| Startup latency | 14 | `A2A3_STARTUP_BINARY` |
+|| Completion latency | 26 | `A2A3_COMPL_FP32_EXP` |
+|| Per-repeat throughput | 2 | `A2A3_RPT_2` |
+|| Pipeline interval | 18 | `A2A3_INTERVAL` |
+
+---
 
 ## Examples
 
-```c
-for (int i = 0; i < N; i++)
-    if (mask[i])
-        dst[i] = acc[i] + lhs[i] * rhs[i];
-```
-
-## Detailed Notes
+### Fused multiply-accumulate
 
 ```c
 for (int i = 0; i < N; i++)
     if (mask[i])
         dst[i] = acc[i] + lhs[i] * rhs[i];
 ```
+
+### MLIR form
+
+```mlir
+%result = pto.vmula %acc, %lhs, %rhs, %mask : (!pto.vreg<64xf32>, !pto.vreg<64xf32>, !pto.vreg<64xf32>, !pto.mask) -> !pto.vreg<64xf32>
+```
+
+### C++ intrinsic
+
+```cpp
+#include <pto/pto-inst.hpp>
+using namespace pto;
+
+Mask<64> mask;
+mask.set_all(true);
+
+VMULA(vdst, vacc, vlhs, vrhs, mask);
+```
+
+## Index Generation
+
+This operation does not generate indices.
 
 ## Related Ops / Instruction Set Links
 

@@ -57,18 +57,6 @@ Synchronous form:
 pto.tcvt ins(%src {rmode = #pto.round_mode<CAST_RINT>}: !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.tcvt %src {rmode = #pto.round_mode<CAST_RINT>} : !pto.tile<...> -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.tcvt ins(%src {rmode = #pto.round_mode<CAST_RINT>}: !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp` and `include/pto/common/constants.hpp`:
@@ -88,15 +76,19 @@ Overload 2 (with explicit `SaturationMode`) is not currently implemented on the 
 
 ## Inputs
 
-- `src` is the source tile whose elements are converted to the destination type.
-- `dst` names the destination tile receiving the converted values.
-- `mode` specifies the rounding mode.
-- `satMode` (overload 2 only) specifies saturation behavior.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src` | Source tile | Source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%dst` | Destination tile | Destination tile receiving the converted values |
+| `mode` | Rounding mode | One of `CAST_RINT`, `CAST_RZ`, `CAST_RP`, `CAST_RM`, `CAST_RN` |
+| `satMode` | Saturation mode (optional) | `NONE` or `SAT` for explicit saturation control |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile with converted element values. `src`'s element values are not modified.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain the converted element values after the operation |
 
 ## Side Effects
 

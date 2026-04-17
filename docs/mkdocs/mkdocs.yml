@@ -29,7 +29,6 @@ exclude_docs: |
   docs/README.md
   docs/README_zh.md
   docs/agent.md
-  docs/assembly/**
   docs/auto_mode/**
   docs/coding/**
   docs/menu_apis.md
@@ -436,6 +435,15 @@ nav:
               - pto.pintlv_b16: docs/isa/scalar/ops/predicate-generation-and-algebra/pintlv-b16.md
           - Shared Arithmetic: docs/isa/scalar/shared-arith.md
           - Shared SCF: docs/isa/scalar/shared-scf.md
+          - PTO Micro-Instruction Reference:
+              - Overview: docs/isa/scalar/ops/micro-instruction/README.md
+              - BlockDim Query: docs/isa/scalar/ops/micro-instruction/block-dim-query.md
+              - Pointer Operations: docs/isa/scalar/ops/micro-instruction/pointer-operations.md
+              - Vector Execution Scope: docs/isa/scalar/ops/micro-instruction/vecscope.md
+              - Alignment State Type: docs/isa/scalar/ops/micro-instruction/align-type.md
+  - 11A. PTO-AS Reference:
+          - PTO-AS Specification: docs/assembly/PTO-AS.md
+          - PTO-AS 规范: docs/assembly/PTO-AS_zh.md
   - 12. Other And Communication Reference:
           - Overview: docs/isa/other/README.md
           - Communication And Runtime:

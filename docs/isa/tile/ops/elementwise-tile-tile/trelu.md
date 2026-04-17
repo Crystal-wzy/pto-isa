@@ -8,7 +8,7 @@ Elementwise ReLU of a tile.
 
 ## Mechanism
 
-Elementwise ReLU of a tile. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Elementwise ReLU of a tile.
 
 For each element `(i, j)` in the valid region:
 
@@ -36,18 +36,6 @@ Synchronous form:
 pto.trelu ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.trelu %src : !pto.tile<...> -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.trelu ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`:
@@ -59,13 +47,17 @@ PTO_INST RecordEvent TRELU(TileDataDst &dst, TileDataSrc &src, WaitEvents &... e
 
 ## Inputs
 
-- `src` is the source tile.
-- `dst` names the destination tile.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src` | Source tile | Source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%dst` | Destination tile | Destination tile receiving the result |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile or updated tile payload produced by the operation.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `max(src[i,j], 0)` after the operation |
 
 ## Side Effects
 
@@ -96,6 +88,21 @@ No architectural side effects beyond producing the destination tile. Does not im
     - Tile location must be vector (`TileData::Loc == TileType::Vec`).
     - Static valid bounds: `TileData::ValidRow <= TileData::Rows` and `TileData::ValidCol <= TileData::Cols`.
     - Runtime: `src` and `dst` tiles should have the same `validRow/validCol`.
+
+## Performance
+
+### A2/A3 Throughput
+
+`TRELU` compiles to CCE vector instructions via the `TUnaryOp.hpp` performance model:
+
+| Metric | Value |
+|--------|-------|
+| Startup latency | 13 |
+| Completion latency | 26 (FP transcendental) |
+| Per-repeat throughput | 1 |
+| Pipeline interval | 18 |
+
+---
 
 ## Examples
 

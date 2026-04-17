@@ -4,13 +4,21 @@
 
 ## Summary
 
-Drain all pending ops in the specified pipe. All previously issued operations on that pipe complete before any subsequent operation begins.
+Drain all previously issued work in one pipeline before allowing later work on that same pipeline to begin.
 
 ## Mechanism
 
-`pto.pipe_barrier` is a `pto.*` control/configuration operation. It changes ordering, buffer, event, or DMA-visible state that later payload work depends on. The portable guarantee is the dependency/configuration effect, while concrete pipe/event spaces remain target-profile details.
+`pto.pipe_barrier` forces completion of the named pipeline's outstanding work. It is the simplest ordering primitive when the hazard is confined to one pipeline and no explicit cross-pipeline event identity is required.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+pipe_barrier "PIPE_*"
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 pto.pipe_barrier "PIPE_*"
@@ -18,69 +26,45 @@ pto.pipe_barrier "PIPE_*"
 
 ## Inputs
 
-The inputs are the architecture-visible control operands shown in the syntax: pipe ids, event ids, buffer ids, loop/stride values, pointers, or configuration words used to drive later execution.
+| Operand | Type | Description |
+| --- | --- | --- |
+| `PIPE_*` | pipe identifier | Pipeline whose outstanding work must retire before later work begins |
 
 ## Expected Outputs
 
-This form is primarily defined by the side effect it has on control state, predicate state, or memory. It does not publish a new payload SSA result beyond any explicit state outputs shown in the syntax.
+| Result | Type | Description |
+| --- | --- | --- |
+| None | `—` | This form does not return SSA values; it establishes an ordering point on the named pipeline. |
 
 ## Side Effects
 
-This operation updates control, synchronization, or DMA configuration state. Depending on the form, it may stall a stage, establish a producer-consumer edge, reserve or release a buffer token, or configure later copy behavior.
+Stalls the named pipeline until its previously issued operations retire. Later operations issued to that pipeline are ordered after the barrier.
 
 ## Constraints
 
-This operation inherits the legality and operand-shape rules of its instruction set overview. Any target-specific narrowing of element types, distributions, pipe/event spaces, or configuration tuples must be stated by the selected target profile.
+- The selected pipe identifier MUST be valid for the selected target profile.
+- This barrier orders work within one pipeline; cross-pipeline producer-consumer edges still require the appropriate event or buffer protocol.
+- Portable code SHOULD use the narrowest ordering primitive that matches the hazard.
 
 ## Exceptions
 
-- It is illegal to use unsupported pipe ids, event ids, buffer ids, or configuration tuples for the selected target profile.
-- Waiting on state that was never established by a matching producer or prior configuration is an illegal PTO program.
+- The verifier rejects illegal operand shapes, unsupported pipe or event identifiers, and attribute combinations that are not valid for the selected instruction set or target profile.
+- Any additional illegality stated in the constraints section is also part of the contract.
 
 ## Target-Profile Restrictions
 
-- CPU simulation preserves the visible dependency/configuration contract, but it may not expose every low-level hazard that motivates the form on hardware targets.
-- A2/A3 and A5 profiles may use different concrete pipe, DMA, predicate, or event spaces. Portable code must rely on the documented PTO contract plus the selected target profile.
+- CPU simulation preserves the visible ordering contract but may not expose every pipeline hazard that motivates the barrier on hardware.
+- A2/A3 and A5 may differ in the exact pipe set that can be named.
 
 ## Examples
 
-```c
-pipe_barrier(pipe);
-```
-
 ```mlir
-// Both stores target the same GM address — order matters!
-pto.copy_ubuf_to_gm %ub_partial_0, %gm_result, ...
-// Without pipe_barrier, MTE3 could execute the second copy before the first
-// completes, producing a non-deterministic result at %gm_result.
 pto.pipe_barrier "PIPE_MTE3"
-// After barrier: first copy is guaranteed complete. Second copy overwrites deterministically.
-pto.copy_ubuf_to_gm %ub_partial_1, %gm_result, ...
-```
-
-## Detailed Notes
-
-```c
-pipe_barrier(pipe);
-```
-
-**Pipe identifiers:** `PIPE_MTE2`, `PIPE_V`, `PIPE_MTE3`
-
-**Example:** Two back-to-back `copy_ubuf_to_gm` calls writing to the same GM address. Without a barrier, MTE3 may reorder them and the final GM value is non-deterministic:
-
-```mlir
-// Both stores target the same GM address — order matters!
-pto.copy_ubuf_to_gm %ub_partial_0, %gm_result, ...
-// Without pipe_barrier, MTE3 could execute the second copy before the first
-// completes, producing a non-deterministic result at %gm_result.
-pto.pipe_barrier "PIPE_MTE3"
-// After barrier: first copy is guaranteed complete. Second copy overwrites deterministically.
-pto.copy_ubuf_to_gm %ub_partial_1, %gm_result, ...
 ```
 
 ## Related Ops / Instruction Set Links
 
 - Instruction set overview: [Pipeline Sync](../../pipeline-sync.md)
 - Previous op in instruction set: [pto.wait_flag](./wait-flag.md)
-- Next op in instruction set: [pto.get_buf](./get-buf.md)
+- Next op in instruction set: [pto.mem_bar](./mem-bar.md)
 - Control-shell overview: [Control and configuration](../../control-and-configuration.md)
