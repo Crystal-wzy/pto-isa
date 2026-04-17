@@ -42,18 +42,6 @@ Synchronous form:
 pto.tsel ins(%mask, %src0, %src1 : !pto.tile_buf<...>, !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.tsel %mask, %src0, %src1 : (!pto.tile<...>, !pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.tsel ins(%mask, %src0, %src1 : !pto.tile_buf<...>, !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`:
@@ -73,16 +61,20 @@ PTO_INST RecordEvent TSEL(TileData &dst, MaskTile &selMask, TileData &src0,
 
 ## Inputs
 
-- `dst` names the destination tile receiving the selected values.
-- `selMask` is the predicate mask tile. Lane `(i,j)` selects from `src0` if non-zero, otherwise from `src1`.
-- `src0` is the source tile selected for mask-true lanes.
-- `src1` is the source tile selected for mask-false lanes.
-- `tmp` is a required temporary working tile for predicate unpacking.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%dst` | Destination tile | Destination tile receiving the selected values |
+| `%mask` | Predicate mask tile | Predicate mask; lane `(i,j)` selects from `src0` if non-zero, otherwise from `src1` |
+| `%src0` | True-value source tile | Source tile selected for mask-true lanes; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%src1` | False-value source tile | Source tile selected for mask-false lanes; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%tmp` | Temporary tile | Required temporary working tile for predicate unpacking |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile — `src0` where the mask is true, `src1` otherwise.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `src0[i,j]` where mask is true, otherwise `src1[i,j]` after the operation |
 
 ## Side Effects
 
@@ -112,6 +104,21 @@ No architectural side effects beyond producing the destination tile. Does not im
 | Row-major layout | Required | Required |
 | Same shape (dst/src0/src1) | Required | Required |
 | `tmp` tile required | Yes | Yes |
+
+## Performance
+
+### A2/A3 Throughput
+
+`TSEL` compiles to CCE vector instructions via the `TBinOp.hpp` performance model. The throughput is identical to `TADD` (binary arithmetic):
+
+| Metric | Value (FP) | Value (INT) |
+|--------|-------------|-------------|
+| Startup latency | 14 | 14 |
+| Completion latency | 19 | 17 |
+| Per-repeat throughput | 2 | 2 |
+| Pipeline interval | 18 | 18 |
+
+---
 
 ## Examples
 

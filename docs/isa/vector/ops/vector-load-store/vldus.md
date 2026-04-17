@@ -12,6 +12,14 @@ Unaligned load using primed align state.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vldus %result, %align_out, %base_out, %source, %align
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result, %align_out, %base_out = pto.vldus %source, %align : !pto.ptr<T, ub>, !pto.align -> !pto.vreg<NxT>, !pto.align, !pto.ptr<T, ub>
 ```

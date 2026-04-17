@@ -8,7 +8,7 @@ Elementwise division of two tiles.
 
 ## Mechanism
 
-Elementwise division of two tiles. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Elementwise division of two tiles.
 
 For each element `(i, j)` in the valid region:
 
@@ -53,14 +53,17 @@ PTO_INST RecordEvent TDIV(TileDataDst &dst, TileDataSrc0 &src0, TileDataSrc1 &sr
 
 ## Inputs
 
-- `src0` is the first source tile (left operand).
-- `src1` is the second source tile (right operand).
-- `dst` names the destination tile.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src0` | Left tile | First source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%src1` | Right tile | Second source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile or updated tile payload produced by the operation.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `src0[i,j] / src1[i,j]` after the operation |
 
 ## Side Effects
 
@@ -97,6 +100,21 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 - **High Precision Algorithm**
     - Only available on A5, `PrecisionType` option is ignored on A3.
+
+## Performance
+
+### A2/A3 Throughput
+
+`TDIV` compiles to CCE vector instructions via the `TBinOp.hpp` performance model. The throughput is identical to `TADD` (binary arithmetic):
+
+| Metric | Value (FP) | Value (INT) |
+|--------|-------------|-------------|
+| Startup latency | 14 | 14 |
+| Completion latency | 19 | 17 |
+| Per-repeat throughput | 2 | 2 |
+| Pipeline interval | 18 | 18 |
+
+---
 
 ## Examples
 

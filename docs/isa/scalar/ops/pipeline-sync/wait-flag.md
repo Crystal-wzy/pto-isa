@@ -4,13 +4,21 @@
 
 ## Summary
 
-Block destination pipe until source pipe signals event.
+Block the destination pipeline until a matching event is signaled.
 
 ## Mechanism
 
-`pto.wait_flag` is a `pto.*` control/configuration operation. It changes ordering, buffer, event, or DMA-visible state that later payload work depends on. The portable guarantee is the dependency/configuration effect, while concrete pipe/event spaces remain target-profile details.
+`pto.wait_flag` is the consumer half of the explicit event protocol. The destination pipeline stalls until the matching `(SRC_PIPE, DST_PIPE, EVENT_ID)` signal becomes visible, after which later work on the destination pipeline may proceed.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+wait_flag["SRC_PIPE", "DST_PIPE", "EVENT_ID"]
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 pto.wait_flag["SRC_PIPE", "DST_PIPE", "EVENT_ID"]
@@ -18,47 +26,40 @@ pto.wait_flag["SRC_PIPE", "DST_PIPE", "EVENT_ID"]
 
 ## Inputs
 
-The inputs are the architecture-visible control operands shown in the syntax: pipe ids, event ids, buffer ids, loop/stride values, pointers, or configuration words used to drive later execution.
+| Operand | Type | Description |
+| --- | --- | --- |
+| `SRC_PIPE` | pipe identifier | Pipeline expected to produce the event |
+| `DST_PIPE` | pipe identifier | Pipeline that must wait for the event |
+| `EVENT_ID` | event identifier | Named event slot that forms the producer-consumer edge |
 
 ## Expected Outputs
 
-This form is primarily defined by the side effect it has on control state, predicate state, or memory. It does not publish a new payload SSA result beyond any explicit state outputs shown in the syntax.
+| Result | Type | Description |
+| --- | --- | --- |
+| None | `—` | This form does not return SSA values; it blocks pipeline progress until the event becomes visible. |
 
 ## Side Effects
 
-This operation updates control, synchronization, or DMA configuration state. Depending on the form, it may stall a stage, establish a producer-consumer edge, reserve or release a buffer token, or configure later copy behavior.
+Stalls the destination pipeline until the matching event is signaled. Other pipelines may continue according to the target profile.
 
 ## Constraints
 
-This operation inherits the legality and operand-shape rules of its instruction set overview. Any target-specific narrowing of element types, distributions, pipe/event spaces, or configuration tuples must be stated by the selected target profile.
+- The selected pipe identifiers and event identifier MUST be valid for the selected target profile.
+- Waiting on an event that is never signaled is an illegal PTO program.
+- Portable code MUST pair each wait with the intended producer-side `pto.set_flag`.
 
 ## Exceptions
 
-- It is illegal to use unsupported pipe ids, event ids, buffer ids, or configuration tuples for the selected target profile.
-- Waiting on state that was never established by a matching producer or prior configuration is an illegal PTO program.
+- The verifier rejects illegal operand shapes, unsupported pipe or event identifiers, and attribute combinations that are not valid for the selected instruction set or target profile.
+- Any additional illegality stated in the constraints section is also part of the contract.
 
 ## Target-Profile Restrictions
 
-- CPU simulation preserves the visible dependency/configuration contract, but it may not expose every low-level hazard that motivates the form on hardware targets.
-- A2/A3 and A5 profiles may use different concrete pipe, DMA, predicate, or event spaces. Portable code must rely on the documented PTO contract plus the selected target profile.
+- CPU simulation preserves the visible event protocol but may not expose all low-level hazards that motivate it on hardware.
+- A2/A3 and A5 may use different concrete pipe and event spaces; portable code must rely on the documented PTO contract plus the selected target profile.
 
 ## Examples
 
-```c
-wait_flag(src_pipe, dst_pipe, event_id);
-```
-
-```mlir
-pto.wait_flag["PIPE_MTE2", "PIPE_V", "EVENT_ID0"]
-```
-
-## Detailed Notes
-
-```c
-wait_flag(src_pipe, dst_pipe, event_id);
-```
-
-**Example:** Vector pipe waits for MTE2 data to arrive:
 ```mlir
 pto.wait_flag["PIPE_MTE2", "PIPE_V", "EVENT_ID0"]
 ```

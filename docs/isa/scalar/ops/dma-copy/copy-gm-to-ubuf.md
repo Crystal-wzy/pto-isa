@@ -4,76 +4,73 @@
 
 ## Summary
 
-DMA transfer from Global Memory (`!pto.ptr<T, gm>`) to Unified Buffer (`!pto.ptr<T, ub>`).
+Execute a DMA transfer from Global Memory into Unified Buffer using the current GM→UB loop and stride configuration.
 
 ## Mechanism
 
-`pto.copy_gm_to_ubuf` is a `pto.*` control/configuration operation. It changes ordering, buffer, event, or DMA-visible state that later payload work depends on. The portable guarantee is the dependency/configuration effect, while concrete pipe/event spaces remain target-profile details.
+The DMA engine reads `%n_burst` rows from `%gm_src` and writes them to `%ub_dst`. `%len_burst` controls the contiguous byte count copied per row. `%left_padding`, `%right_padding`, and `%data_select_bit` control whether the destination row is padded beyond the copied byte range. `%src_stride` and `%dst_stride` specify the row-to-row start offsets for this copy invocation.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+copy_gm_to_ubuf %gm_src, %ub_dst, %sid, %n_burst, %len_burst, %left_padding, %right_padding, %data_select_bit, %l2_cache_ctl, %src_stride, %dst_stride
+```
+
+### AS Level 1 (SSA)
+
+```mlir
+pto.copy_gm_to_ubuf %gm_src, %ub_dst, %sid, %n_burst, %len_burst, %left_padding, %right_padding, %data_select_bit, %l2_cache_ctl, %src_stride, %dst_stride : !pto.ptr<T, gm>, !pto.ptr<T, ub>, i64, i64, i64, i64, i64, i1, i64, i64, i64
+```
 
 ## Inputs
 
-The inputs are the architecture-visible control operands shown in the syntax: pipe ids, event ids, buffer ids, loop/stride values, pointers, or configuration words used to drive later execution.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %gm_src | `!pto.ptr<T, gm>` | GM source pointer |
+| %ub_dst | `!pto.ptr<T, ub>` | UB destination pointer |
+| %sid | `i64` | DMA stream identifier |
+| %n_burst | `i64` | Number of burst rows to transfer |
+| %len_burst | `i64` | Contiguous byte count transferred per row |
+| %left_padding | `i64` | Left padding byte count applied in the destination row |
+| %right_padding | `i64` | Right padding byte count applied in the destination row |
+| %data_select_bit | `i1` | Controls whether padding bytes are materialized according to the configured pad behavior |
+| %l2_cache_ctl | `i64` | Target-specific L2 cache allocation hint |
+| %src_stride | `i64` | GM row-to-row start offset in bytes |
+| %dst_stride | `i64` | UB row-to-row start offset in bytes |
 
 ## Expected Outputs
 
-This form is primarily defined by the side effect it has on control state, predicate state, or memory. It does not publish a new payload SSA result beyond any explicit state outputs shown in the syntax.
+| Result | Type | Description |
+| --- | --- | --- |
+| None | `—` | This form does not return SSA values; it writes data into Unified Buffer memory. |
 
 ## Side Effects
 
-This operation updates control, synchronization, or DMA configuration state. Depending on the form, it may stall a stage, establish a producer-consumer edge, reserve or release a buffer token, or configure later copy behavior.
+Reads GM-visible storage, writes UB-visible storage, and consumes the active GM→UB loop and stride configuration.
 
 ## Constraints
 
-This operation inherits the legality and operand-shape rules of its instruction set overview. Any target-specific narrowing of element types, distributions, pipe/event spaces, or configuration tuples must be stated by the selected target profile.
+- `%ub_dst` MUST satisfy the UB alignment requirements of the selected target profile.
+- `%len_burst` MUST fit within the configured row stride and DMA limits of the selected target profile.
+- If padding is enabled, the padded destination footprint MUST still fit in the destination UB region.
 
 ## Exceptions
 
-- It is illegal to use unsupported pipe ids, event ids, buffer ids, or configuration tuples for the selected target profile.
-- Waiting on state that was never established by a matching producer or prior configuration is an illegal PTO program.
+- The verifier rejects illegal operand shapes, unsupported pipe or event identifiers, and attribute combinations that are not valid for the selected instruction set or target profile.
+- Any additional illegality stated in the constraints section is also part of the contract.
 
 ## Target-Profile Restrictions
 
-- CPU simulation preserves the visible dependency/configuration contract, but it may not expose every low-level hazard that motivates the form on hardware targets.
-- A2/A3 and A5 profiles may use different concrete pipe, DMA, predicate, or event spaces. Portable code must rely on the documented PTO contract plus the selected target profile.
+- CPU simulation preserves the visible copy contract but may not expose all DMA overlap hazards.
+- A2/A3 and A5 may narrow supported element sizes, row widths, or cache-control semantics.
 
 ## Examples
 
 ```mlir
-pto.copy_gm_to_ubuf %gm_src, %ub_dst,
-    %sid, %n_burst, %len_burst, %left_padding, %right_padding,
-    %data_select_bit, %l2_cache_ctl, %src_stride, %dst_stride
-    : !pto.ptr<T, gm>, !pto.ptr<T, ub>, i64, i64, i64,
-      i64, i64, i1, i64, i64, i64
+pto.copy_gm_to_ubuf %gm_src, %ub_dst, %sid, %n_burst, %len_burst, %left_padding, %right_padding, %data_select_bit, %l2_cache_ctl, %src_stride, %dst_stride : !pto.ptr<f32, gm>, !pto.ptr<f32, ub>, i64, i64, i64, i64, i64, i1, i64, i64, i64
 ```
-
-## Detailed Notes
-
-```mlir
-pto.copy_gm_to_ubuf %gm_src, %ub_dst,
-    %sid, %n_burst, %len_burst, %left_padding, %right_padding,
-    %data_select_bit, %l2_cache_ctl, %src_stride, %dst_stride
-    : !pto.ptr<T, gm>, !pto.ptr<T, ub>, i64, i64, i64,
-      i64, i64, i1, i64, i64, i64
-```
-
-**Parameters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `%gm_src` | GM source pointer (`!pto.ptr<T, gm>`) |
-| `%ub_dst` | UB destination pointer (`!pto.ptr<T, ub>`, 32B-aligned) |
-| `%sid` | Stream ID (usually 0) |
-| `%n_burst` | Number of burst rows (innermost loop count) |
-| `%len_burst` | Contiguous bytes transferred per burst row |
-| `%left_padding` | Left padding count (bytes) |
-| `%right_padding` | Right padding count (bytes) |
-| `%data_select_bit` | Padding / data-select control bit (`i1`) |
-| `%l2_cache_ctl` | L2 cache allocate control (TBD — controls whether DMA allocates in L2 cache) |
-| `%src_stride` | GM source stride: start-to-start distance between consecutive burst rows (bytes) |
-| `%dst_stride` | UB destination stride: start-to-start distance between consecutive burst rows (bytes, 32B-aligned) |
 
 ## Related Ops / Instruction Set Links
 

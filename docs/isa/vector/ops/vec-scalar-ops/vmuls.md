@@ -4,13 +4,21 @@
 
 ## Summary
 
-`%result` is the lane-wise product.
+Lane-wise multiply of a vector register by a broadcast scalar.
 
 ## Mechanism
 
-`pto.vmuls` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+For each active lane `i`, `dst[i] = src[i] * scalar`. The scalar is broadcast to every active lane. Inactive lanes do not participate in the computation.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vmuls %dst, %src, %scalar, %mask : !pto.vreg<NxT>, T
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vmuls %input, %scalar, %mask : !pto.vreg<NxT>, T, !pto.mask -> !pto.vreg<NxT>
@@ -18,20 +26,27 @@
 
 ## Inputs
 
-`%input`, `%scalar`, and `%mask` as above.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %input | `!pto.vreg<NxT>` | Source vector register |
+| %scalar | `T` | Scalar multiplier broadcast to every active lane |
+| %mask | `!pto.mask` | Predicate mask; only lanes with mask bit 1 participate |
 
 ## Expected Outputs
 
-`%result` is the lane-wise product.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Lane-wise product on the active lanes |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Supported element types are hardware-instruction set
-  specific; the current PTO ISA vector instructions documentation covers the common numeric cases.
+- `%input` and `%result` MUST have the same vector width `N` and element type `T`.
+- The mask width MUST match `N`.
+- Supported element types depend on the selected target profile.
 
 ## Exceptions
 
@@ -40,8 +55,8 @@ Supported element types are hardware-instruction set
 
 ## Target-Profile Restrictions
 
+- Common numeric element types are expected; exact target coverage is profile-specific.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -61,14 +76,12 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 
 ```c
 for (int i = 0; i < N; i++)
-    dst[i] = src[i] * scalar;
+    if (mask[i])
+        dst[i] = src[i] * scalar;
 ```
 
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = src[i] * scalar;
+```mlir
+%result = pto.vmuls %values, %scale, %mask : !pto.vreg<64xf16>, f16, !pto.mask -> !pto.vreg<64xf16>
 ```
 
 ## Related Ops / Instruction Set Links

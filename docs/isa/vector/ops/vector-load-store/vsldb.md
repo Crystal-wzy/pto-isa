@@ -12,6 +12,14 @@ Block-strided load for 2D tile access.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vsldb %result, %source, %offset, %mask
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vsldb %source, %offset, %mask : !pto.ptr<T, ub>, i32, !pto.mask -> !pto.vreg<NxT>
 ```

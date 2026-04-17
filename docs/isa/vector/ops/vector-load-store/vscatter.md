@@ -12,6 +12,14 @@ Indexed scatter to UB.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vscatter %value, %dest, %offsets, %active_lanes
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vscatter %value, %dest, %offsets, %active_lanes : !pto.vreg<NxT>, !pto.ptr<T, ub>, !pto.vreg<NxI>, index
 ```

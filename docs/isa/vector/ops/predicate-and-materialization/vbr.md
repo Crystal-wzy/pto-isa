@@ -12,6 +12,14 @@ Broadcast scalar to all vector lanes.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vbr %result, %value
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vbr %value : T -> !pto.vreg<NxT>
 ```

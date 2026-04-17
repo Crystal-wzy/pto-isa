@@ -8,7 +8,7 @@ Broadcast the first element of each source row across the destination row.
 
 ## Mechanism
 
-Broadcast the first element of each source row across the destination row. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Broadcast the first element of each source row across the destination row.
 
 Let `R = dst.GetValidRow()` and `C = dst.GetValidCol()`. For `0 <= i < R` and `0 <= j < C`:
 
@@ -31,18 +31,6 @@ Synchronous form:
 ```
 
 ### AS Level 2 (DPS)
-
-```text
-pto.trowexpand ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.trowexpand %src : !pto.tile<...> -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
 
 ```text
 pto.trowexpand ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)

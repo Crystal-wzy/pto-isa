@@ -12,6 +12,14 @@ Dual load with deinterleave (AoS → SoA conversion).
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vldx2 %low, %high, %source[%offset], "DIST"
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %low, %high = pto.vldx2 %source[%offset], "DIST" : !pto.ptr<T, ub>, index -> !pto.vreg<NxT>, !pto.vreg<NxT>
 ```

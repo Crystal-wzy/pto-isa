@@ -4,13 +4,21 @@
 
 ## Summary
 
-Expand — scatter front elements to active positions.
+Expand a front-packed stream back into the positions selected by a mask.
 
 ## Mechanism
 
-`pto.vusqz` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vusqz` is the inverse placement form of `pto.vsqz`. It consumes an implicit front-packed source stream and scatters those elements into the lanes selected by `%mask`; lanes not selected by the mask are zero-filled.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vusqz %dst, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vusqz %mask : !pto.mask -> !pto.vreg<NxT>
@@ -18,21 +26,25 @@ Expand — scatter front elements to active positions.
 
 ## Inputs
 
-`%mask` is the expansion/placement predicate.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %mask | `!pto.mask` | Predicate mask that selects the lanes that should receive front-packed elements |
 
 ## Expected Outputs
 
-`%result` is the expanded vector image.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Expanded vector image with selected lanes filled and other lanes zeroed |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-The source-front stream is implicit in the
-  current instruction set. Lane placement for active and inactive positions MUST be
-  preserved exactly.
+- The front-packed source stream is implicit in the selected instruction form and target profile.
+- Lane placement for active and inactive positions MUST be preserved exactly.
+- Unselected lanes are zero-filled.
 
 ## Exceptions
 
@@ -42,32 +54,9 @@ The source-front stream is implicit in the
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
-
-## Performance
-
-### Timing Disclosure
-
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vusqz`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
-
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
-
-If software scheduling or performance modeling depends on the exact cost of `pto.vusqz`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Examples
-
-```c
-int j = 0;
-for (int i = 0; i < N; i++)
-    if (mask[i]) dst[i] = src_front[j++];
-    else dst[i] = 0;
-```
-
-## Detailed Notes
 
 ```c
 int j = 0;

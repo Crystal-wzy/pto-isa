@@ -15,7 +15,7 @@
         <strong>Introduction and reading order</strong>
         <span>Get the scope, document structure, and design boundaries before reading individual ops.</span>
       </a>
-      <a class="landing-action-card" href="docs/isa/README/">
+      <a class="landing-action-card" href="docs/isa/">
         <span class="landing-action-eyebrow">Browse the reference</span>
         <strong>ISA index and instruction sets</strong>
         <span>Open the merged ISA tree, then drill into tile, vector, scalar, or communication instructions.</span>

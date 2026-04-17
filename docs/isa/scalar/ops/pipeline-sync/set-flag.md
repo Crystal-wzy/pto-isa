@@ -4,13 +4,21 @@
 
 ## Summary
 
-Signal event from source pipe to destination pipe.
+Signal an event from one pipeline to another pipeline.
 
 ## Mechanism
 
-`pto.set_flag` is a `pto.*` control/configuration operation. It changes ordering, buffer, event, or DMA-visible state that later payload work depends on. The portable guarantee is the dependency/configuration effect, while concrete pipe/event spaces remain target-profile details.
+`pto.set_flag` marks the named event as produced by the source pipeline and visible to the destination pipeline. It is the producer half of the explicit event protocol used to connect MTE, vector, and other execution stages.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+set_flag["SRC_PIPE", "DST_PIPE", "EVENT_ID"]
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 pto.set_flag["SRC_PIPE", "DST_PIPE", "EVENT_ID"]
@@ -18,47 +26,40 @@ pto.set_flag["SRC_PIPE", "DST_PIPE", "EVENT_ID"]
 
 ## Inputs
 
-The inputs are the architecture-visible control operands shown in the syntax: pipe ids, event ids, buffer ids, loop/stride values, pointers, or configuration words used to drive later execution.
+| Operand | Type | Description |
+| --- | --- | --- |
+| `SRC_PIPE` | pipe identifier | Pipeline that produces the event |
+| `DST_PIPE` | pipe identifier | Pipeline that is allowed to consume the event |
+| `EVENT_ID` | event identifier | Named event slot used for the producer-consumer edge |
 
 ## Expected Outputs
 
-This form is primarily defined by the side effect it has on control state, predicate state, or memory. It does not publish a new payload SSA result beyond any explicit state outputs shown in the syntax.
+| Result | Type | Description |
+| --- | --- | --- |
+| None | `—` | This form does not return SSA values; it updates pipeline-event state. |
 
 ## Side Effects
 
-This operation updates control, synchronization, or DMA configuration state. Depending on the form, it may stall a stage, establish a producer-consumer edge, reserve or release a buffer token, or configure later copy behavior.
+Signals the named event, making later `pto.wait_flag` operations on the matching `(SRC_PIPE, DST_PIPE, EVENT_ID)` tuple eligible to unblock.
 
 ## Constraints
 
-This operation inherits the legality and operand-shape rules of its instruction set overview. Any target-specific narrowing of element types, distributions, pipe/event spaces, or configuration tuples must be stated by the selected target profile.
+- The selected pipe identifiers and event identifier MUST be valid for the selected target profile.
+- The event protocol is directional: the producer and consumer pipe roles matter.
+- Portable code MUST pair event signaling with the corresponding wait in the intended dependency chain.
 
 ## Exceptions
 
-- It is illegal to use unsupported pipe ids, event ids, buffer ids, or configuration tuples for the selected target profile.
-- Waiting on state that was never established by a matching producer or prior configuration is an illegal PTO program.
+- The verifier rejects illegal operand shapes, unsupported pipe or event identifiers, and attribute combinations that are not valid for the selected instruction set or target profile.
+- Any additional illegality stated in the constraints section is also part of the contract.
 
 ## Target-Profile Restrictions
 
-- CPU simulation preserves the visible dependency/configuration contract, but it may not expose every low-level hazard that motivates the form on hardware targets.
-- A2/A3 and A5 profiles may use different concrete pipe, DMA, predicate, or event spaces. Portable code must rely on the documented PTO contract plus the selected target profile.
+- CPU simulation preserves the visible event protocol but may not expose all low-level hazards that motivate it on hardware.
+- A2/A3 and A5 may use different concrete pipe and event spaces; portable code must rely on the documented PTO contract plus the selected target profile.
 
 ## Examples
 
-```c
-set_flag(src_pipe, dst_pipe, event_id);
-```
-
-```mlir
-pto.set_flag["PIPE_MTE2", "PIPE_V", "EVENT_ID0"]
-```
-
-## Detailed Notes
-
-```c
-set_flag(src_pipe, dst_pipe, event_id);
-```
-
-**Example:** After MTE2 completes GM→UB transfer, signal Vector pipe:
 ```mlir
 pto.set_flag["PIPE_MTE2", "PIPE_V", "EVENT_ID0"]
 ```
@@ -66,5 +67,6 @@ pto.set_flag["PIPE_MTE2", "PIPE_V", "EVENT_ID0"]
 ## Related Ops / Instruction Set Links
 
 - Instruction set overview: [Pipeline Sync](../../pipeline-sync.md)
+- Previous op in instruction set: (none)
 - Next op in instruction set: [pto.wait_flag](./wait-flag.md)
 - Control-shell overview: [Control and configuration](../../control-and-configuration.md)

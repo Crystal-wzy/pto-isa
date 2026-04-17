@@ -8,9 +8,17 @@
 
 ## Mechanism
 
-`pto.vln` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vln` computes the lane-wise natural logarithm: `dst[i] = ln(src[i])`. For real-number semantics, active inputs SHOULD be strictly positive; non-positive inputs follow the target's exception/NaN rules. Inactive lanes leave the destination unchanged.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vln %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vln %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -20,11 +28,16 @@ Documented A5 types or forms: `f16, f32`.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects active lanes.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` holds the natural logarithm per active lane.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise natural logarithm: `dst[i] = ln(src[i])` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 
@@ -33,8 +46,6 @@ This operation has no architectural side effect beyond producing its SSA results
 ## Constraints
 
 Only floating-point element types are legal.
-  For real-number semantics, active inputs SHOULD be strictly positive; non-
-  positive inputs follow the target's exception/NaN rules.
 
 ## Exceptions
 

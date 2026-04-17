@@ -4,38 +4,56 @@
 
 ## Summary
 
-Sum all elements. Result in lane 0, others zeroed.
+Full-vector reduction that sums all active lanes into a single scalar result, written to lane 0 with all other lanes zeroed.
 
 ## Mechanism
 
-`pto.vcadd` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+Reduces all active lanes of the source vector to a scalar sum, using a tree-reduction strategy implemented by the hardware. The result is broadcast to lane 0 of the output vector; all other lanes are zeroed.
+
+For each active lane `i` in `0 .. N-1`:
+
+$$ \mathrm{dst}_{0} = \sum_{i=0}^{N-1} \mathrm{src}_{i} $$
+
+Inactive lanes are treated as zero. If all predicate bits are zero, the result is zero.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vcadd %dst, %src, %mask : !pto.vreg<NxT>
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vcadd %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
 ```
 
-Documented A5 types or forms: `i16-i64, f16, f32`.
+Supported element types on A5: `i16-i64`, `f16`, `f32`.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects participating
-  lanes.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%input` | Source vector | Vector register holding the values to reduce; read at each active lane `i` |
+| `%mask` | Predicate mask | Selects which lanes participate in the reduction; inactive lanes contribute zero |
 
 ## Expected Outputs
 
-`%result` contains the reduction result in its low element(s).
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Result vector: lane 0 holds the scalar sum; all other lanes are zeroed |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Some narrow integer forms may widen the
-  internal accumulation or result placement. If all predicate bits are zero, the
-  result is zero.
+- **Narrow integer widening**: Some narrow integer forms (e.g., `i8`, `i16`) may use an internal wider accumulator; the final result is still returned in the declared result type.
+- **All lanes inactive**: If all predicate bits are zero, `dst[0]` is zero and all other lanes are zero.
+- **Mask granularity**: The mask has one bit per lane; partial-masking at sub-lane granularity is not supported.
 
 ## Exceptions
 
@@ -44,25 +62,21 @@ Some narrow integer forms may widen the
 
 ## Target-Profile Restrictions
 
-- Documented A5 coverage: `i16-i64, f16, f32`.
+- Documented A5 coverage: `i16-i64`, `f16`, `f32`.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
 - Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency and Throughput
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vcadd`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+Vector reduction latency and throughput are target-specific. Consult the target profile's performance model for cycle-accurate estimates. Reduction operations typically have higher latency than elementwise vector ops due to the tree-reduction sequence.
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
-
-If software scheduling or performance modeling depends on the exact cost of `pto.vcadd`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+---
 
 ## Examples
+
+### C — Scalar Pseudocode
 
 ```c
 T sum = 0;
@@ -73,18 +87,32 @@ for (int i = 1; i < N; i++)
     dst[i] = 0;
 ```
 
-## Detailed Notes
+### MLIR — SSA Form
 
-```c
-T sum = 0;
-for (int i = 0; i < N; i++)
-    sum += src[i];
-dst[0] = sum;
-for (int i = 1; i < N; i++)
-    dst[i] = 0;
+```mlir
+// Full-vector sum reduction: result in lane 0
+%result = pto.vcadd %input, %mask : !pto.vreg<128xf32>, !pto.mask -> !pto.vreg<128xf32>
+```
+
+### MLIR — DPS Form
+
+```mlir
+pto.vcadd ins(%input, %mask : !pto.vreg<128xf32>, !pto.mask)
+          outs(%result : !pto.vreg<128xf32>)
+```
+
+### Typical Usage
+
+```mlir
+// Compute the sum of a 128-element f32 vector tile
+%mask = pto vidu %c128 : i1 -> !pto.mask
+%sum = pto.vcadd %vec, %mask : !pto.vreg<128xf32>, !pto.mask -> !pto.vreg<128xf32>
+// %sum[0] contains the total; %sum[1..127] are zero
 ```
 
 ## Related Ops / Instruction Set Links
 
 - Instruction set overview: [Reduction Instructions](../../reduction-ops.md)
 - Next op in instruction set: [pto.vcmax](./vcmax.md)
+- Related reduction: [pto.vcgadd](./vcgadd.md) — lane-group reduction
+- Related reduction: [pto.vcmax](./vcmax.md) — full-vector max

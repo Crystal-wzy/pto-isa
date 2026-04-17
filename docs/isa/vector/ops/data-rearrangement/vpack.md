@@ -4,13 +4,21 @@
 
 ## Summary
 
-Narrowing pack — two wide vectors to one narrow vector.
+Pack two wide vectors into one narrower vector.
 
 ## Mechanism
 
-`pto.vpack` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vpack` narrows the two source vectors and concatenates the narrowed halves into one destination vector. The exact narrowing mode is controlled by `%part` and the selected target profile.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vpack %dst, %src0, %src1, %part
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vpack %src0, %src1, %part : !pto.vreg<NxT_wide>, !pto.vreg<NxT_wide>, index -> !pto.vreg<2NxT_narrow>
@@ -18,22 +26,26 @@ Narrowing pack — two wide vectors to one narrow vector.
 
 ## Inputs
 
-`%src0` and `%src1` are wide source vectors and `%part` selects
-  the packing submode.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %src0 | `!pto.vreg<NxT_wide>` | First wide source vector |
+| %src1 | `!pto.vreg<NxT_wide>` | Second wide source vector |
+| %part | `index` | Packing mode or submode selector |
 
 ## Expected Outputs
 
-`%result` is the packed narrow vector.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<2NxT_narrow>` | Packed narrow vector built from both sources |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Packing is a narrowing conversion. Source
-  values that do not fit the destination width follow the truncation semantics
-  of the selected packing mode.
+- Packing is a narrowing conversion; values that do not fit the destination width follow the truncation or saturation behavior of the selected form.
+- Lowering MUST preserve the destination ordering between the first and second source halves.
 
 ## Exceptions
 
@@ -43,7 +55,7 @@ Packing is a narrowing conversion. Source
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -62,19 +74,8 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 ## Examples
 
 ```c
-// e.g., two vreg<64xi32> → one vreg<128xi16>
 for (int i = 0; i < N; i++) {
-    dst[i]     = truncate(src0[i]);
-    dst[N + i] = truncate(src1[i]);
-}
-```
-
-## Detailed Notes
-
-```c
-// e.g., two vreg<64xi32> → one vreg<128xi16>
-for (int i = 0; i < N; i++) {
-    dst[i]     = truncate(src0[i]);
+    dst[i] = truncate(src0[i]);
     dst[N + i] = truncate(src1[i]);
 }
 ```

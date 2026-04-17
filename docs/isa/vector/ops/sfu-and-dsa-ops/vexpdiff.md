@@ -12,6 +12,14 @@ Fused exp(x - max) for numerically stable softmax.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vexpdiff %result, %input, %max
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vexpdiff %input, %max : !pto.vreg<NxT>, !pto.vreg<NxT> -> !pto.vreg<NxT>
 ```
@@ -62,13 +70,6 @@ For `pto.vexpdiff`, those public sources describe the instruction semantics, ope
 If software scheduling or performance modeling depends on the exact cost of `pto.vexpdiff`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
 
 ## Examples
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = expf(src[i] - max[i]);
-```
-
-## Detailed Notes
 
 ```c
 for (int i = 0; i < N; i++)

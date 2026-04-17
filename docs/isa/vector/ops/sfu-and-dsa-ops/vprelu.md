@@ -8,24 +8,37 @@ Parametric ReLU with per-element alpha vector.
 
 ## Mechanism
 
-`pto.vprelu` is a specialized `pto.v*` operation. It exposes fused, widening, or domain-specific hardware behavior through one stable virtual mnemonic so the instruction set can be reasoned about at the ISA level.
+Computes parametric ReLU: `dst[i] = (src[i] >= 0) ? src[i] : alpha[i] * src[i]`. For each lane `i`, if the input is non-negative, pass it through; otherwise scale by the per-lane alpha coefficient.
 
 ## Syntax
 
-```mlir
-%result = pto.vprelu %input, %alpha : !pto.vreg<NxT>, !pto.vreg<NxT> -> !pto.vreg<NxT>
+### PTO Assembly Form
+
+```text
+vprelu %dst, %src, %alpha, %mask : !pto.vreg<NxT>
 ```
 
-Documented A5 types or forms: `f16, f32`.
+### AS Level 1 (SSA)
+
+```mlir
+%result = pto.vprelu %input, %alpha, %mask : !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
+```
+
+Documented A5 types: `f16, f32`.
 
 ## Inputs
 
-`%input` is the activation vector and `%alpha` is the per-element
-  slope vector.
+|| Operand | Type | Description |
+||---------|------|-------------|
+|| `%input` | `!pto.vreg<NxT>` | Activation input vector |
+|| `%alpha` | `!pto.vreg<NxT>` | Per-element slope (alpha) vector |
+|| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 are active |
 
 ## Expected Outputs
 
-`%result` is the parametric-ReLU vector.
+|| Result | Type | Description |
+||--------|------|-------------|
+|| `%result` | `!pto.vreg<NxT>` | Parametric ReLU output: `dst[i] = (src[i] >= 0) ? src[i] : alpha[i] * src[i]` |
 
 ## Side Effects
 
@@ -33,8 +46,11 @@ This operation has no architectural side effect beyond producing its SSA results
 
 ## Constraints
 
-Floating-point element types only on the
-  current A5 instruction set.
+- **Type match**: `%input`, `%alpha`, and `%result` MUST have identical element types.
+- **Width match**: All three registers MUST have the same vector width `N`.
+- **Mask width**: `%mask` MUST have width equal to `N`.
+- **Active lanes**: Only lanes where the mask bit is 1 (true) participate in the computation.
+- **Floating-point only**: Parametric ReLU is defined for floating-point element types on the current A5 instruction set.
 
 ## Exceptions
 
@@ -49,30 +65,34 @@ Floating-point element types only on the
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vprelu`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+SFU operations have higher latency than standard arithmetic ops. Consult the target profile's performance model for cycle-accurate estimates.
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
+### A2/A3 Throughput
 
-If software scheduling or performance modeling depends on the exact cost of `pto.vprelu`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+|| Metric | Value | Constant |
+||--------|-------|----------|
+|| Startup latency | 14 | `A2A3_STARTUP_BINARY` |
+|| Completion latency | 26 | `A2A3_COMPL_FP32_EXP` |
+|| Per-repeat throughput | 2 | `A2A3_RPT_2` |
+|| Pipeline interval | 18 | `A2A3_INTERVAL` |
+
+---
 
 ## Examples
+
+### Parametric ReLU with per-lane alpha
 
 ```c
 for (int i = 0; i < N; i++)
     dst[i] = (src[i] >= 0) ? src[i] : alpha[i] * src[i];
 ```
 
-## Detailed Notes
+### MLIR form
 
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = (src[i] >= 0) ? src[i] : alpha[i] * src[i];
+```mlir
+%result = pto.vprelu %input, %alpha, %mask : (!pto.vreg<64xf16>, !pto.vreg<64xf16>, !pto.mask) -> !pto.vreg<64xf16>
 ```
 
 ## Related Ops / Instruction Set Links

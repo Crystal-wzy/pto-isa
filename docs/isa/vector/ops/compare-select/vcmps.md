@@ -4,13 +4,21 @@
 
 ## Summary
 
-Compare vector against scalar.
+Element-wise vector-to-scalar comparison that produces a predicate mask.
 
 ## Mechanism
 
-`pto.vcmps` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+For each lane `i` where `%seed[i]` is true, `result[i]` is set to the outcome of applying `CMP_MODE` to `src[i]` and the broadcast scalar. Lanes disabled by `%seed` produce a zero bit in the result mask.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vcmps %dst, %src, %scalar, %seed, "CMP_MODE" : !pto.mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vcmps %src, %scalar, %seed, "CMP_MODE" : !pto.vreg<NxT>, T, !pto.mask -> !pto.mask
@@ -18,21 +26,29 @@ Compare vector against scalar.
 
 ## Inputs
 
-`%src` is the vector source, `%scalar` is the scalar comparison
-  value, and `%seed` is the incoming predicate.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %src | `!pto.vreg<NxT>` | Vector operand |
+| %scalar | `T` | Scalar comparison value broadcast to every active lane |
+| %seed | `!pto.mask` | Incoming predicate mask that limits which lanes are compared |
+| `CMP_MODE` | enum | Comparison predicate such as `eq`, `ne`, `lt`, `le`, `gt`, or `ge` |
 
 ## Expected Outputs
 
-`%result` is the generated predicate mask.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.mask` | Predicate mask whose active bits record the comparison result |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-For 32-bit scalar forms, the scalar source
-  MUST satisfy the backend's legal scalar-source constraints for this instruction set.
+- The seed mask width MUST match `N`.
+- The scalar source MUST satisfy any backend-specific scalar-source legality rule for this instruction family.
+- Floating-point and integer comparisons follow the element-type-specific comparison rules of the selected target profile.
+Supported compare modes are `eq`, `ne`, `lt`, `le`, `gt`, and `ge`.
 
 ## Exceptions
 
@@ -42,49 +58,17 @@ For 32-bit scalar forms, the scalar source
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
-
-## Performance
-
-### Timing Disclosure
-
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vcmps`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
-
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
-
-If software scheduling or performance modeling depends on the exact cost of `pto.vcmps`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+- Code that depends on an implicit predicate source or a target-specific encoding variant should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Examples
 
 ```c
 for (int i = 0; i < N; i++)
-    if (seed[i])
-        dst[i] = (src[i] CMP scalar) ? 1 : 0;
+    result[i] = seed[i] ? cmp(src[i], scalar, CMP_MODE) : 0;
 ```
 
 ```mlir
-%positive_mask = pto.vcmps %values, %c0_f32, %all_active, "gt"
-    : !pto.vreg<64xf32>, f32, !pto.mask -> !pto.mask
-// positive_mask[i] = 1 if values[i] > 0
-```
-
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++)
-    if (seed[i])
-        dst[i] = (src[i] CMP scalar) ? 1 : 0;
-```
-
-**Example:**
-```mlir
-%positive_mask = pto.vcmps %values, %c0_f32, %all_active, "gt"
-    : !pto.vreg<64xf32>, f32, !pto.mask -> !pto.mask
-// positive_mask[i] = 1 if values[i] > 0
+%positive_mask = pto.vcmps %values, %c0_f32, %all_active, "gt" : !pto.vreg<64xf32>, f32, !pto.mask -> !pto.mask
 ```
 
 ## Related Ops / Instruction Set Links

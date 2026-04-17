@@ -4,37 +4,47 @@
 
 ## Summary
 
-Min within each VLane.
+Per-VLane-group minimum reduction.
 
 ## Mechanism
 
-`pto.vcgmin` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+The instruction reduces each hardware 32-byte VLane group independently. Within each group, it finds the minimum of the active lanes and writes the result to the low slot of that group; the remaining lanes in each group are zero-filled.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vcgmin %dst, %src, %mask : !pto.vreg<NxT>
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vcgmin %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
 ```
 
-Documented A5 types or forms: `i16-i32, f16, f32`.
-
 ## Inputs
 
-`%input` is the source vector and `%mask` selects participating
-  lanes.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %input | `!pto.vreg<NxT>` | Source vector register to reduce per VLane group |
+| %mask | `!pto.mask` | Predicate mask; inactive lanes do not participate |
 
 ## Expected Outputs
 
-`%result` contains one minimum per 32-byte VLane group.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | One minimum per 32-byte VLane group, written to the low lane of each group |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Grouping is by hardware 32-byte VLane, not by
-  arbitrary software subvector.
+- Grouping is by the hardware 32-byte VLane, not by an arbitrary software subvector.
+- The mask width MUST match `N`.
 
 ## Exceptions
 
@@ -43,9 +53,8 @@ Grouping is by hardware 32-byte VLane, not by
 
 ## Target-Profile Restrictions
 
-- Documented A5 coverage: `i16-i32, f16, f32`.
+- Documented A5 coverage: `i16-i32`, `f16`, `f32`.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -64,29 +73,16 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 ## Examples
 
 ```c
-int K = N / 8;
-for (int g = 0; g < 8; g++) {
+for (int g = 0; g < GROUPS; g++) {
     T mn = INF;
-    for (int i = 0; i < K; i++)
-        if (src[g*K + i] < mn) mn = src[g*K + i];
-    dst[g*K] = mn;
-    for (int i = 1; i < K; i++)
-        dst[g*K + i] = 0;
+    for (int i = 0; i < LANES_PER_GROUP; i++)
+        if (mask[g*LANES_PER_GROUP + i] && src[g*LANES_PER_GROUP + i] < mn) mn = src[g*LANES_PER_GROUP + i];
+    dst[g*LANES_PER_GROUP] = mn;
 }
 ```
 
-## Detailed Notes
-
-```c
-int K = N / 8;
-for (int g = 0; g < 8; g++) {
-    T mn = INF;
-    for (int i = 0; i < K; i++)
-        if (src[g*K + i] < mn) mn = src[g*K + i];
-    dst[g*K] = mn;
-    for (int i = 1; i < K; i++)
-        dst[g*K + i] = 0;
-}
+```mlir
+%result = pto.vcgmin %input, %mask : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
 ```
 
 ## Related Ops / Instruction Set Links

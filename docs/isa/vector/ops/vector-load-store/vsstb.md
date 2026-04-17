@@ -12,6 +12,14 @@ Block-strided store for 2D tile access.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vsstb %value, %dest, %offset, %mask
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vsstb %value, %dest, %offset, %mask : !pto.vreg<NxT>, !pto.ptr<T, ub>, i32, !pto.mask
 ```

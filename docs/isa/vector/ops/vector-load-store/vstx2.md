@@ -12,6 +12,14 @@ Dual interleaved store (SoA → AoS conversion).
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vstx2 %low, %high, %dest[%offset], "DIST", %mask
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vstx2 %low, %high, %dest[%offset], "DIST", %mask : !pto.vreg<NxT>, !pto.vreg<NxT>, !pto.ptr<T, ub>, index, !pto.mask
 ```

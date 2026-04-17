@@ -12,6 +12,14 @@ Vector load with distribution mode.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vlds %result, %source[%offset] {dist = "DIST"}
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vlds %source[%offset] {dist = "DIST"} : !pto.ptr<T, ub> -> !pto.vreg<NxT>
 ```

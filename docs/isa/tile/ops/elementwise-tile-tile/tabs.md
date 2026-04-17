@@ -8,8 +8,6 @@ Elementwise absolute value of a tile.
 
 ## Mechanism
 
-Elementwise absolute value of a tile. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
-
 For each element `(i, j)` in the valid region:
 
 $$ \mathrm{dst}_{i,j} = \left|\mathrm{src}_{i,j}\right| $$
@@ -36,18 +34,6 @@ Synchronous form:
 pto.tabs ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-%dst = pto.tabs %src : !pto.tile<...> -> !pto.tile<...>
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.tabs ins(%src : !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`:
@@ -59,13 +45,17 @@ PTO_INST RecordEvent TABS(TileDataDst &dst, TileDataSrc &src, WaitEvents &... ev
 
 ## Inputs
 
-- `src` is the source tile.
-- `dst` names the destination tile.
-- The operation iterates over `dst`'s valid region.
+| Operand | Role | Description |
+|---------|------|-------------|
+| `%src` | Source tile | Source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
+| `%dst` | Destination tile | Destination tile receiving the result |
+| `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
 
-`dst` carries the result tile or updated tile payload produced by the operation.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%dst` | `!pto.tile<...>` | Destination tile; all `(i, j)` in its valid region contain `|src[i,j]|` after the operation |
 
 ## Side Effects
 
@@ -80,6 +70,21 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
 - Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
+
+## Performance
+
+### A2/A3 Throughput
+
+`TABS` compiles to CCE vector instructions via the `TUnaryOp.hpp` performance model:
+
+| Metric | Value |
+|--------|-------|
+| Startup latency | 13 |
+| Completion latency | 26 (FP transcendental) |
+| Per-repeat throughput | 1 |
+| Pipeline interval | 18 |
+
+---
 
 ## Target-Profile Restrictions
 

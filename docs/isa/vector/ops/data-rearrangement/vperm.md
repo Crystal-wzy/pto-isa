@@ -4,13 +4,21 @@
 
 ## Summary
 
-In-register permute (table lookup). **Not** memory gather.
+In-register permutation by per-lane index lookup.
 
 ## Mechanism
 
-`pto.vperm` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vperm` performs a register-local lookup: each lane of `%index` chooses which lane of `%src` is copied into the corresponding result lane. Unlike `pto.vgather2`, the data source is another vector register, not UB memory.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vperm %dst, %src, %index
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vperm %src, %index : !pto.vreg<NxT>, !pto.vreg<NxI> -> !pto.vreg<NxT>
@@ -18,22 +26,26 @@ In-register permute (table lookup). **Not** memory gather.
 
 ## Inputs
 
-`%src` is the source vector and `%index` supplies per-lane source
-  indices.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %src | `!pto.vreg<NxT>` | Source vector to permute |
+| %index | `!pto.vreg<NxI>` | Per-lane source-index selector |
 
 ## Expected Outputs
 
-`%result` is the permuted vector.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Permuted vector |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-This is an in-register permutation instruction set.
-  `%index` values outside the legal range follow the wrap/clamp behavior of the
-  selected form.
+- `%index` values outside the supported range follow the wrap or clamp behavior of the selected form.
+- `%src` and `%result` MUST have the same element type and vector width.
+- This is an in-register permutation and does not access UB memory.
 
 ## Exceptions
 
@@ -43,7 +55,7 @@ This is an in-register permutation instruction set.
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -65,15 +77,6 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 for (int i = 0; i < N; i++)
     dst[i] = src[index[i] % N];
 ```
-
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = src[index[i] % N];
-```
-
-**Note:** This operates on register contents, unlike `pto.vgather2` which reads from UB memory.
 
 ## Related Ops / Instruction Set Links
 

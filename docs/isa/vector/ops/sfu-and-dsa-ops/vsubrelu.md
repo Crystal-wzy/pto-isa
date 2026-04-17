@@ -4,36 +4,55 @@
 
 ## Summary
 
-Fused sub + ReLU.
+Fused subtract + ReLU: computes subtraction followed by ReLU in a single fused operation.
 
 ## Mechanism
 
-`pto.vsubrelu` is a specialized `pto.v*` operation. It exposes fused, widening, or domain-specific hardware behavior through one stable virtual mnemonic so the instruction set can be reasoned about at the ISA level.
+Fused subtract + ReLU: `dst[i] = max(0, lhs[i] - rhs[i])`. Computes subtraction followed by ReLU in a single fused operation. This combines two separate ops into one hardware instruction, eliminating an intermediate register write and improving throughput.
 
 ## Syntax
 
-```mlir
-%result = pto.vsubrelu %lhs, %rhs : !pto.vreg<NxT>, !pto.vreg<NxT> -> !pto.vreg<NxT>
+### PTO Assembly Form
+
+```text
+vsubrelu %dst, %lhs, %rhs, %mask : !pto.vreg<NxT>
 ```
 
-Documented A5 types or forms: `f16, f32`.
+### AS Level 1 (SSA)
+
+```mlir
+%result = pto.vsubrelu %lhs, %rhs, %mask : (!pto.vreg<NxT>, !pto.vreg<NxT>, !pto.mask) -> !pto.vreg<NxT>
+```
+
+Documented A5 types: `f16, f32`.
 
 ## Inputs
 
-`%lhs` is the minuend and `%rhs` is the subtrahend.
+|| Operand | Type | Description |
+||---------|------|-------------|
+|| `%lhs` | `!pto.vreg<NxT>` | Minuend source vector register |
+|| `%rhs` | `!pto.vreg<NxT>` | Subtrahend source vector register |
+|| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 are active |
+
+Both source registers MUST have the same element type and the same vector width `N`. The mask width MUST match `N`.
 
 ## Expected Outputs
 
-`%result` is the fused sub-then-ReLU result.
+|| Result | Type | Description |
+||--------|------|-------------|
+|| `%result` | `!pto.vreg<NxT>` | Fused sub-then-ReLU result on active lanes |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination vector register. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Floating-point element types only on the
-  current documented instruction set.
+- **Type match**: `%lhs`, `%rhs`, and `%result` MUST have identical element types.
+- **Width match**: All three registers MUST have the same vector width `N`.
+- **Mask width**: `%mask` MUST have width equal to `N`.
+- **Active lanes**: Only lanes where the mask bit is 1 (true) participate in the computation.
+- **Floating-point only**: Fused sub-ReLU is defined for floating-point element types on the current documented instruction set.
 
 ## Exceptions
 
@@ -48,30 +67,46 @@ Floating-point element types only on the
 
 ## Performance
 
-### Timing Disclosure
+### A5 Latency
 
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vsubrelu`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
+SFU operations have higher latency than standard arithmetic ops. Consult the target profile's performance model for cycle-accurate estimates.
 
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
+### A2/A3 Throughput
 
-If software scheduling or performance modeling depends on the exact cost of `pto.vsubrelu`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+|| Metric | Value | Constant |
+||--------|-------|----------|
+|| Startup latency | 14 | `A2A3_STARTUP_BINARY` |
+|| Completion latency | 26 | `A2A3_COMPL_FP32_EXP` |
+|| Per-repeat throughput | 2 | `A2A3_RPT_2` |
+|| Pipeline interval | 18 | `A2A3_INTERVAL` |
+
+---
 
 ## Examples
+
+### Fused subtract + ReLU
 
 ```c
 for (int i = 0; i < N; i++)
     dst[i] = max(src0[i] - src1[i], 0);
 ```
 
-## Detailed Notes
+### MLIR form
 
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = max(src0[i] - src1[i], 0);
+```mlir
+%result = pto.vsubrelu %lhs, %rhs, %mask : (!pto.vreg<64xf32>, !pto.vreg<64xf32>, !pto.mask) -> !pto.vreg<64xf32>
+```
+
+### C++ intrinsic
+
+```cpp
+#include <pto/pto-inst.hpp>
+using namespace pto;
+
+Mask<64> mask;
+mask.set_all(true);
+
+VSUBRELU(vdst, va, vb, mask);
 ```
 
 ## Related Ops / Instruction Set Links

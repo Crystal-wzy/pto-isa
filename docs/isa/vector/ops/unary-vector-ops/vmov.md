@@ -8,9 +8,17 @@ Vector register copy.
 
 ## Mechanism
 
-`pto.vmov` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vmov` performs a lane-wise register copy: `dst[i] = src[i]`. The predicated form copies only active lanes; inactive lanes leave the destination unchanged. The unpredicated form copies all lanes.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vmov %result, %input, %mask
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vmov %input, %mask : !pto.vreg<NxT>, !pto.mask -> !pto.vreg<NxT>
@@ -18,11 +26,16 @@ Vector register copy.
 
 ## Inputs
 
-`%input` is the source vector and `%mask` selects active lanes.
+| Operand | Type | Description |
+|---------|------|-------------|
+| `%input` | `!pto.vreg<NxT>` | Source vector register; read at each active lane `i` |
+| `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 (true) are active |
 
 ## Expected Outputs
 
-`%result` is a copy of the source vector.
+| Result | Type | Description |
+|--------|------|-------------|
+| `%result` | `!pto.vreg<NxT>` | Lane-wise copy: `dst[i] = src[i]` on active lanes; inactive lanes are unmodified |
 
 ## Side Effects
 
@@ -43,47 +56,30 @@ Predicated `pto.vmov` behaves like a masked
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
 - Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
-## Performance
-
-### Timing Disclosure
-
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vmov`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
-
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
-
-If software scheduling or performance modeling depends on the exact cost of `pto.vmov`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
-
 ## Examples
+
+### C Semantics
 
 ```c
 for (int i = 0; i < N; i++)
     dst[i] = src[i];
 ```
 
-### Full-register copy
+### MLIR Usage
 
 ```mlir
-%dst = pto.vmov %src, %mask_all : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
+// Softmax numerator: exp(x - max)
+%sub = pto.vsub %x, %max_broadcast, %mask : !pto.vreg<64xf32>, !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
+%exp = pto.vexp %sub, %mask : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
+
+// Reciprocal for division
+%sum_rcp = pto.vrec %sum, %mask : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
+
+// ReLU activation
+%activated = pto.vrelu %linear_out, %mask : !pto.vreg<64xf32>, !pto.mask -> !pto.vreg<64xf32>
 ```
-
-### Predicated copy
-
-```mlir
-%dst = pto.vmov %src, %tail_mask : !pto.vreg<128xf16>, !pto.mask -> !pto.vreg<128xf16>
-```
-
-## Detailed Notes
-
-`pto.vmov` is the plain register-to-register move in the vector surface. Use it
-when the ISA-level effect is “preserve the selected lanes exactly as they are,”
-without introducing arithmetic or conversion semantics.
 
 ## Related Ops / Instruction Set Links
 
 - Instruction set overview: [Unary Vector Instructions](../../unary-vector-ops.md)
 - Previous op in instruction set: [pto.vcls](./vcls.md)
-- Next op in instruction set: [pto.vabs](./vabs.md)

@@ -12,6 +12,14 @@ Prime alignment buffer for subsequent unaligned load.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vldas %result, %source
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vldas %source : !pto.ptr<T, ub> -> !pto.align
 ```

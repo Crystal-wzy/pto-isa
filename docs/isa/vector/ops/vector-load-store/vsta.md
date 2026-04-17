@@ -12,6 +12,14 @@ Flush alignment state to memory.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vsta %value, %dest[%offset]
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vsta %value, %dest[%offset] : !pto.align, !pto.ptr<T, ub>, index
 ```

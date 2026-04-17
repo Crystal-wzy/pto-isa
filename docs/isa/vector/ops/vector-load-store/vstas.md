@@ -12,6 +12,14 @@ Scalar-register-offset form of alignment-state flush.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vstas %value, %dest, %offset
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vstas %value, %dest, %offset : !pto.align, !pto.ptr<T, ub>, i32
 ```

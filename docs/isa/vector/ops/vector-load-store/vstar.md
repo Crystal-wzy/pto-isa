@@ -12,6 +12,14 @@ Flush remaining alignment state.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vstar %value, %dest
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 pto.vstar %value, %dest : !pto.align, !pto.ptr<T, ub>
 ```

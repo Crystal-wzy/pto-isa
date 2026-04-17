@@ -4,13 +4,21 @@
 
 ## Summary
 
-`%result` is the lane-wise maximum.
+Lane-wise maximum of a vector register and a broadcast scalar.
 
 ## Mechanism
 
-`pto.vmaxs` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+For each active lane `i`, `dst[i] = max(src[i], scalar)`. The scalar is broadcast to every active lane. Inactive lanes do not participate in the comparison.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vmaxs %dst, %src, %scalar, %mask : !pto.vreg<NxT>, T
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %result = pto.vmaxs %input, %scalar, %mask : !pto.vreg<NxT>, T, !pto.mask -> !pto.vreg<NxT>
@@ -18,19 +26,27 @@
 
 ## Inputs
 
-`%input`, `%scalar`, and `%mask` as above.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %input | `!pto.vreg<NxT>` | Source vector register |
+| %scalar | `T` | Scalar operand compared against each active lane |
+| %mask | `!pto.mask` | Predicate mask; only lanes with mask bit 1 participate |
 
 ## Expected Outputs
 
-`%result` is the lane-wise maximum.
+| Result | Type | Description |
+| --- | --- | --- |
+| %result | `!pto.vreg<NxT>` | Lane-wise maximum on the active lanes |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-Input and result types MUST match.
+- `%input` and `%result` MUST have the same vector width `N` and element type `T`.
+- The mask width MUST match `N`.
+- The comparison semantics follow the signed/integer or floating-point rules of `T`.
 
 ## Exceptions
 
@@ -39,8 +55,8 @@ Input and result types MUST match.
 
 ## Target-Profile Restrictions
 
+- Numeric element types are expected; exact target coverage is profile-specific.
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
 
 ## Performance
 
@@ -60,14 +76,12 @@ If software scheduling or performance modeling depends on the exact cost of `pto
 
 ```c
 for (int i = 0; i < N; i++)
-    dst[i] = (src[i] > scalar) ? src[i] : scalar;
+    if (mask[i])
+        dst[i] = (src[i] > scalar) ? src[i] : scalar;
 ```
 
-## Detailed Notes
-
-```c
-for (int i = 0; i < N; i++)
-    dst[i] = (src[i] > scalar) ? src[i] : scalar;
+```mlir
+%result = pto.vmaxs %values, %threshold, %mask : !pto.vreg<64xf32>, f32, !pto.mask -> !pto.vreg<64xf32>
 ```
 
 ## Related Ops / Instruction Set Links

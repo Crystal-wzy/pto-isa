@@ -12,6 +12,14 @@ Duplicate scalar or vector element to all lanes.
 
 ## Syntax
 
+### PTO Assembly Form
+
+```text
+vdup %result, %input {position = "POSITION"}
+```
+
+### AS Level 1 (SSA)
+
 ```mlir
 %result = pto.vdup %input {position = "POSITION"} : T|!pto.vreg<NxT> -> !pto.vreg<NxT>
 ```

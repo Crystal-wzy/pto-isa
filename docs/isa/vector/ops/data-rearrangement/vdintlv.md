@@ -4,13 +4,21 @@
 
 ## Summary
 
-Deinterleave elements into even/odd.
+Deinterleave an interleaved source stream into even/odd result vectors.
 
 ## Mechanism
 
-`pto.vdintlv` is a `pto.v*` compute operation. It applies its semantics to active lanes, obeys the instruction set operand model, and returns its results in vector-register or mask form.
+`pto.vdintlv` separates an interleaved source stream into two result vectors. The low result receives the even-position elements and the high result receives the odd-position elements from the logical interleaved stream carried by `%lhs` and `%rhs`.
 
 ## Syntax
+
+### PTO Assembly Form
+
+```text
+vdintlv %low, %high, %lhs, %rhs
+```
+
+### AS Level 1 (SSA)
 
 ```mlir
 %low, %high = pto.vdintlv %lhs, %rhs : !pto.vreg<NxT>, !pto.vreg<NxT> -> !pto.vreg<NxT>, !pto.vreg<NxT>
@@ -18,21 +26,26 @@ Deinterleave elements into even/odd.
 
 ## Inputs
 
-`%lhs` and `%rhs` represent the interleaved source stream in the
-  current PTO ISA vector instructions representation.
+| Operand | Type | Description |
+| --- | --- | --- |
+| %lhs | `!pto.vreg<NxT>` | First half of the interleaved source stream |
+| %rhs | `!pto.vreg<NxT>` | Second half of the interleaved source stream |
 
 ## Expected Outputs
 
-`%low` and `%high` are the separated destination vectors.
+| Result | Type | Description |
+| --- | --- | --- |
+| %low | `!pto.vreg<NxT>` | Even-position elements recovered from the interleaved stream |
+| %high | `!pto.vreg<NxT>` | Odd-position elements recovered from the interleaved stream |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its SSA results. It does not implicitly reserve buffers, signal events, or establish memory fences unless the form says so.
+This operation has no architectural side effect beyond producing its destination values. It does not implicitly reserve buffers, signal events, or establish memory fences.
 
 ## Constraints
 
-The two outputs form the even/odd
-  deinterleave result pair, and their ordering MUST be preserved.
+- `%lhs`, `%rhs`, `%low`, and `%high` MUST have the same element type and vector width.
+- The result pair ordering is architectural and MUST be preserved by lowering.
 
 ## Exceptions
 
@@ -42,36 +55,13 @@ The two outputs form the even/odd
 ## Target-Profile Restrictions
 
 - A5 is the most detailed concrete profile in the current manual; CPU simulation and A2/A3-class targets may support narrower subsets or emulate the behavior while preserving the visible PTO contract.
-- Code that depends on an instruction-set-specific type list, distribution mode, or fused form should treat that dependency as target-profile-specific unless the PTO manual states cross-target portability explicitly.
-
-## Performance
-
-### Timing Disclosure
-
-The current public VPTO timing material for PTO micro instructions remains limited.
-For `pto.vdintlv`, those public sources describe the instruction semantics, operand legality, and pipeline placement, but they do **not** publish a numeric latency or steady-state throughput.
-
-| Metric | Status | Source Basis |
-|--------|--------|--------------|
-| A5 latency | Not publicly published | Current public VPTO timing material |
-| Steady-state throughput | Not publicly published | Current public VPTO timing material |
-
-If software scheduling or performance modeling depends on the exact cost of `pto.vdintlv`, treat that cost as target-profile-specific and measure it on the concrete backend rather than inferring a manual constant.
+- Code that depends on an instruction-set-specific packing, selector, or permutation mode should treat that dependency as target-profile-specific unless the manual states cross-target portability explicitly.
 
 ## Examples
 
 ```c
-// Deinterleave: separate even/odd elements
-// low  = {src0[0], src0[2], src0[4], ...}  // even
-// high = {src0[1], src0[3], src0[5], ...}  // odd
-```
-
-## Detailed Notes
-
-```c
-// Deinterleave: separate even/odd elements
-// low  = {src0[0], src0[2], src0[4], ...}  // even
-// high = {src0[1], src0[3], src0[5], ...}  // odd
+// low  = {src[0], src[2], src[4], ...}
+// high = {src[1], src[3], src[5], ...}
 ```
 
 ## Related Ops / Instruction Set Links

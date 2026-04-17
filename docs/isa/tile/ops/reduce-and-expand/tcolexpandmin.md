@@ -8,7 +8,7 @@ Column-wise broadcast min with per-column scalar vector.
 
 ## Mechanism
 
-Column-wise broadcast min: take `min(src0, src1)` where `src1` provides one scalar per column. It operates on tile payloads rather than scalar control state, and its legality is constrained by tile shape, layout, valid-region, and target-profile support.
+Column-wise broadcast min: take `min(src0, src1)` where `src1` provides one scalar per column.
 
 Let `R = dst.GetValidRow()` and `C = dst.GetValidCol()`. Let `s_j` be the per-column scalar taken from `src1` (one value per column).
 
@@ -86,7 +86,46 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Examples
 
-See related examples in `docs/isa/` and `docs/coding/tutorials/`.
+### Auto
+
+```cpp
+#include <pto/pto-inst.hpp>
+
+using namespace pto;
+
+void example_auto() {
+  using SrcT = Tile<TileType::Vec, float, 16, 16>;
+  using DstT = Tile<TileType::Vec, float, 16, 16>;
+  using ColVecT = Tile<TileType::Vec, float, 1, 16, BLayout::RowMajor>;
+  SrcT src0;
+  DstT dst;
+  ColVecT src1;
+  // Col-expand-min: each column of dst = min(src0.col, src1.col_scalar)
+  TCOLEXPANDMIN(dst, src0, src1);
+}
+```
+
+### Manual
+
+```cpp
+#include <pto/pto-inst.hpp>
+
+using namespace pto;
+
+void example_manual() {
+  using SrcT = Tile<TileType::Vec, float, 16, 16>;
+  using DstT = Tile<TileType::Vec, float, 16, 16>;
+  using ColVecT = Tile<TileType::Vec, float, 1, 16, BLayout::RowMajor>;
+  SrcT src0;
+  DstT dst;
+  ColVecT src1;
+  TASSIGN(src0, 0x1000);
+  TASSIGN(dst, 0x2000);
+  TASSIGN(src1, 0x3000);
+  // Col-expand-min in manual mode
+  TCOLEXPANDMIN(dst, src0, src1);
+}
+```
 
 ### Auto Mode
 
