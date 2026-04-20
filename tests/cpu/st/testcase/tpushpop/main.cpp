@@ -394,38 +394,6 @@ TEST_F(TPushPopTest, a5_style_c2v_dual_subblock_split_push_pop)
     run_iteration(1);
 }
 
-TEST_F(TPushPopTest, a5_style_v2c_local_split_push_pop)
-{
-    using VecTile = Tile<TileType::Vec, float, 8, 16, BLayout::RowMajor, 8, 16>;
-    using MatTile = Tile<TileType::Mat, float, 16, 16, BLayout::RowMajor, 16, 16>;
-    using Pipe = TPipe<3, Direction::DIR_V2C, sizeof(float) * MatTile::Numel, 2>;
-
-    Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, 0x0, 0x10000);
-
-    VecTile src;
-    MatTile dst;
-    TASSIGN(src, 0);
-    TASSIGN(dst, VecTile::Rows * VecTile::Cols * sizeof(VecTile::DType));
-
-    fillTile<float, 8, 16, TileType::Vec>(src, 0);
-    std::fill(dst.data(), dst.data() + dst.Numel, 0.0f);
-
-    TPUSH<Pipe, VecTile, TileSplitAxis::TILE_UP_DOWN>(pipe, src);
-    TPOP<Pipe, MatTile, TileSplitAxis::TILE_UP_DOWN>(pipe, dst);
-    TFREE<Pipe, TileSplitAxis::TILE_UP_DOWN>(pipe);
-
-    for (int c = 0; c < dst.GetValidCol(); ++c) {
-        EXPECT_EQ(dst.data()[GetTileElementOffset<MatTile>(0, c)], src.data()[GetTileElementOffset<VecTile>(0, c)]);
-        for (int r = 0; r < src.GetValidRow(); ++r) {
-            EXPECT_EQ(dst.data()[GetTileElementOffset<MatTile>(r, c)], src.data()[GetTileElementOffset<VecTile>(r, c)]);
-        }
-        for (int r = src.GetValidRow(); r < dst.GetValidRow(); ++r) {
-            EXPECT_EQ(dst.data()[GetTileElementOffset<MatTile>(r, c)], 0.0f);
-        }
-    }
-}
-
 TEST_F(TPushPopTest, cpu_stub_prefers_injected_hooks_for_subblock_and_pipe_state)
 {
     HookTestPipe::SharedStateStorage storage{};
@@ -481,8 +449,6 @@ TEST_F(TPushPopTest, v2c_split_with_injected_pipe_hook_waits_for_both_lanes_befo
 
     {
         cpu_sim::ScopedExecutionContext ctx(0, 0, 2);
-        EXPECT_EQ(cpu_pipe::GetActiveSplitCount<TileSplitAxis::TILE_UP_DOWN>(), 2u);
-        EXPECT_EQ(cpu_pipe::GetActiveSplitLaneMask<TileSplitAxis::TILE_UP_DOWN>(), 0x3u);
         TPUSH<HookedV2CPipe, VecTile, TileSplitAxis::TILE_UP_DOWN>(producer0, topHalf);
     }
 
@@ -494,8 +460,6 @@ TEST_F(TPushPopTest, v2c_split_with_injected_pipe_hook_waits_for_both_lanes_befo
 
     {
         cpu_sim::ScopedExecutionContext ctx(0, 1, 2);
-        EXPECT_EQ(cpu_pipe::GetActiveSplitCount<TileSplitAxis::TILE_UP_DOWN>(), 2u);
-        EXPECT_EQ(cpu_pipe::GetActiveSplitLaneMask<TileSplitAxis::TILE_UP_DOWN>(), 0x3u);
         TPUSH<HookedV2CPipe, VecTile, TileSplitAxis::TILE_UP_DOWN>(producer1, bottomHalf);
     }
 
@@ -522,39 +486,6 @@ TEST_F(TPushPopTest, v2c_split_with_injected_pipe_hook_waits_for_both_lanes_befo
     EXPECT_GT(g_pipe_hook_call_count.load(std::memory_order_relaxed), 0u);
     EXPECT_EQ(g_pipe_hook_size, sizeof(HookedV2CPipe::SharedStateStorage));
     EXPECT_NE(g_pipe_hook_last_key, 0u);
-}
-
-TEST_F(TPushPopTest, v2c_split_single_subblock_with_injected_pipe_hook_tracks_one_active_lane)
-{
-    using VecTile = Tile<TileType::Vec, float, 8, 16, BLayout::RowMajor, 8, 16>;
-    using MatTile = Tile<TileType::Mat, float, 16, 16, BLayout::RowMajor, 16, 16>;
-
-    HookedV2CPipe::SharedStateStorage storage{};
-    g_pipe_hook_call_count.store(0, std::memory_order_relaxed);
-    g_pipe_hook_storage = &storage;
-    g_pipe_hook_size = 0;
-    g_pipe_hook_last_key = 0;
-
-    ScopedCpuStubHooks hooks(nullptr, reinterpret_cast<void *>(MockPipeSharedStateHook));
-    HookedV2CPipe::reset_for_cpu_sim();
-
-    HookedV2CPipe producer((__gm__ void *)nullptr, 0x0, 0x10000);
-    VecTile src;
-    TASSIGN(src, 0);
-    fillTile<float, 8, 16, TileType::Vec>(src, 0);
-
-    {
-        cpu_sim::ScopedExecutionContext ctx(0, 0, 1);
-        EXPECT_EQ(cpu_pipe::GetActiveSplitCount<TileSplitAxis::TILE_UP_DOWN>(), 1u);
-        EXPECT_EQ(cpu_pipe::GetActiveSplitLaneMask<TileSplitAxis::TILE_UP_DOWN>(), 0x1u);
-        TPUSH<HookedV2CPipe, VecTile, TileSplitAxis::TILE_UP_DOWN>(producer, src);
-    }
-
-    auto &state = HookedV2CPipe::GetSharedState();
-    EXPECT_EQ(state.occupied, 1);
-    EXPECT_EQ(state.next_producer_slot, 1);
-    EXPECT_EQ(state.producers_done[0], 0u);
-    EXPECT_EQ(state.producers_allocated[0], 0u);
 }
 
 TEST_F(TPushPopTest, a5_style_dir_both_updown_waits_for_matching_direction)

@@ -125,25 +125,29 @@ PTO_INTERNAL constexpr uint32_t GetAllSplitLaneMask()
     return (1u << GetSplitCount<Split>()) - 1u;
 }
 
-template <TileSplitAxis Split>
-PTO_INTERNAL uint32_t GetActiveSplitCount()
+template <typename TileData>
+PTO_INTERNAL constexpr uint32_t GetThreadSubblockDim()
 {
-    constexpr uint32_t splitCount = GetSplitCount<Split>();
-    const uint32_t subblockDim = get_subblockdim();
-    if (subblockDim != 0) {
-        return (subblockDim < splitCount) ? subblockDim : splitCount;
-    }
-    if ((cpu_sim::injected_subblock_id_hook != nullptr) || (cpu_sim::injected_pipe_shared_state_hook != nullptr) ||
-        (cpu_sim::ResolveSubblockIdHook() != nullptr) || (cpu_sim::ResolvePipeSharedStateHook() != nullptr)) {
-        return splitCount;
-    }
-    return 1u;
+    static_assert(is_tile_data_v<TileData> || is_conv_tile_v<TileData>,
+                  "GetThreadSubblockDim requires a Tile or ConvTile type.");
+    constexpr uint32_t kVecSubblockDim = 2u;
+    constexpr uint32_t kDefaultSubblockDim = 1u;
+
+    return (TileData::Loc == TileType::Vec) ? kVecSubblockDim : kDefaultSubblockDim;
 }
 
-template <TileSplitAxis Split>
-PTO_INTERNAL uint32_t GetActiveSplitLaneMask()
+template <typename TileData, TileSplitAxis Split>
+PTO_INTERNAL constexpr uint32_t GetActiveSplitCount()
 {
-    return (1u << GetActiveSplitCount<Split>()) - 1u;
+    constexpr uint32_t splitCount = GetSplitCount<Split>();
+    constexpr uint32_t subblockDim = GetThreadSubblockDim<TileData>();
+    return (subblockDim < splitCount) ? subblockDim : splitCount;
+}
+
+template <typename TileData, TileSplitAxis Split>
+PTO_INTERNAL constexpr uint32_t GetActiveSplitLaneMask()
+{
+    return (1u << GetActiveSplitCount<TileData, Split>()) - 1u;
 }
 
 template <typename TileData>
@@ -460,7 +464,7 @@ struct TPipe {
                               Split != TileSplitAxis::TILE_NO_SPLIT) {
                     const uint32_t laneMask = cpu_pipe::GetSplitLaneMask<Split>(static_cast<uint32_t>(subTileIndex));
                     shared_state.producers_done[slotIdx] |= laneMask;
-                    if (shared_state.producers_done[slotIdx] != cpu_pipe::GetActiveSplitLaneMask<Split>()) {
+                    if (shared_state.producers_done[slotIdx] != cpu_pipe::GetActiveSplitLaneMask<TileProd, Split>()) {
                         return;
                     }
                     shared_state.producers_allocated[slotIdx] = 0;
