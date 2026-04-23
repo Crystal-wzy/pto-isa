@@ -1,47 +1,53 @@
 # 其他指令集
 
-“其他”指令集覆盖不适合归入 tile、vector 或 scalar/control 主干的可见操作，包括跨 NPU 通信和若干支撑性操作。
+“其他”指令集覆盖那些不适合归入 tile、vector 或 scalar/control 主干的可见操作，包括跨 NPU 通信、集合操作，以及若干支撑性非 ISA 操作。
 
 ## 指令集概览
 
-| 类别 | 说明 | Profile |
-| --- | --- | --- |
-| 通信与运行时 | 并行组上的点对点与集合通信 | A2/A3, A5 |
-| 非 ISA 与支撑操作 | tile 序列、量化、释放与辅助操作 | 依操作而定 |
+| 类别 | 说明 | Availability |
+|------|------|--------------|
+| 通信与运行时 | 跨 NPU 点对点与集合通信 | A2/A3, A5 |
+| 非 ISA 与支撑操作 | tile 序列、量化、释放与辅助语义 | All profiles |
 
-## 输入
+### 通信与运行时
 
-这类指令集常见输入包括：
+这组操作跨越并行组中的多个 NPU，需要 `ParallelGroup` 句柄：
 
-- 并行组句柄
-- 本地或远端 GM 视图
-- 暂存 tile
-- tile 序列
-- 量化参数或控制参数
+| 类别 | 操作 |
+|------|------|
+| 集合广播 | `tbroadcast`、`tscatter`、`tgather` |
+| 点对点 | `tget`、`tget_async`、`tput`、`tput_async` |
+| 集合归约 | `treduce` |
+| 通知协议 | `tnotify`、`ttest`、`twait` |
 
-## 输出
+**CPU 模拟器**：通信类操作在 CPU 仿真路径上不可用。
 
-其他指令集会产生：
+### 非 ISA 与支撑操作
 
-- 跨 rank 的数据传输结果
-- 集合归约结果
-- tile 序列或量化表示的变化
-- 资源状态变化
+这组操作提供更高层的语义，不一定对应单条核心 ISA 指令：
 
-## 约束
+| 类别 | 操作 |
+|------|------|
+| Tile 序列 | `talias`、`tconcat`、`taxpy` |
+| 内存管理 | `tfree` |
+| 量化 | `tquant`、`tdequant` |
+| 计数 / 谓词辅助 | `tpop`、`tpush` |
+| A5 专属 | `thistogram`、`tpack`、`trandom` |
 
-- 通信操作必须遵守并行组一致性。
-- 支撑操作仍然必须遵守 PTO 的类型、形状和 profile 约束。
-- 不同操作的副作用差异较大，不能套用 tile 或 vector 的默认推理方式。
+## 共享约束
+
+- 通信操作要求所有参与 rank 使用一致的并行组协议。
+- 非根 rank 在广播 / scatter 等操作中必须准备好可写目标缓冲区。
+- 支撑操作仍然要满足各自的类型、形状与 profile 约束。
 
 ## 不允许的情形
 
-- 把 CPU 仿真路径当作跨 NPU 通信 profile
-- 在不满足 profile 条件时使用 A5 专属支撑操作
-- 把 tile 序列操作误当成普通逐元素指令
+- 把 CPU 仿真路径当成跨 NPU 通信 profile。
+- 在不支持的 profile 上使用 A5 专属支撑操作。
+- 把 tile 序列 / 量化类支撑操作误当成普通逐元素 tile 指令。
 
 ## 相关页面
 
+- [其他与通信参考](../other/README_zh.md)
 - [通信与运行时](../other/communication-and-runtime_zh.md)
 - [非 ISA 与支撑操作](../other/non-isa-and-supporting-ops_zh.md)
-- [其他指令族](../instruction-families/other-families_zh.md)

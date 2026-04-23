@@ -34,13 +34,13 @@ Tile Buffer ──► Tile Compute ──► Tile Buffer ──► TSTORE: Tile 
 | 类别 | 说明 | 示例 |
 |------|------|------|
 | 同步与配置 | 资源绑定、事件建立、tile 侧配置 | `tassign`、`tsync`、`tsettf32mode`、`tset_img2col_rpt` |
-| 逐元素 Tile-Tile | tile 与 tile 之间的逐元素运算 | `tadd`、`tmul`、`tcmp`、`tcvt`、`tsel`、`trelu` |
-| Tile-标量与立即数 | tile 与标量 / 立即数混合运算 | `tadds`、`tmuls`、`tlrelu`、`tcmps` |
+| 逐元素 Tile-Tile | tile 与 tile 之间的逐元素运算 | `tadd`、`tmul`、`tpow`、`tcmp`、`tcvt`、`tsel`、`trelu` |
+| Tile-标量与立即数 | tile 与标量 / 立即数混合运算 | `tadds`、`tmuls`、`tpows`、`tlrelu`、`tcmps` |
 | 归约与扩展 | 按行 / 列归约或广播扩展 | `trowsum`、`tcolmax`、`trowexpand`、`tcolexpand` |
 | 内存与数据搬运 | GM↔tile 搬运、gather / scatter、fix-pipe store | `tload`、`tstore`、`tstore_fp`、`mgather`、`mscatter` |
 | 矩阵与矩阵-向量 | GEMV、matmul 及变体 | `tgemv`、`tgemv_mx`、`tmatmul`、`tmatmul_acc`、`tmatmul_bias` |
 | 布局与重排 | reshape、transpose、extract、insert、img2col | `tmov`、`ttrans`、`treshape`、`textract`、`tinsert`、`timg2col` |
-| 不规则与复杂 | 排序、量化、打印、partial 类操作 | `tmrgsort`、`tsort32`、`tquant`、`thistogram`、`tprint` |
+| 不规则与复杂 | 排序、量化、索引型搬运、partial 类操作 | `tmrgsort`、`tsort32`、`tquant`、`tgather`、`tpartadd` |
 
 ## 输入
 

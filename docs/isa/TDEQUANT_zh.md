@@ -1,41 +1,12 @@
-# TDEQUANT
+# pto.tdequant
 
-## 指令示意图
+旧路径兼容入口。规范页见 [pto.tdequant](./other/ops/non-isa-and-supporting-ops/tdequant_zh.md)。
 
-![TDEQUANT tile operation](../figures/isa/TDEQUANT.svg)
+## 规范位置
 
-## 简介
+- 指令集：[非 ISA 与支撑操作](./other/non-isa-and-supporting-ops_zh.md)
+- 规范页：[pto.tdequant](./other/ops/non-isa-and-supporting-ops/tdequant_zh.md)
 
-使用 scale 与 offset Tile 将整数量化 Tile 反量化为浮点 Tile。
+## 兼容性说明
 
-## 数学语义
-
-语义随指令而变化。 除非另有说明，行为都按目标 valid region 定义。
-
-## 汇编语法
-
-PTO-AS 形式：参见 [PTO-AS 规范](../assembly/PTO-AS_zh.md)。
-
-### AS Level 1（SSA）
-
-```text
-%dst = pto.tdequant ...
-```
-
-### AS Level 2（DPS）
-
-```text
-pto.tdequant ins(...) outs(%dst : !pto.tile_buf<...>)
-```
-
-## C++ 内建接口
-
-声明于 `include/pto/common/pto_instr.hpp`.
-
-## 约束
-
-数据类型、layout、location 和 shape 的进一步限制以对应 backend 的合法性检查为准。
-
-## 示例
-
-具体的 Auto / Manual 使用方式见 `docs/isa/` 下的相关指令页。
+这个根级页面仅保留为旧链接兼容入口。新的 PTO ISA 文档应直接链接到分组后的规范页。

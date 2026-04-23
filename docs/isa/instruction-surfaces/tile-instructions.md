@@ -24,13 +24,13 @@ Tile Buffer ──► Tile Compute ──► Tile Buffer ──► TSTORE: Tile 
 | Class | Description | Examples |
 |-------|-------------|----------|
 | Sync and Config | Resource binding, event setup, tile-local config | `tassign`, `tsync`, `tsettf32mode`, `tset_img2col_rpt` |
-| Elementwise Tile-Tile | Lane-wise binary and unary operations | `tadd`, `tmul`, `tcmp`, `tcvt`, `tsel`, `trelu` |
-| Tile-Scalar and Immediate | Tile combined with scalar or immediate operands | `tadds`, `tmuls`, `tlrelu`, `tcmps` |
+| Elementwise Tile-Tile | Lane-wise binary and unary operations | `tadd`, `tmul`, `tpow`, `tcmp`, `tcvt`, `tsel`, `trelu` |
+| Tile-Scalar and Immediate | Tile combined with scalar or immediate operands | `tadds`, `tmuls`, `tpows`, `tlrelu`, `tcmps` |
 | Reduce and Expand | Row/column reductions and expansions | `trowsum`, `tcolmax`, `trowexpand`, `tcolexpand` |
 | Memory and Data Movement | GM↔tile transfer, gather/scatter, fix-pipe store variants | `tload`, `tstore`, `tstore_fp`, `mgather`, `mscatter` |
 | Matrix and Matrix-Vector | GEMV, matmul, and variants | `tgemv`, `tgemv_mx`, `tmatmul`, `tmatmul_acc`, `tmatmul_bias` |
 | Layout and Rearrangement | Reshape, transpose, extract, insert | `tmov`, `ttrans`, `treshape`, `textract`, `tinsert`, `timg2col` |
-| Irregular and Complex | Sort, quantize, histogram, print | `tmrgsort`, `tsort32`, `tquant`, `thistogram`, `tprint` |
+| Irregular and Complex | Sort, quantize, index movement, partial reductions | `tmrgsort`, `tsort32`, `tquant`, `tgather`, `tpartadd` |
 
 ## Inputs
 

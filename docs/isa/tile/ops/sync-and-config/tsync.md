@@ -4,13 +4,21 @@
 
 ## Summary
 
-Synchronize PTO execution (wait on events or insert a per-op pipeline barrier).
+Synchronize PTO execution. Two forms exist: the event-wait form blocks until specified event tokens are ready, and the barrier form inserts a pipeline drain for all operations of a given class.
 
 ## Mechanism
 
-`TSYNC(events...)` waits on a set of explicit event tokens. `TSYNC<Op>()` inserts a pipeline barrier for a single operation class.
+### Event-Wait Form: `TSYNC(events...)`
 
-Many intrinsics in `include/pto/common/pto_instr.hpp` call `TSYNC(events...)` internally before issuing the instruction. It is part of the tile synchronization or configuration shell, so the visible effect is ordering or state setup rather than arithmetic payload transformation.
+Waits on one or more `RecordEvent` tokens. Each token is produced by a prior tile operation (`TLOAD`, `TSTORE`, `TADD`, `TMATMUL`, etc.). The call does not return until all supplied events have been recorded. After this point, the tile data produced by the operations that created these events is guaranteed to be visible to subsequent operations.
+
+The underlying mechanism calls `events.Wait()` on each event token. In Auto mode, this may be a no-op when the compiler/runtime proves ordering by construction.
+
+### Barrier Form: `TSYNC<Op>()`
+
+Inserts a pipeline barrier for all operations of the specified operation class. All operations of class `Op` that appear before the barrier complete before any operation of class `Op` that appears after the barrier begins. The barrier does not affect other operation classes.
+
+`TSYNC<Op>()` only supports vector-pipeline operations. Attempting to use it for non-vector operations produces undefined results.
 
 ## Syntax
 
@@ -28,77 +36,77 @@ Single-op barrier form:
 tsync.op #pto.op<TADD>
 ```
 
-### AS Level 1 (SSA)
-
-The SSA form for `TSYNC` does not use explicit event SSA values. The ISA-level primitive is the C++ `RecordEvent` chaining via `WaitEvents...` on tile intrinsics. SSA-level representations of event ordering use `record_event` / `wait_event` (see below) which are PTO-DSL internal IR nodes, not the portable ISA instruction set.
-
 ### AS Level 2 (DPS)
 
 The AS Level 2 form exposes explicit event ordering primitives:
 
 ```text
 pto.record_event[src_op, dst_op, eventID]
-// Supported ops: TLOAD, TSTORE_ACC, TSTORE_VEC, TMOV_M2L, TMOV_M2S,
-//                 TMOV_M2B, TMOV_M2V, TMOV_V2M, TMATMUL, TVEC
 pto.wait_event[src_op, dst_op, eventID]
-// Supported ops: same as record_event
 pto.barrier(op)
-// Supported ops: TVEC, TMATMUL
 ```
 
-In the current PTO-DSL front-end flow, `record_event` and `wait_event` should be treated as low-level TSYNC forms. Front-end kernels SHOULD normally stay free of explicit event wiring and rely on `ptoas --enable-insert-sync` instead.
+`record_event` / `wait_event` are low-level TSYNC forms. Front-end kernels should normally stay free of explicit event wiring and rely on `ptoas --enable-insert-sync` instead.
 
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`:
 
 ```cpp
+// Barrier for a single operation class
 template <Op OpCode>
 PTO_INST void TSYNC();
 
+// Wait on one or more RecordEvent tokens
 template <typename... WaitEvents>
 PTO_INST void TSYNC(WaitEvents &... events);
 ```
 
 ## Inputs
 
-`TSYNC(events...)` takes one or more `RecordEvent` values as operands. Each `RecordEvent` is produced by a prior tile operation (`TLOAD`, `TADD`, `TMATMUL`, etc.). The call waits for all supplied events before proceeding.
-
-`TSYNC<Op>()` takes a compile-time operation tag (`Op::TLOAD`, `Op::TADD`, `Op::TMATMUL`, etc.) and inserts a pipeline barrier for all operations of that class.
+| Form | Operands | Description |
+|------|----------|-------------|
+| Event-wait | `events...` | One or more `RecordEvent` values produced by prior tile operations |
+| Barrier | `Op` template parameter | Operation class tag (`Op::TLOAD`, `Op::TADD`, `Op::TMATMUL`, etc.) |
 
 ## Expected Outputs
 
-This form is defined primarily by its ordering or configuration effect. It does not introduce a new payload tile beyond any explicit state object named by the syntax.
+The event-wait form produces no value; it blocks until events are ready.
+The barrier form produces no value; it blocks until the barrier completes.
 
 ## Side Effects
 
-This operation may establish a synchronization edge, bind or configure architectural tile state, or update implementation-defined configuration that later tile instructions consume.
+- Event-wait: may block the scalar unit until all specified events are recorded.
+- Barrier: may block the specified pipeline until all prior operations of that class complete.
+
+Does not affect unrelated tile traffic or other operation classes (barrier form only).
 
 ## Constraints
 
-- **`TSYNC(events...)` semantics**:
-    - `TSYNC(events...)` calls `WaitAllEvents(events...)`, which invokes `events.Wait()` on each event token. In auto mode, this is no-op.
+- `TSYNC(events...)`: If no events are supplied, the call is a no-op.
+- `TSYNC<Op>()`: Only valid for vector-pipeline operations. Attempting to use it for tile, matrix, or scalar operations is undefined.
+- All events must be produced by operations that precede the `TSYNC` in program order.
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
+- Supplying events that are not produced by any preceding operation causes undefined behavior.
+- Using `TSYNC<Op>()` with an unsupported operation class is rejected by the verifier.
 
 ## Target-Profile Restrictions
 
-- **Implementation checks (`TSYNC<Op>()`)**:
-    - `TSYNC_IMPL<Op>()` only supports vector-pipeline ops (`static_assert(pipe == PIPE_V)` in `include/pto/common/event.hpp`).
+- CPU simulation: `TSYNC` emulates the ordering semantics but may not reflect hardware pipeline latency.
+- A2/A3: `TSYNC<Op>()` only supports vector-pipeline ops.
+- A5: same as A2/A3.
 
 ## Examples
 
-### Auto
+### Event-wait
 
 ```cpp
 #include <pto/pto-inst.hpp>
-
 using namespace pto;
 
-void example_auto(__gm__ float* in) {
+void example(__gm__ float* in) {
   using TileT = Tile<TileType::Vec, float, 16, 16>;
   using GShape = Shape<1, 1, 1, 16, 16>;
   using GStride = BaseShape2D<float, 16, 16, Layout::ND>;
@@ -107,41 +115,27 @@ void example_auto(__gm__ float* in) {
   GT gin(in);
   TileT t;
   RecordEvent e = TLOAD(t, gin);  // TLOAD returns RecordEvent
-  TSYNC(e);                       // wait for load to complete
+  TSYNC(e);                        // wait for load to complete
 }
 ```
 
-### Manual
+### Pipeline barrier
 
 ```cpp
 #include <pto/pto-inst.hpp>
-
 using namespace pto;
 
-void example_manual() {
+void example() {
   using TileT = Tile<TileType::Vec, float, 16, 16>;
   TileT a, b, c;
-  RecordEvent e = TADD(c, a, b);  // TADD returns RecordEvent
-  TSYNC<Op::TADD>();              // pipeline barrier for TADD
-  TSYNC(e);                       // explicit wait
+  RecordEvent e = TADD(c, a, b);     // returns RecordEvent
+  TSYNC<Op::TADD>();                 // drain all TADD operations
+  TSYNC(e);                           // wait for this specific TADD
 }
 ```
 
-### PTO Assembly Form
-
-Event-wait form (bare assembly):
-
-```text
-tsync %e0, %e1 : !pto.event<...>, !pto.event<...>
-```
-
-Barrier form:
-
-```text
-tsync.op #pto.op<TADD>
-```
-
-## Related Ops / Instruction Set Links
+## See Also
 
 - Instruction set overview: [Sync And Config](../../sync-and-config.md)
 - Next op in instruction set: [pto.tassign](./tassign.md)
+- [Ordering and Synchronization](../../../machine-model/ordering-and-synchronization.md) for the full event model

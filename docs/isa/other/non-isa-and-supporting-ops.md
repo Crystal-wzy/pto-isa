@@ -9,7 +9,7 @@ Supporting operations provide convenience semantics over tile sequences, memory 
 | [TALIAS](../TALIAS.md) | Create an alias view of a tile without copying data | Alias |
 | [TAXPY](../TAXPY.md) | Fused multiply-add: `dst = src0 * scalar + src1` | Fused compute |
 | [TCONCAT](../TCONCAT.md) | Concatenate two tiles along a specified dimension | Tile sequence |
-| [TDEQUANT](../TDEQUANT.md) | Dequantize a tile from quantized format | Quantize |
+| [pto.tdequant](./ops/non-isa-and-supporting-ops/tdequant.md) | Dequantize a tile from quantized format | Quantize |
 | [TFREE](../TFREE.md) | Free a previously allocated tile or buffer | Memory |
 | [THISTOGRAM](../THISTOGRAM.md) | Compute histogram of tile values | Statistics |
 | [TPACK](../TPACK.md) | Pack multiple tiles into a single tile buffer | Tile sequence |
@@ -34,7 +34,10 @@ Fused multiply-add: `dst = src0 * scalar + src1`. This is a convenience operatio
 
 ### Quantization (TQUANT, TDEQUANT)
 
-Convert between floating-point and quantized integer representations. Quantized formats include INT8, UINT8, INT4, UINT4, FP4, FP8, etc.
+Convert between floating-point and quantized integer representations. In the current authored tree:
+
+- [pto.tquant](../tile/ops/irregular-and-complex/tquant.md) remains on the tile irregular/complex path.
+- [pto.tdequant](./ops/non-isa-and-supporting-ops/tdequant.md) is documented under supporting ops.
 
 Requires scale and zero-point tensors:
 

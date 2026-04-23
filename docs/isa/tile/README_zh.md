@@ -9,13 +9,13 @@
 | 指令族 | 说明 | 典型指令 |
 | --- | --- | --- |
 | [同步与配置](./sync-and-config_zh.md) | 资源绑定、事件等待、tile 侧模式设置 | `TASSIGN`、`TSYNC` |
-| [逐元素 Tile-Tile](./elementwise-tile-tile_zh.md) | tile 与 tile 的逐元素算术、比较和选择 | `TADD`、`TMUL`、`TSEL` |
-| [Tile-标量与立即数](./tile-scalar-and-immediate_zh.md) | tile 与标量或立即数的组合运算 | `TADDS`、`TMULS` |
+| [逐元素 Tile-Tile](./elementwise-tile-tile_zh.md) | tile 与 tile 的逐元素算术、比较和选择 | `TADD`、`TMUL`、`TPOW` |
+| [Tile-标量与立即数](./tile-scalar-and-immediate_zh.md) | tile 与标量或立即数的组合运算 | `TADDS`、`TMULS`、`TPOWS` |
 | [归约与扩展](./reduce-and-expand_zh.md) | 行 / 列归约和按轴扩展 | `TROWSUM`、`TROWEXPAND` |
 | [内存与数据搬运](./memory-and-data-movement_zh.md) | GM 与 tile 间传输，以及 tile 侧 gather / scatter | `TLOAD`、`TSTORE` |
 | [矩阵与矩阵-向量](./matrix-and-matrix-vector_zh.md) | cube 路径矩阵乘、GEMV 及其变体 | `TMATMUL`、`TGEMV` |
 | [布局与重排](./layout-and-rearrangement_zh.md) | reshape、transpose、extract、insert、img2col | `TTRANS`、`TIMG2COL` |
-| [不规则与复杂](./irregular-and-complex_zh.md) | 排序、量化、索引型搬运、部分归约等 | `TSORT32`、`TQUANT` |
+| [不规则与复杂](./irregular-and-complex_zh.md) | 排序、量化、索引型搬运、部分归约等 | `TSORT32`、`TQUANT`、`TGATHER` |
 
 ## 常见 tile 角色
 

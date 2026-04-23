@@ -60,7 +60,6 @@ The following ops require A5 profile:
 
 - `vstu`, `vstus`, `vstur` — Vector unaligned store with alignment state
 - `vselr`, `vselrv2` — Pair select operations
-- `thistogram`, `tpack`, `trandom` — Tile instructions but listed under the SFU category
 - All ops using FP8 element types (e4m3, e5m2)
 
 ## Navigation

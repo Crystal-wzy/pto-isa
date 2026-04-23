@@ -16,11 +16,11 @@ Version 1.0 also includes supporting reference material in the `other/` tree for
 
 PTO ISA Version 1.0 currently documents:
 
-- **120** tile instructions
-- **99** vector micro instructions
-- **44** scalar and control instructions
+- **125** tile instructions
+- **110** vector micro instructions
+- **53** scalar and control instructions
 
-That yields **263 named instructions** in the Version 1.0 reference set, excluding non-ISA/supporting reference pages.
+That yields **288 named instructions** in the Version 1.0 reference set, excluding non-ISA/supporting reference pages.
 
 ## Tile Instruction Inventory
 
@@ -30,11 +30,11 @@ That yields **263 named instructions** in the Version 1.0 reference set, excludi
 
 ### Elementwise Tile-Tile
 
-`tabs`, `tadd`, `taddc`, `tand`, `tcmp`, `tcvt`, `tdiv`, `texp`, `tfmod`, `tlog`, `tmax`, `tmin`, `tmul`, `tneg`, `tnot`, `tor`, `tprelu`, `trecip`, `trelu`, `trem`, `trsqrt`, `tsel`, `tshl`, `tshr`, `tsqrt`, `tsub`, `tsubc`, `txor`
+`tabs`, `tadd`, `taddc`, `tand`, `tcmp`, `tcvt`, `tdiv`, `texp`, `tpow`, `tfmod`, `tlog`, `tmax`, `tmin`, `tmul`, `tneg`, `tnot`, `tor`, `tprelu`, `trecip`, `trelu`, `trem`, `trsqrt`, `tsel`, `tshl`, `tshr`, `tsqrt`, `tsub`, `tsubc`, `txor`
 
 ### Tile-Scalar And Immediate
 
-`tadds`, `taddsc`, `tands`, `tcmps`, `tdivs`, `texpands`, `tfmods`, `tlrelu`, `tmaxs`, `tmins`, `tmuls`, `tors`, `trems`, `tsels`, `tshls`, `tshrs`, `tsubs`, `tsubsc`, `txors`
+`tadds`, `taddsc`, `tands`, `tcmps`, `tdivs`, `texpands`, `tfmods`, `tlrelu`, `tmaxs`, `tmins`, `tmuls`, `tpows`, `tors`, `trems`, `tsels`, `tshls`, `tshrs`, `tsubs`, `tsubsc`, `txors`
 
 ### Reduce And Expand
 

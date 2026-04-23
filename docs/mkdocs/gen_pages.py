@@ -12,9 +12,15 @@
 """
 MkDocs build-time generator for PTO Tile Lib.
 
-We intentionally keep MkDocs config under `docs/mkdocs/` and generate a *mirror*
-of repository markdown into `docs/mkdocs/src/` so the site can browse markdown
-across the entire repo (README files under kernels/, tests/, scripts/, etc.).
+MkDocs configuration lives under `docs/mkdocs/`, but authored ISA/manual content
+lives under the main repo trees such as `docs/isa/`, `docs/assembly/`, and the
+top-level manual hubs. This generator exposes those authored sources to MkDocs
+at build time by generating a virtual mirror under `docs/mkdocs/src/`.
+
+Important source-of-truth rule:
+- `docs/mkdocs/src/docs/**` is generated build-time content, not a hand-edited
+  authored tree.
+- `docs/isa/` remains the canonical authored ISA source tree.
 
 Key property:
 - Generated pages preserve original repository paths, so existing repo-relative

@@ -19,10 +19,6 @@ Irregular operations cover tile compute that does not fit the standard elementwi
 | [pto.tpartmax](./ops/irregular-and-complex/tpartmax.md) | Partial maximum | Reduce | All |
 | [pto.tpartmin](./ops/irregular-and-complex/tpartmin.md) | Partial minimum | Reduce | All |
 | [pto.tquant](./ops/irregular-and-complex/tquant.md) | Quantize tile to integer format | Quantize | A2/A3, A5 |
-| [pto.tdequant](../TDEQUANT.md) | Dequantize tile to floating-point | Quantize | A2/A3, A5 |
-| [pto.tpack](../TPACK.md) | Pack tile data | Pack | A5 only |
-| [pto.trandom](../TRANDOM.md) | Random number generation | Random | A5 only |
-| [pto.thistogram](../THISTOGRAM.md) | Histogram computation | Histogram | A5 only |
 
 ## Mechanism
 
@@ -42,17 +38,9 @@ $$ \mathrm{dst}_{\mathrm{index}_i} = \mathrm{src}_i \quad \text{(scatter)} $$
 
 Partial reductions compute intermediate results that are later combined across tiles. Unlike full row/column reductions, partial reductions produce tiles with reduced but non-singular extent — they divide the reduction axis into segments.
 
-### Quantization (TQUANT, TDEQUANT)
+### Quantization (TQUANT)
 
-Convert between floating-point and quantized integer representations. Quantized formats include INT8, UINT8, INT4, UINT4, FP4, NF4. Requires scale and zero-point tensors. These operations are **not available** on the CPU simulator.
-
-### A5-Only Operations
-
-| Operation | Description |
-|-----------|-------------|
-| `TPACK` | Pack tile data into a compact format |
-| `TRANDOM` | Generate random numbers into tile |
-| `THISTOGRAM` | Compute histogram of tile elements |
+`TQUANT` converts floating-point tile data into quantized representations. In the current authored tree, `TDEQUANT`, `TPACK`, `TRANDOM`, and `THISTOGRAM` are documented under the supporting-op / other path rather than this tile family page.
 
 ## Type Support by Target Profile
 
@@ -73,13 +61,11 @@ Convert between floating-point and quantized integer representations. Quantized 
 - Quantization requires valid scale (non-zero) and zero-point values within representable range.
 - Scatter requires a valid index tile with non-negative indices within the destination bounds.
 - Partial reductions may have different behavior across profiles.
-- A5-only operations MUST NOT be used on CPU simulator, A2, or A3.
 
 ## Cases That Are Not Allowed
 
 - **MUST NOT** use quantization with invalid scale (zero or NaN) or out-of-range zero-point.
 - **MUST NOT** scatter to indices outside the destination tile's declared shape bounds.
-- **MUST NOT** use A5-only operations (`TPACK`, `TRANDOM`, `THISTOGRAM`) on CPU simulator, A2, or A3.
 - **MUST NOT** use sort operations with element types incompatible with the sort variant (e.g., `TSORT32` on i8).
 
 ## Performance Notes
@@ -110,8 +96,6 @@ PTO_INST RecordEvent TSCATTER(TileDst& dst, TileIdx& indices, TileSrc& src);
 template <typename TileDst, typename TileSrc, typename TileScale, typename TileZp>
 PTO_INST RecordEvent TQUANT(TileDst& dst, TileSrc& src, TileScale& scale, TileZp& zp);
 
-template <typename TileDst, typename TileSrc, typename TileScale, typename TileZp>
-PTO_INST RecordEvent TDEQUANT(TileDst& dst, TileSrc& src, TileScale& scale, TileZp& zp);
 ```
 
 ## See Also

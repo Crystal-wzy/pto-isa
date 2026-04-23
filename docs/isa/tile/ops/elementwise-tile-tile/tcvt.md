@@ -19,21 +19,21 @@ where `rmode` is the rounding policy and `satmode` (if provided) controls satura
 | Mode | Behavior |
 |------|----------|
 | `RoundMode::CAST_RINT` | Round to nearest, ties to even |
-| `RoundMode::CAST_RZ` | Round toward zero |
-| `RoundMode::CAST_RP` | Round toward +∞ |
-| `RoundMode::CAST_RM` | Round toward -∞ |
-| `RoundMode::CAST_RN` | Round to nearest, ties away from zero |
+| `RoundMode::CAST_ROUND` | Round to nearest, ties away from zero |
+| `RoundMode::CAST_FLOOR` | Round toward -∞ |
+| `RoundMode::CAST_CEIL` | Round toward +∞ |
+| `RoundMode::CAST_TRUNC` | Round toward zero |
 
 ## Saturation Modes
 
-When `SaturationMode` is provided (overload 2), saturation behavior is explicitly controlled:
+When `SaturationMode` is provided, saturation behavior is explicitly controlled:
 
 | Mode | Behavior |
 |------|----------|
-| `SaturationMode::NONE` | No saturation; wraps on overflow |
-| `SaturationMode::SAT` | Clamp to destination type's representable range |
+| `SaturationMode::ON` | Saturation enabled |
+| `SaturationMode::OFF` | Saturation disabled |
 
-When `SaturationMode` is omitted (overload 1), the implementation chooses a target-defined default for the specific source/destination type pair.
+When `SaturationMode` is omitted, the implementation chooses the default behavior for the selected target/type path. Some conversion paths also expose a `tmp`-tile overload used for explicit scratch storage.
 
 ## Syntax
 
@@ -62,17 +62,22 @@ pto.tcvt ins(%src {rmode = #pto.round_mode<CAST_RINT>}: !pto.tile_buf<...>) outs
 Declared in `include/pto/common/pto_instr.hpp` and `include/pto/common/constants.hpp`:
 
 ```cpp
-// Overload 1: implementation-chosen default saturation
-template <typename TileDataD, typename TileDataS, typename... WaitEvents>
-PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, RoundMode mode, WaitEvents &... events);
+template <typename TileDataD, typename TileDataS, typename TmpTileData, typename... WaitEvents>
+PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, TmpTileData &tmp, RoundMode mode,
+                          SaturationMode satMode, WaitEvents &... events);
 
-// Overload 2: explicit saturation control (A2/A3, A5 only)
+template <typename TileDataD, typename TileDataS, typename TmpTileData, typename... WaitEvents>
+PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, TmpTileData &tmp, RoundMode mode, WaitEvents &... events);
+
 template <typename TileDataD, typename TileDataS, typename... WaitEvents>
 PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, RoundMode mode,
                           SaturationMode satMode, WaitEvents &... events);
+
+template <typename TileDataD, typename TileDataS, typename... WaitEvents>
+PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, RoundMode mode, WaitEvents &... events);
 ```
 
-Overload 2 (with explicit `SaturationMode`) is not currently implemented on the CPU simulator.
+The `tmp`-tile overloads exist for conversion paths that need explicit scratch storage.
 
 ## Inputs
 
@@ -80,8 +85,9 @@ Overload 2 (with explicit `SaturationMode`) is not currently implemented on the 
 |---------|------|-------------|
 | `%src` | Source tile | Source tile; read at `(i, j)` for each `(i, j)` in `dst` valid region |
 | `%dst` | Destination tile | Destination tile receiving the converted values |
-| `mode` | Rounding mode | One of `CAST_RINT`, `CAST_RZ`, `CAST_RP`, `CAST_RM`, `CAST_RN` |
-| `satMode` | Saturation mode (optional) | `NONE` or `SAT` for explicit saturation control |
+| `mode` | Rounding mode | One of `CAST_RINT`, `CAST_ROUND`, `CAST_FLOOR`, `CAST_CEIL`, `CAST_TRUNC` |
+| `satMode` | Saturation mode (optional) | `ON` or `OFF` |
+| `tmp` | Temporary tile (optional) | Scratch tile for conversion paths that require explicit temporary storage |
 | `WaitEvents...` | Optional synchronisation | `RecordEvent` tokens to wait on before issuing the operation |
 
 ## Expected Outputs
@@ -97,29 +103,22 @@ No architectural side effects beyond producing the destination tile. Does not im
 ## Constraints
 
 - `src` and `dst` MUST have compatible shapes (declared shape and valid region).
-- The source/destination type pair MUST be supported by the target profile.
+- The source/destination type pair MUST be supported by the selected target profile.
 - The rounding mode MUST be supported for the given type pair.
-- The output tile `dst` MUST have a different element type from `src`.
+- When a conversion path requires explicit scratch storage, callers MUST use one of the `tmp`-tile overloads.
+- Disabling saturation may change overflow behavior for some backend/type paths, especially low-precision integer conversions.
 
 ## Cases That Are Not Allowed
 
 - **MUST NOT** use a type pair not supported by the target profile.
 - **MUST NOT** use a rounding mode not supported for the given type pair.
+- **MUST NOT** assume that disabling saturation still clamps overflow to the destination range.
 
 ## Target-Profile Restrictions
 
-| Feature | CPU Simulator | A2/A3 | A5 |
-|---------|:-------------:|:------:|:--:|
-| Overload 1 (default sat) | Yes | Yes | Yes |
-| Overload 2 (explicit sat) | No | Yes | Yes |
-| f32 → f16 | Yes | Yes | Yes |
-| f16 → f32 | Yes | Yes | Yes |
-| f32 → bf16 | Yes | Yes | Yes |
-| bf16 → f32 | Yes | Yes | Yes |
-| f32 → int32_t | Yes | Yes | Yes |
-| int32_t → f32 | Yes | Yes | Yes |
-| f16 → bf16 | No | Yes | Yes |
-| FP8 types | No | No | Yes |
+`pto.tcvt` preserves PTO-visible semantics across CPU simulation, A2/A3-class targets, and A5-class targets, but the exact set of supported type pairs, scratch requirements, and saturation behavior is backend-specific.
+
+In this checkout, the fp16 → int8 non-saturating path is explicitly implemented through helper logic that may require temporary storage and row-aware sub-chunking.
 
 ## Examples
 
@@ -139,29 +138,12 @@ void example_auto() {
 }
 ```
 
-### Manual
+### Explicit Saturation / Scratch
 
 ```cpp
-#include <pto/pto-inst.hpp>
-
-using namespace pto;
-
-void example_manual() {
-  using SrcT = Tile<TileType::Vec, float, 16, 16>;
-  using DstT = Tile<TileType::Vec, half, 16, 16>;
-  SrcT src;
-  DstT dst;
-  TASSIGN(src, 0x1000);
-  TASSIGN(dst, 0x2000);
-  TCVT(dst, src, RoundMode::CAST_RINT);
-}
-```
-
-### Explicit Saturation (A2/A3, A5)
-
-```cpp
-// A2/A3 and A5 only
-TCVT(dst, src, RoundMode::CAST_RINT, SaturationMode::SAT);
+using TmpT = Tile<TileType::Vec, int32_t, 16, 16>;
+TmpT tmp;
+TCVT(dst, src, tmp, RoundMode::CAST_TRUNC, SaturationMode::OFF);
 ```
 
 ### PTO Assembly Form

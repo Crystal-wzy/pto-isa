@@ -19,6 +19,7 @@
 | `pto.tshl` / `pto.tshr` | 逐元素移位 | Binary |
 | `pto.txor` | 逐元素按位异或 | Binary |
 | `pto.tlog` / `pto.trecip` / `pto.texp` / `pto.tsqrt` / `pto.trsqrt` | 一元数学运算 | Unary |
+| `pto.tpow` | 逐元素幂运算 | Binary |
 | `pto.tprelu` / `pto.trelu` / `pto.tneg` / `pto.tnot` | 激活或一元变体 | Unary/Binary |
 | `pto.taddc` / `pto.tsubc` | 三输入融合加减 | Ternary-like Binary |
 | `pto.tcvt` | 逐元素类型转换 | Unary |

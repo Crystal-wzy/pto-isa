@@ -4,17 +4,20 @@
 
 ## Summary
 
-Lane-wise addition of two vector registers, producing a result vector register. Only lanes selected by the predicate mask are active; inactive lanes do not participate in the computation and their destination elements are left unchanged.
+Lane-wise addition of two vector registers, producing a result vector register. Only lanes where the predicate mask bit is 1 (active lanes) participate in the computation.
 
 ## Mechanism
 
-`pto.vadd` is a `pto.v*` compute operation. It reads two source vector registers lane-by-lane, adds the corresponding elements, and writes the result to the destination vector register. The iteration domain covers all N lanes; the predicate mask determines which lanes are active.
+`pto.vadd` reads two source vector registers lane-by-lane, adds the corresponding elements, and writes the result to the destination vector register. The iteration domain covers all N lanes; the predicate mask determines which lanes are active.
 
 For each lane `i` where the predicate is true:
 
 $$ \mathrm{dst}_i = \mathrm{lhs}_i + \mathrm{rhs}_i $$
 
-Lanes where the predicate is false are **inactive**: the destination register element at that lane is unmodified.
+For each lane `i` where the predicate is false (inactive lanes):
+
+- The destination register element at that lane is not modified by the operation.
+- Programs must not rely on the value of inactive lanes after the operation.
 
 ## Syntax
 
@@ -55,47 +58,47 @@ vadd(dst, src0, src1, mask);
 | `%rhs` | `!pto.vreg<NxT>` | Right-hand source vector register |
 | `%mask` | `!pto.mask` | Predicate mask; lanes where mask bit is 1 are active |
 
-Both source registers MUST have the same element type and the same vector width `N`. The mask width MUST match `N`.
+All three registers must have the same element type and same vector width `N`. The mask width must match `N`.
 
 ## Expected Outputs
 
 | Result | Type | Description |
 |--------|------|-------------|
-| `%dst` | `!pto.vreg<NxT>` | Lane-wise sum on active lanes; inactive lanes are unmodified |
+| `%dst` | `!pto.vreg<NxT>` | Lane-wise sum on active lanes; inactive lanes are unchanged |
 
 ## Side Effects
 
-This operation has no architectural side effect beyond producing its destination vector register. It does not implicitly reserve buffers, signal events, or establish memory fences.
+No architectural side effects. Does not reserve buffers, signal events, or establish fences.
 
 ## Constraints
 
-- **Type match**: `%lhs`, `%rhs`, and `%dst` MUST have identical element types.
-- **Width match**: All three registers MUST have the same vector width `N`.
-- **Mask width**: `%mask` MUST have width equal to `N`.
-- **Active lanes**: Only lanes where the mask bit is 1 (true) participate in the addition.
-- **Inactive lanes**: Destination elements at inactive lanes are unmodified.
+- **Type match**: `%lhs`, `%rhs`, and `%dst` must have identical element types.
+- **Width match**: All three registers must have the same vector width `N`.
+- **Mask width**: `%mask` must have width equal to `N`.
+- **Active lanes**: Only lanes where mask bit is 1 (true) participate in the addition.
+- **Inactive lanes**: Destination elements at inactive lanes are not modified by the operation. Programs must not assume any particular value in inactive lanes.
 
 ## Exceptions
 
-- The verifier rejects illegal operand type mismatches, width mismatches, or mask width mismatches.
-- Any additional illegality stated in the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set page is also part of the contract.
+- Verifier rejects type mismatches, width mismatches, or mask width mismatches.
+- Any additional illegality stated in the [Binary Vector Instructions](../../binary-vector-ops.md) instruction set page is part of the contract.
 
 ## Target-Profile Restrictions
 
 | Element Type | CPU Simulator | A2/A3 | A5 |
-|------------|:-------------:|:------:|:--:|
+|:------------|:-------------:|:------:|:--:|
 | `f32` | Simulated | Simulated | Supported |
 | `f16` / `bf16` | Simulated | Simulated | Supported |
 | `i8`–`i64`, `u8`–`u64` | Simulated | Simulated | Supported |
 
-A5 is the primary concrete profile for the vector instructions. CPU simulation and A2/A3-class targets emulate `pto.v*` operations using scalar loops while preserving the visible PTO contract. Code that depends on specific performance characteristics or latency should treat those dependencies as target-profile-specific.
+A5 is the primary concrete profile for vector instructions. CPU simulation and A2/A3-class targets emulate `pto.v*` operations using scalar loops while preserving the visible PTO contract. Code that depends on specific performance characteristics should treat those as target-profile-specific.
 
 ## Performance
 
 ### A5 Latency
 
 | Element Type | Latency (cycles) | A5 RV |
-|---|---|---|
+|---|:---:|:---:|
 | `f32` | 7 | `RV_VADD` |
 | `f16` | 7 | `RV_VADD` |
 | `i32` | 7 | `RV_VADD` |
@@ -105,26 +108,20 @@ A5 is the primary concrete profile for the vector instructions. CPU simulation a
 ### A2/A3 Throughput
 
 | Metric | Value | Applies To |
-|--------|-------|-----------|
-| Startup latency | 14 (`A2A3_STARTUP_BINARY`) | all FP/INT binary ops |
-| Completion: FP32 | 19 (`A2A3_COMPL_FP_BINOP`) | f32, i32 |
-| Completion: INT16 | 17 (`A2A3_COMPL_INT_BINOP`) | int16 |
-| Per-repeat throughput | 2 (`A2A3_RPT_2`) | all binary ops |
-| Pipeline interval | 18 (`A2A3_INTERVAL`) | all vector ops |
+|--------|:------:|-----------|
+| Startup latency | 14 | all FP/INT binary ops |
+| Completion: FP32 | 19 | f32, i32 |
+| Completion: INT16 | 17 | int16 |
+| Per-repeat throughput | 2 | all binary ops |
+| Pipeline interval | 18 | all vector ops |
 | Cycle model | `14 + C + 2R + (R-1)×18` | C=completion, R=repeats |
 
-**Example**: 1024 f32 elements with 16 iterations (`R=16`):
+Example: 1024 f32 elements with 16 iterations (`R=16`):
 
 ```
 A5 total (pipelined): 7 + 15×2 = 37 cycles
 A2/A3 total: 14 + 19 + 32 + 270 = 335 cycles
 ```
-
-### Execution Throughput
-
-`vadd` has 2× the per-repeat throughput of unary ops, making it efficient for element-wise kernels. For batched processing, the vecscope loop hides latency through pipelining.
-
----
 
 ## Examples
 
@@ -134,7 +131,6 @@ A2/A3 total: 14 + 19 + 32 + 270 = 335 cycles
 #include <pto/pto-inst.hpp>
 using namespace pto;
 
-// All lanes active: mask set to all-ones
 Mask<64> mask;
 mask.set_all(true);  // predicate all-true
 
@@ -169,7 +165,7 @@ void vector_add(Ptr<ub_space_t, ub_t> ub_a, Ptr<ub_space_t, ub_t> ub_b,
 }
 ```
 
-## Related Ops / Instruction Set Links
+## See Also
 
 - Instruction set overview: [Binary Vector Instructions](../../binary-vector-ops.md)
 - Next op in instruction set: [pto.vsub](./vsub.md)

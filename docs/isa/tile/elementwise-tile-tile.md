@@ -29,6 +29,7 @@ Elementwise tile-tile operations perform lane-wise binary and unary operations o
 | [pto.trsqrt](./ops/elementwise-tile-tile/trsqrt.md) | Elementwise reciprocal square root | Unary | `TRSQRT(dst, src)` |
 | [pto.tsqrt](./ops/elementwise-tile-tile/tsqrt.md) | Elementwise square root | Unary | `TSQRT(dst, src)` |
 | [pto.texp](./ops/elementwise-tile-tile/texp.md) | Elementwise exponential | Unary | `TEXP(dst, src)` |
+| [pto.tpow](./ops/elementwise-tile-tile/tpow.md) | Elementwise power with tile exponent | Binary | `TPOW(dst, base, exp, tmp)` |
 | [pto.tnot](./ops/elementwise-tile-tile/tnot.md) | Elementwise bitwise NOT | Unary | `TNOT(dst, src)` |
 | [pto.trelu](./ops/elementwise-tile-tile/trelu.md) | Elementwise ReLU | Unary | `TRELU(dst, src)` |
 | [pto.tneg](./ops/elementwise-tile-tile/tneg.md) | Elementwise negation | Unary | `TNEG(dst, src)` |

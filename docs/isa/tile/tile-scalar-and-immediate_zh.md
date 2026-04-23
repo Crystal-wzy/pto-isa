@@ -6,7 +6,7 @@ Tile-标量类操作把一个 tile 与一个标量或立即数结合。标量在
 
 | 操作 | 说明 |
 | --- | --- |
-| `pto.tadds` / `tsubs` / `tmuls` / `tdivs` | 与标量做逐元素算术 |
+| `pto.tadds` / `tsubs` / `tmuls` / `tpows` / `tdivs` | 与标量做逐元素算术 |
 | `pto.tfmods` / `trems` | 与标量做模 / 余数 |
 | `pto.tmins` / `tmaxs` | 与标量做逐元素 min / max |
 | `pto.tands` / `tors` / `txors` | 与标量做逐元素按位逻辑 |

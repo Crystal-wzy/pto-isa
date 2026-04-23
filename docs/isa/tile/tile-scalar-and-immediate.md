@@ -9,6 +9,7 @@ Tile-scalar operations combine a tile operand with a scalar value or immediate o
 | [pto.tadds](./ops/tile-scalar-and-immediate/tadds.md) | Elementwise addition with scalar | Binary | `TADDS(dst, src, scalar)` |
 | [pto.tsubs](./ops/tile-scalar-and-immediate/tsubs.md) | Elementwise subtraction with scalar | Binary | `TSUBS(dst, src, scalar)` |
 | [pto.tmuls](./ops/tile-scalar-and-immediate/tmuls.md) | Elementwise multiplication with scalar | Binary | `TMULS(dst, src, scalar)` |
+| [pto.tpows](./ops/tile-scalar-and-immediate/tpows.md) | Elementwise power with scalar exponent | Binary | `TPOWS(dst, base, exp, tmp)` |
 | [pto.tdivs](./ops/tile-scalar-and-immediate/tdivs.md) | Elementwise division with scalar | Binary | `TDIVS(dst, src, scalar)` |
 | [pto.tfmods](./ops/tile-scalar-and-immediate/tfmods.md) | Elementwise modulo with scalar | Binary | `TFMODS(dst, src, scalar)` |
 | [pto.trems](./ops/tile-scalar-and-immediate/trems.md) | Elementwise remainder with scalar | Binary | `TREMS(dst, src, scalar)` |

@@ -4,21 +4,17 @@
 
 ## Summary
 
-Bind a Tile object to an implementation-defined on-chip address (manual placement).
+Bind a Tile object to an on-chip physical address. In Manual mode, this is how the author controls which tile buffer holds which logical tile variable.
 
 ## Mechanism
 
-Bind a Tile object to an implementation-defined on-chip address (manual placement). It is part of the tile synchronization or configuration shell, so the visible effect is ordering or state setup rather than arithmetic payload transformation.
+`TASSIGN` maps a tile variable to a physical storage address within the tile buffer space (UB, L0A, L0B, L0C, etc.). The mapping is immediate and persists until the tile is rebound or the program ends.
 
-Not applicable.
+Without `TASSIGN`, the compiler/runtime assigns tile buffers automatically (Auto mode). With `TASSIGN`, the author overrides this assignment for Manual mode code.
+
+The physical address is interpreted by the tile buffer controller on the AI Core. The exact encoding and addressing scheme within the buffer space is implementation-defined.
 
 ## Syntax
-
-Textual spelling is defined by the PTO ISA syntax-and-operands pages.
-
-`TASSIGN` is typically introduced by bufferization/lowering when mapping SSA tiles to physical storage.
-
-Synchronous form:
 
 ```text
 tassign %tile, %addr : !pto.tile<...>, index
@@ -36,18 +32,6 @@ pto.tassign %tile, %addr : !pto.tile<...>, dtype
 pto.tassign ins(%tile, %addr : !pto.tile_buf<...>, dtype)
 ```
 
-### IR Level 1 (SSA)
-
-```text
-pto.tassign %tile, %addr : !pto.tile<...>, dtype
-```
-
-### IR Level 2 (DPS)
-
-```text
-pto.tassign ins(%tile, %addr : !pto.tile_buf<...>, dtype)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/common/pto_instr.hpp`.
@@ -59,8 +43,7 @@ template <typename T, typename AddrType>
 PTO_INST void TASSIGN(T& obj, AddrType addr);
 ```
 
-Binds `obj` to the on-chip address `addr`. No compile-time bounds checking is
-performed (the address value is not available at compile time).
+Binds `obj` to the on-chip address `addr`. The address value is interpreted at runtime; no compile-time bounds checking is performed.
 
 ### Form 2: Compile-time address (with static bounds check)
 
@@ -69,24 +52,19 @@ template <std::size_t Addr, typename T>
 PTO_INST void TASSIGN(T& obj);
 ```
 
-Binds `obj` to the on-chip address `Addr`. Because `Addr` is a non-type
-template parameter, the compiler performs the following **compile-time** checks
-via `static_assert`:
+Binds `obj` to the on-chip address `Addr`. Because `Addr` is a non-type template parameter, the compiler performs static bounds checks at compile time:
 
-| Check | Condition | Assertion ID | Error message |
-|-------|-----------|--------------|---------------|
+| Check | Condition | Error ID | Error Message |
+|-------|-----------|----------|---------------|
 | Memory space exists | `capacity > 0` | SA-0351 | Memory space is not available on this architecture. |
 | Tile fits in memory | `tile_size <= capacity` | SA-0352 | Tile storage size exceeds memory space capacity. |
 | Address in bounds | `Addr + tile_size <= capacity` | SA-0353 | addr + tile_size exceeds memory space capacity (out of bounds). |
 | Address aligned | `Addr % alignment == 0` | SA-0354 | addr is not properly aligned for the target memory space. |
 
-See `docs/coding/debug.md` (fix recipe `FIX-A12`) for suggested remedies.
+The memory space, capacity, and alignment are determined from the tile's `TileType`:
 
-The memory space, capacity, and alignment are determined automatically from the
-Tile's `TileType` (i.e. `Loc` template parameter):
-
-| TileType | Memory | Capacity (A2A3) | Capacity (A5) | Capacity (Kirin9030) | Capacity (KirinX90) | Alignment |
-|----------|--------|-----------------|---------------|----------------------|---------------------|-----------|
+| TileType | Buffer | Capacity (A2A3) | Capacity (A5) | Capacity (Kirin9030) | Capacity (KirinX90) | Alignment |
+|----------|--------|:---------:|:---------:|:----------:|:----------:|:---------:|
 | Vec | UB | 192 KB | 256 KB | 128 KB | 128 KB | 32 B |
 | Mat | L1 | 512 KB | 512 KB | 512 KB | 1024 KB | 32 B |
 | Left | L0A | 64 KB | 64 KB | 32 KB | 64 KB | 32 B |
@@ -97,56 +75,46 @@ Tile's `TileType` (i.e. `Loc` template parameter):
 | ScaleLeft | L0A | N/A | 4 KB | N/A | N/A | 32 B |
 | ScaleRight | L0B | N/A | 4 KB | N/A | N/A | 32 B |
 
-Capacities can be overridden at build time via `-D` flags (e.g.
-`-DPTO_UBUF_SIZE_BYTES=262144`). See `include/pto/common/buffer_limits.hpp`.
+Capacities can be overridden at build time via `-D` flags (e.g., `-DPTO_UBUF_SIZE_BYTES=262144`). See `include/pto/common/buffer_limits.hpp`.
 
-**Note:** This overload is only available for `Tile` and `ConvTile` types. For
-`GlobalTensor`, use `TASSIGN(obj, pointer)` (Form 1).
+Form 2 is only available for `Tile` and `ConvTile` types. For `GlobalTensor`, use Form 1.
 
 ## Inputs
 
-- `tile` is the tile to bind.
-- `addr` is the on-chip address to bind the tile to.
+| Operand | Description |
+|---------|-------------|
+| `tile` | The tile object to bind |
+| `addr` | The on-chip address to bind (runtime value or compile-time constant) |
 
 ## Expected Outputs
 
-This form is defined primarily by its ordering or configuration effect. It does not introduce a new payload tile beyond any explicit state object named by the syntax.
+None. The binding takes effect immediately; subsequent tile operations on `tile` use the bound physical address.
 
 ## Side Effects
 
-This operation may establish a synchronization edge, bind or configure architectural tile state, or update implementation-defined configuration that later tile instructions consume.
+Binds the tile variable to a physical address. Using the same physical address for two non-alias tiles simultaneously produces undefined results.
 
 ## Constraints
 
-- Configuration and synchronization state MUST only be used where later instructions document the dependency.
-
-- Programs must not treat implementation-defined manual placement as a portable substitute for legal PTO behavior.
+- Two non-alias tiles must not use the same physical address without an intervening `TSYNC`.
+- Configuration state must only be used where later instructions document the dependency.
+- Programs must not treat manual placement as a portable substitute for legal PTO behavior.
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
-
-## Target-Profile Restrictions
-
-- **Implementation checks**:
-    - If `obj` is a Tile:
-    - In manual mode (when `__PTO_AUTO__` is not defined), `addr` must be an integral type and is reinterpreted as the tile's storage address.
-    - In auto mode (when `__PTO_AUTO__` is defined), `TASSIGN(tile, addr)` is a no-op.
-    - If `obj` is a `GlobalTensor`:
-    - `addr` must be a pointer type.
-    - The pointed-to element type must match `GlobalTensor::DType`.
+- In Auto mode, `TASSIGN(tile, addr)` is a no-op because the compiler/runtime manages placement.
+- If `obj` is a `GlobalTensor`, `addr` must be a pointer type matching `GlobalTensor::DType`.
+- Using `TASSIGN` with an out-of-bounds address triggers a compile-time error (Form 2) or undefined behavior (Form 1).
 
 ## Examples
 
-### Runtime address (no compile-time check)
+### Runtime address
 
 ```cpp
 #include <pto/pto-inst.hpp>
-
 using namespace pto;
 
-void example_runtime() {
+void example() {
   using TileT = Tile<TileType::Vec, float, 16, 16>;
   TileT a, b, c;
   TASSIGN(a, 0x1000);
@@ -160,87 +128,52 @@ void example_runtime() {
 
 ```cpp
 #include <pto/pto-inst.hpp>
-
 using namespace pto;
 
-void example_checked() {
+void example() {
   using TileT = Tile<TileType::Vec, float, 16, 16>;
   TileT a, b, c;
-
-  TASSIGN<0x0000>(a);   // OK: 0x0000 + 1024 <= 192KB
-  TASSIGN<0x0400>(b);   // OK: 0x0400 + 1024 <= 192KB
-  TASSIGN<0x0800>(c);   // OK: 0x0800 + 1024 <= 192KB
+  TASSIGN<0x0000>(a);    // OK: 0 + 1024 <= 192KB
+  TASSIGN<0x0400>(b);    // OK: 0x0400 + 1024 <= 192KB
+  TASSIGN<0x0800>(c);    // OK: 0x0800 + 1024 <= 192KB
   TADD(c, a, b);
 }
 ```
 
-The following triggers a compile error:
+Compile-time errors for out-of-bounds placement:
 
 ```cpp
-void example_oob() {
-  // Tile<Vec, float, 256, 256> occupies 256*256*4 = 256KB
-  using BigTile = Tile<TileType::Vec, float, 256, 256>;
+// Compile error: tile size exceeds buffer capacity
+void bad1() {
+  using BigTile = Tile<TileType::Vec, float, 256, 256>;  // 256KB
   BigTile t;
-
-  // static_assert fires: tile_size (256KB) > UB capacity (192KB on A2A3)
-  TASSIGN<0x0>(t);
+  TASSIGN<0x0>(t);  // SA-0352: exceeds 192KB on A2A3
 }
-```
 
-```cpp
-void example_oob_addr() {
+// Compile error: address + tile size exceeds capacity
+void bad2() {
   using TileT = Tile<TileType::Vec, float, 128, 128>;  // 64KB
   TileT t;
-
-  // static_assert fires: 0x20000 (128KB) + 64KB = 192KB,
-  //                       but 0x20001 + 64KB > 192KB
-  TASSIGN<0x20001>(t);
+  TASSIGN<0x20001>(t);  // SA-0353: 0x20001 + 64KB > 192KB
 }
 ```
 
 ### Ping-pong L0 buffer allocation
 
 ```cpp
-void example_pingpong() {
-  using L0ATile = TileLeft<half, 64, 128>;   // L0A tile
-  using L0BTile = TileRight<half, 128, 64>;  // L0B tile
-
+void pingpong() {
+  using L0ATile = TileLeft<half, 64, 128>;
+  using L0BTile = TileRight<half, 128, 64>;
   L0ATile a0, a1;
   L0BTile b0, b1;
-
   TASSIGN<0x0000>(a0);   // L0A ping
   TASSIGN<0x8000>(a1);   // L0A pong
-  TASSIGN<0x0000>(b0);   // L0B ping  (separate physical memory from L0A)
+  TASSIGN<0x0000>(b0);   // L0B ping (separate physical memory)
   TASSIGN<0x8000>(b1);   // L0B pong
 }
 ```
 
-### Auto Mode
-
-```text
-# Auto mode: compiler/runtime-managed placement and scheduling.
-pto.tassign %tile, %addr : !pto.tile<...>, dtype
-```
-
-### Manual Mode
-
-```text
-# Manual mode: bind resources explicitly before issuing the instruction.
-# Optional for tile operands:
-# pto.tassign %arg0, @tile(0x1000)
-# pto.tassign %arg1, @tile(0x2000)
-pto.tassign %tile, %addr : !pto.tile<...>, dtype
-```
-
-### PTO Assembly Form
-
-```text
-tassign %tile, %addr : !pto.tile<...>, index
-# AS Level 2 (DPS)
-pto.tassign ins(%tile, %addr : !pto.tile_buf<...>, dtype)
-```
-
-## Related Ops / Instruction Set Links
+## See Also
 
 - Instruction set overview: [Sync And Config](../../sync-and-config.md)
 - Previous op in instruction set: [pto.tsync](./tsync.md)

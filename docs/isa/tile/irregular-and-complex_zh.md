@@ -21,10 +21,6 @@
 | [pto.tpartmax](./ops/irregular-and-complex/tpartmax_zh.md) | 局部最大值规约 | Partial reduction | All |
 | [pto.tpartmin](./ops/irregular-and-complex/tpartmin_zh.md) | 局部最小值规约 | Partial reduction | All |
 | [pto.tquant](./ops/irregular-and-complex/tquant_zh.md) | 量化 | Quantize | A2A3 / A5 |
-| [pto.tdequant](../TDEQUANT_zh.md) | 反量化 | Quantize | A2A3 / A5 |
-| [pto.tpack](../TPACK_zh.md) | 数据打包 | Pack | A5 |
-| [pto.trandom](../TRANDOM_zh.md) | 随机数生成 | Random | A5 |
-| [pto.thistogram](../THISTOGRAM_zh.md) | 直方图统计 | Histogram | A5 |
 
 ## 机制
 
@@ -51,11 +47,7 @@ $$ \mathrm{dst}_{\mathrm{index}_i} = \mathrm{src}_i \quad \text{(scatter)} $$
 
 ### 量化
 
-`TQUANT` / `TDEQUANT` 负责在浮点表示和量化表示之间转换，通常需要 scale、zero-point 等参数。它们不是 CPU 模拟器上的主路径，target 约束也明显更强。
-
-### A5 专属操作
-
-`TPACK`、`TRANDOM`、`THISTOGRAM` 目前属于 A5 专属能力。它们之所以放在这一组，是因为它们同样不适合归入标准逐元素或标准搬运家族。
+当前作者维护树中，`TQUANT` 保留在 tile 不规则与复杂路径；`TDEQUANT`、`TPACK`、`TRANDOM`、`THISTOGRAM` 则在“其他 / 支撑操作”路径中单独说明。
 
 ## 目标 Profile 支持
 
@@ -71,13 +63,11 @@ $$ \mathrm{dst}_{\mathrm{index}_i} = \mathrm{src}_i \quad \text{(scatter)} $$
 - 量化要求 scale 非零，且 zero-point 落在合法范围内。
 - `TSCATTER` 要求索引非负且落在目标范围内。
 - `TPART*` 的具体行为可能随 profile 缩窄。
-- `TPACK`、`TRANDOM`、`THISTOGRAM` 不能在 CPU 或 A2A3 上使用。
 
 ## 不允许的情形
 
 - 使用非法 scale 或越界 zero-point 做量化；
 - scatter 到目标 tile 形状之外；
-- 在 CPU / A2A3 上使用 A5 专属操作；
 - 把某个 target 上偶然可接受的行为当成可移植合同。
 
 ## 相关页面

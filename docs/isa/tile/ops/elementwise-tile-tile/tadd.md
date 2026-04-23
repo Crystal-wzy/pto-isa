@@ -94,7 +94,7 @@ None beyond producing the destination tile. Does not implicitly fence unrelated 
 
 - Verifier rejects type mismatches between source and destination tiles.
 - Backend rejects unsupported element types, layouts, or shapes for the selected target profile.
-- Programs MUST NOT rely on the value of any destination lane that is outside `dst`'s declared valid region.
+- Programs that read values from destination lanes outside `dst`'s declared valid region observe undefined behavior.
 
 ## Target-Profile Restrictions
 

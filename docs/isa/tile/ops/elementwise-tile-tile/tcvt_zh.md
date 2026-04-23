@@ -24,17 +24,17 @@ $$ \mathrm{dst}_{i,j} = \mathrm{cast}_{\mathrm{rmode},\mathrm{satmode}}\!\left(\
 | 模式 | 行为 |
 | --- | --- |
 | `CAST_RINT` | 就近舍入，ties to even |
-| `CAST_RZ` | 向 0 舍入 |
-| `CAST_RP` | 向正无穷舍入 |
-| `CAST_RM` | 向负无穷舍入 |
-| `CAST_RN` | 就近舍入，ties away from zero |
+| `CAST_ROUND` | 就近舍入，ties away from zero |
+| `CAST_FLOOR` | 向负无穷舍入 |
+| `CAST_CEIL` | 向正无穷舍入 |
+| `CAST_TRUNC` | 向 0 舍入 |
 
 ## 饱和模式
 
 | 模式 | 行为 |
 | --- | --- |
-| `NONE` | 不饱和，溢出时 wrap 或走目标定义行为 |
-| `SAT` | 饱和到目标类型可表示范围 |
+| `ON` | 开启饱和 |
+| `OFF` | 关闭饱和 |
 
 ## 语法
 
@@ -59,14 +59,22 @@ pto.tcvt ins(%src {rmode = #pto.round_mode<CAST_RINT>}: !pto.tile_buf<...>) outs
 ## C++ 内建接口
 
 ```cpp
+template <typename TileDataD, typename TileDataS, typename TmpTileData, typename... WaitEvents>
+PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, TmpTileData &tmp, RoundMode mode,
+                          SaturationMode satMode, WaitEvents &... events);
+
+template <typename TileDataD, typename TileDataS, typename TmpTileData, typename... WaitEvents>
+PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, TmpTileData &tmp, RoundMode mode, WaitEvents &... events);
+
 template <typename TileDataD, typename TileDataS, typename... WaitEvents>
-PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, RoundMode mode, SaturationMode satMode, WaitEvents &... events);
+PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, RoundMode mode, SaturationMode satMode,
+                          WaitEvents &... events);
 
 template <typename TileDataD, typename TileDataS, typename... WaitEvents>
 PTO_INST RecordEvent TCVT(TileDataD &dst, TileDataS &src, RoundMode mode, WaitEvents &... events);
 ```
 
-CPU 模拟器当前只实现了不显式传入 `SaturationMode` 的形式。
+`tmp` 版本用于那些需要显式 scratch tile 的转换路径。
 
 ## 输入
 
@@ -74,8 +82,9 @@ CPU 模拟器当前只实现了不显式传入 `SaturationMode` 的形式。
 | --- | --- | --- |
 | `%src` | 源 tile | 在 `dst` valid region 上逐坐标读取 |
 | `%dst` | 目标 tile | 保存转换后的元素值 |
-| `mode` | 舍入模式 | `CAST_RINT` / `CAST_RZ` / `CAST_RP` / `CAST_RM` / `CAST_RN` |
-| `satMode` | 可选饱和模式 | `NONE` / `SAT` |
+| `mode` | 舍入模式 | `CAST_RINT` / `CAST_ROUND` / `CAST_FLOOR` / `CAST_CEIL` / `CAST_TRUNC` |
+| `satMode` | 可选饱和模式 | `ON` / `OFF` |
+| `tmp` | 可选临时 tile | 需要显式 scratch 的路径使用 |
 
 ## 预期输出
 
@@ -92,31 +101,20 @@ CPU 模拟器当前只实现了不显式传入 `SaturationMode` 的形式。
 - `src` 与 `dst` 必须在 shape 和 valid region 上兼容。
 - 源 / 目标类型对必须属于目标 profile 支持的集合。
 - 给定类型对必须支持所选 rounding mode。
-- `dst` 与 `src` 必须是不同元素类型。
+- 对于需要显式 scratch 的路径，调用方必须使用 `tmp` 版本。
+- 关闭饱和可能改变某些低精度整数转换路径的溢出语义。
 
 ## 不允许的情形
 
 - 使用目标 profile 不支持的类型对。
 - 使用该类型对不支持的 rounding mode。
+- 在关闭饱和时仍假设溢出会被 clamp。
 
 ## Target-Profile 限制
 
-| 特性 | CPU Simulator | A2A3 | A5 |
-| --- | :---: | :---: | :---: |
-| 默认饱和形式 | Yes | Yes | Yes |
-| 显式 `SaturationMode` | No | Yes | Yes |
-| `f32 -> f16` | Yes | Yes | Yes |
-| `f16 -> f32` | Yes | Yes | Yes |
-| `f32 -> bf16` | Yes | Yes | Yes |
-| `bf16 -> f32` | Yes | Yes | Yes |
-| `f32 -> int32_t` | Yes | Yes | Yes |
-| `int32_t -> f32` | Yes | Yes | Yes |
-| `f16 -> bf16` | No | Yes | Yes |
-| FP8 类型 | No | No | Yes |
+`pto.tcvt` 在 CPU 仿真、A2/A3 和 A5 上都保留 PTO 可见语义，但具体支持的类型对、是否需要 scratch、以及饱和关闭后的溢出处理仍然依赖 backend。
 
-## 性能
-
-当前仓内没有把 `tcvt` 作为 tile 路径单独落成公开 cost bucket。若代码依赖具体延迟，应把它视为目标 profile 相关的 tile 类型转换路径。
+当前 checkout 中，fp16 → int8 的非饱和路径通过带 scratch 的 helper 实现，并且会按行做子分块处理。
 
 ## 示例
 
@@ -135,10 +133,12 @@ void example_auto() {
 }
 ```
 
-### 显式饱和
+### 显式饱和 / scratch
 
 ```cpp
-TCVT(dst, src, RoundMode::CAST_RINT, SaturationMode::SAT);
+using TmpT = Tile<TileType::Vec, int32_t, 16, 16>;
+TmpT tmp;
+TCVT(dst, src, tmp, RoundMode::CAST_TRUNC, SaturationMode::OFF);
 ```
 
 ## 相关页面

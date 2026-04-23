@@ -9,7 +9,7 @@
 | `talias` | 在不复制数据的前提下创建 tile 别名视图 | Alias |
 | `taxpy` | 融合乘加 `dst = src0 * scalar + src1` | Fused compute |
 | `tconcat` | 按指定维度拼接 tile | Tile sequence |
-| `tdequant` | 把量化表示恢复成数值表示 | Quantize |
+| [pto.tdequant](./ops/non-isa-and-supporting-ops/tdequant_zh.md) | 把量化表示恢复成数值表示 | Quantize |
 | `tfree` | 释放先前分配的 tile 或缓冲区 | Memory |
 | `thistogram` | 统计 tile 元素直方图 | Statistics |
 | `tpack` | 将多个 tile 打包进单一 tile buffer | Tile sequence |
@@ -30,7 +30,12 @@
 
 ### 量化
 
-`tquant` / `tdequant` 在浮点表示和量化表示之间转换。scale、zero-point 以及目标格式都会进入合法性约束。
+`tquant` / `tdequant` 在浮点表示和量化表示之间转换。当前作者维护树中：
+
+- [pto.tquant](../tile/ops/irregular-and-complex/tquant_zh.md) 仍位于 tile 不规则与复杂路径；
+- [pto.tdequant](./ops/non-isa-and-supporting-ops/tdequant_zh.md) 位于支撑操作路径。
+
+两者都受 scale、offset / zero-point 以及目标格式约束。
 
 ### Memory
 

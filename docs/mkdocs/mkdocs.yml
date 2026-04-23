@@ -153,6 +153,7 @@ nav:
               - pto.trsqrt: docs/isa/tile/ops/elementwise-tile-tile/trsqrt.md
               - pto.tsqrt: docs/isa/tile/ops/elementwise-tile-tile/tsqrt.md
               - pto.texp: docs/isa/tile/ops/elementwise-tile-tile/texp.md
+              - pto.tpow: docs/isa/tile/ops/elementwise-tile-tile/tpow.md
               - pto.tnot: docs/isa/tile/ops/elementwise-tile-tile/tnot.md
               - pto.trelu: docs/isa/tile/ops/elementwise-tile-tile/trelu.md
               - pto.tneg: docs/isa/tile/ops/elementwise-tile-tile/tneg.md
@@ -168,6 +169,7 @@ nav:
               - pto.tsubs: docs/isa/tile/ops/tile-scalar-and-immediate/tsubs.md
               - pto.tdivs: docs/isa/tile/ops/tile-scalar-and-immediate/tdivs.md
               - pto.tmuls: docs/isa/tile/ops/tile-scalar-and-immediate/tmuls.md
+              - pto.tpows: docs/isa/tile/ops/tile-scalar-and-immediate/tpows.md
               - pto.tfmods: docs/isa/tile/ops/tile-scalar-and-immediate/tfmods.md
               - pto.trems: docs/isa/tile/ops/tile-scalar-and-immediate/trems.md
               - pto.tmaxs: docs/isa/tile/ops/tile-scalar-and-immediate/tmaxs.md
@@ -465,7 +467,8 @@ nav:
               - TALIAS: docs/isa/TALIAS.md
               - TAXPY: docs/isa/TAXPY.md
               - TCONCAT: docs/isa/TCONCAT.md
-              - TDEQUANT: docs/isa/TDEQUANT.md
+              - TQUANT: docs/isa/tile/ops/irregular-and-complex/tquant.md
+              - TDEQUANT: docs/isa/other/ops/non-isa-and-supporting-ops/tdequant.md
               - TFREE: docs/isa/TFREE.md
               - THISTOGRAM: docs/isa/THISTOGRAM.md
               - TPACK: docs/isa/TPACK.md

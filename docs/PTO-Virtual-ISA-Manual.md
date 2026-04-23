@@ -38,10 +38,10 @@ Use the instruction set index pages:
 
 | Instruction Set | Overview Page | Count |
 |---------------|-------------|-------|
-| Tile compute & data movement | [Tile Instructions](isa/tile/README.md) | ~70 operations |
-| Vector micro-instructions | [Vector Instructions](isa/vector/README.md) | ~60 operations |
+| Tile compute & data movement | [Tile Instructions](isa/tile/README.md) | ~125 operations |
+| Vector micro-instructions | [Vector Instructions](isa/vector/README.md) | ~110 operations |
 | Scalar, control & DMA | [Scalar and Control](isa/scalar/README.md) | ~50 operations |
-| Collective communication | [Other and Communication](isa/other/README.md) | ~20 operations |
+| Other and communication | [Other and Communication](isa/other/README.md) | ~20 operations |
 
 Or jump directly to the alphabetical index: [Instruction Families](isa/instruction-families/README.md)
 
@@ -55,7 +55,7 @@ PTO is a virtual ISA that spans multiple targets — CPU simulation, A2A3 (Ascen
 pto.t*   Tile instructions         Tile-oriented compute and GM↔tile data movement
 pto.v*   Vector instructions       Low-level vector-pipe ops (predication, masks, etc.)
 pto.*    Scalar & control          Scalar setup, DMA config, pipeline sync
-         Communication            TBROADCAST, TGET, TPUT, TREDUCE, TWAIT, etc.
+         Other / communication    TBROADCAST, TGET, TPUT, TREDUCE, TWAIT, TDEQUANT, etc.
 ```
 
 The manual explains what is guaranteed by PTO itself and what is only a target-profile restriction.

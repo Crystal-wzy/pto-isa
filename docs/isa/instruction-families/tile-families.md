@@ -7,8 +7,8 @@ Tile-instruction set documentation explains how `pto.t*` groups behave. Each ins
 | Instruction Set | Prefix | Description |
 |--------|--------|-------------|
 | [Sync and Config](../tile/sync-and-config.md) | `pto.tassign`, `pto.tsync`, `pto.tset_img2col_*`, `pto.tsubview` | Resource binding, event setup, tile-local config |
-| [Elementwise Tile-Tile](../tile/elementwise-tile-tile.md) | `pto.tadd`, `pto.tmul`, `pto.tcmp`, `pto.tcvt` | Lane-wise binary and unary operations |
-| [Tile-Scalar and Immediate](../tile/tile-scalar-and-immediate.md) | `pto.tadds`, `pto.tmuls`, `pto.tmins` | Tile combined with scalar or immediate operand |
+| [Elementwise Tile-Tile](../tile/elementwise-tile-tile.md) | `pto.tadd`, `pto.tmul`, `pto.tpow`, `pto.tcmp`, `pto.tcvt` | Lane-wise binary and unary operations |
+| [Tile-Scalar and Immediate](../tile/tile-scalar-and-immediate.md) | `pto.tadds`, `pto.tmuls`, `pto.tpows`, `pto.tmins` | Tile combined with scalar or immediate operand |
 | [Reduce and Expand](../tile/reduce-and-expand.md) | `pto.trowsum`, `pto.tcolmax`, `pto.trowexpand` | Row/column reductions and expansions |
 | [Memory and Data Movement](../tile/memory-and-data-movement.md) | `pto.tload`, `pto.tstore`, `pto.mgather` | GM↔tile transfer, gather/scatter |
 | [Matrix and Matrix-Vector](../tile/matrix-and-matrix-vector.md) | `pto.tgemv`, `pto.tmatmul`, `pto.tmatmul_bias` | GEMV, matmul, and variants |

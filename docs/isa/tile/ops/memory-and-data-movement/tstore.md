@@ -4,33 +4,33 @@
 
 ## Summary
 
-Store data from a Tile into a GlobalTensor (GM), optionally using atomic write or quantization parameters.
+Store data from a tile into global memory. The transfer is rectangular, spanning `src.GetValidRow()` by `src.GetValidCol()` elements.
 
 ## Mechanism
 
-Store data from a Tile into a GlobalTensor (GM), optionally using atomic write or quantization parameters. It is part of the tile memory/data-movement instruction set, so the visible behavior includes explicit transfer between GM-visible data and tile-visible state.
+`pto.tstore` initiates a DMA transfer from the source tile buffer to the destination GlobalTensor. The transfer reads a rectangular region from the source tile and writes it to global memory.
 
-Notation depends on the `GlobalTensor` shape/stride and the `Tile` layout. Conceptually (2D view, with a base offset):
+Let `R = src.GetValidRow()` and `C = src.GetValidCol()`. The transfer size is `R × C` elements. The element mapping depends on the GlobalTensor layout:
 
 $$ \mathrm{dst}_{r_0 + i,\; c_0 + j} = \mathrm{src}_{i,j} $$
 
+The operation supports optional atomic accumulation modes and quantization parameters on certain backends.
+
 ## Syntax
 
-Textual spelling is defined by the PTO ISA syntax-and-operands pages.
-
-Synchronous form:
+### PTO Assembly Form
 
 ```text
 tstore %t1, %sv_out[%c0, %c0]
 ```
 
-### IR Level 1 (SSA)
+### AS Level 1 (SSA)
 
 ```text
 pto.tstore %src, %mem : (!pto.tile<...>, !pto.partition_tensor_view<MxNxdtype>) -> ()
 ```
 
-### IR Level 2 (DPS)
+### AS Level 2 (DPS)
 
 ```text
 pto.tstore ins(%src : !pto.tile_buf<...>) outs(%mem : !pto.partition_tensor_view<MxNxdtype>)
@@ -41,88 +41,83 @@ pto.tstore ins(%src : !pto.tile_buf<...>) outs(%mem : !pto.partition_tensor_view
 Declared in `include/pto/common/pto_instr.hpp` and `include/pto/common/constants.hpp`:
 
 ```cpp
+// Basic store
 template <typename TileData, typename GlobalData, AtomicType atomicType = AtomicType::AtomicNone,
           typename... WaitEvents>
 PTO_INST RecordEvent TSTORE(GlobalData &dst, TileData &src, WaitEvents &... events);
 
+// Pre-quantization scalar
 template <typename TileData, typename GlobalData, AtomicType atomicType = AtomicType::AtomicNone,
           typename... WaitEvents>
 PTO_INST RecordEvent TSTORE(GlobalData &dst, TileData &src, uint64_t preQuantScalar, WaitEvents &... events);
 
+// Fix-pipe quantized store
 template <typename TileData, typename GlobalData, typename FpTileData, AtomicType atomicType = AtomicType::AtomicNone,
           typename... WaitEvents>
 PTO_INST RecordEvent TSTORE_FP(GlobalData &dst, TileData &src, FpTileData &fp, WaitEvents &... events);
 ```
 
-The `preQuantScalar` and `TSTORE_FP` quantized-store overloads are only legal for `TileType::Acc` on current A2/A3 and A5 backends. They do not provide a native vec-tile quantized store contract.
+The `preQuantScalar` and `TSTORE_FP` overloads are only legal for `TileType::Acc` on A2/A3 and A5 backends. They do not provide a native vec-tile quantized store contract.
 
 ## Inputs
 
-- `src` is the source tile to store.
-- `dst` is the destination GlobalTensor.
-- `atomicType` (optional): specifies atomic store mode (e.g., `AtomicAdd`).
-- `preQuantScalar` (optional): scalar for pre-quantization.
-- `fp` (optional, for TSTORE_FP): auxiliary fix-pipe tile consumed by the backend FPC path.
+| Operand | Description |
+|---------|-------------|
+| `dst` | Destination GlobalTensor in GM |
+| `src` | Source tile. Transfer shape is `src.GetValidRow()` × `src.GetValidCol()`. |
+| `atomicType` | Optional atomic mode (e.g., `AtomicAdd`). Default: no atomic behavior. |
+| `preQuantScalar` | Optional scalar for pre-quantization (Acc tiles only). |
+| `fp` | Optional fix-pipe tile for quantized store (Acc tiles only). |
 
 ## Expected Outputs
 
-Data is written from `src` to `dst`. With atomic operations, values are accumulated. With `TSTORE_FP`, the transfer uses the fix-pipe sideband state configured by the auxiliary `fp` tile.
+| Result | Type | Description |
+|--------|------|-------------|
+| `RecordEvent` | `RecordEvent` | Token signaling completion |
+
+After the store completes, the data is written to `dst`. With atomic modes, values are accumulated. With `TSTORE_FP`, the transfer uses the fix-pipe sideband state.
 
 ## Side Effects
 
-This operation writes to global memory. With atomic modes, concurrent access may produce implementation-defined results.
+Writes to global memory. With atomic modes, concurrent access may produce implementation-defined results for individual accumulation operations.
 
 ## Constraints
 
-- **Valid region**:
-  - The implementation uses `src.GetValidRow()` / `src.GetValidCol()` as the transfer size.
+- **Valid region**: Transfer size is `src.GetValidRow()` × `src.GetValidCol()`.
+- **Element size match**: `sizeof(tile.dtype) == sizeof(gtensor.dtype)`.
+- **Layout compatibility**: Tile layout and GM layout must be a supported combination.
+- **Atomic modes**: Only supported on `TileType::Acc`. Supported modes: `AtomicNone`, `AtomicAdd`, `AtomicMax`, `AtomicMin` (A5 only).
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
+- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier.
+- Programs must not rely on behavior outside the documented legal domain.
 
 ## Target-Profile Restrictions
 
-- **Implementation checks (A2A3)**:
-  - Source tile location must be one of: `TileType::Vec`, `TileType::Mat`, `TileType::Acc`.
-  - Runtime: all `dst.GetShape(dim)` values and `src.GetValidRow()/GetValidCol()` must be `> 0`.
-  - For `TileType::Vec` / `TileType::Mat`:
-    - `TileData::DType` must be one of: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `half`, `bfloat16_t`, `float`.
-    - `sizeof(TileData::DType) == sizeof(GlobalData::DType)`.
-    - Layouts must match ND/DN/NZ (or a special case where `TileData::Rows == 1` or `TileData::Cols == 1`).
-    - For `int64_t/uint64_t`, only ND->ND or DN->DN are supported.
-    - A2/A3 does not expose a native vec quantized-store path. Frontends that need `vec -> GM` dtype conversion or quantization MUST first materialize the converted vec tile (for example via `TCVT`) and then issue a same-dtype `TSTORE`.
-  - For `TileType::Acc` (including quantized/atomic variants):
-    - Destination layout must be ND or NZ.
-    - Source dtype must be `int32_t` or `float`.
-    - When not using quantization, destination dtype must be `__gm__ int32_t/float/half/bfloat16_t`.
-    - Static shape constraints: `1 <= TileData::Cols <= 4095`; if ND then `1 <= TileData::Rows <= 8192`; if NZ then `1 <= TileData::Rows <= 65535` and `TileData::Cols % 16 == 0`.
-    - Runtime: `1 <= src.GetValidCol() <= 4095`.
+**A2/A3**:
+- Source tile location: `TileType::Vec`, `TileType::Mat`, or `TileType::Acc`.
+- `Vec`/`Mat`: `sizeof(TileData::DType)` must match `sizeof(GlobalData::DType)`.
+- Supported dtypes: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `half`, `bfloat16_t`, `float`.
+- `int64_t/uint64_t`: only ND→ND or DN→DN.
+- `Acc` (non-quantized): destination dtype must be `__gm__ int32_t/float/half/bfloat16_t`.
+- `Acc` shape: `1 <= TileData::Cols <= 4095`; if ND then `1 <= TileData::Rows <= 8192`; if NZ then `1 <= TileData::Rows <= 65535` and `TileData::Cols % 16 == 0`.
 
-- **Implementation checks (A5)**:
-  - Source tile location must be `TileType::Vec` or `TileType::Acc` (no `Mat` store on this target).
-  - For `TileType::Vec`:
-    - `sizeof(TileData::DType) == sizeof(GlobalData::DType)`.
-    - `TileData::DType` must be one of: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `half`, `bfloat16_t`, `float`, `float8_e4m3_t`, `float8_e5m2_t`, `hifloat8_t`, `float4_e1m2x2_t`, `float4_e2m1x2_t`.
-    - Layouts must match ND/DN/NZ (or a special case where `TileData::Rows == 1` or `TileData::Cols == 1`).
-    - Additional alignment constraints are enforced (e.g., for ND the row-major width in bytes must be a multiple of 32; for DN the column-major height in bytes must be a multiple of 32, with special-case exceptions).
-  - For `TileType::Acc`:
-    - Destination layout must be ND or NZ; source dtype must be `int32_t` or `float`.
-    - When not using quantization, destination dtype must be `__gm__ int32_t/float/half/bfloat16_t`.
-    - Static shape constraints match A2A3 for rows/cols; `AtomicAdd` additionally restricts destination dtype to supported atomic types.
+**A5**:
+- Source tile location: `TileType::Vec` or `TileType::Acc`.
+- `Vec`: `sizeof(TileData::DType)` must match `sizeof(GlobalData::DType)`.
+- Additional dtypes on A5: `float8_e4m3_t`, `float8_e5m2_t`, `hifloat8_t`, `float4_e1m2x2_t`, `float4_e2m1x2_t`.
+- Additional alignment constraints (e.g., ND row-major width in bytes must be a multiple of 32).
+- `Acc`: destination layout must be ND or NZ; source dtype must be `int32_t` or `float`.
 
 ## Examples
 
-### Auto
-
 ```cpp
 #include <pto/pto-inst.hpp>
-
 using namespace pto;
 
 template <typename T>
-void example_auto(__gm__ T* out) {
+void example(__gm__ T* out) {
   using TileT = Tile<TileType::Vec, T, 16, 16>;
   using GShape = Shape<1, 1, 1, 16, 16>;
   using GStride = BaseShape2D<T, 16, 16, Layout::ND>;
@@ -134,53 +129,7 @@ void example_auto(__gm__ T* out) {
 }
 ```
 
-### Manual
-
-```cpp
-#include <pto/pto-inst.hpp>
-
-using namespace pto;
-
-template <typename T>
-void example_manual(__gm__ T* out) {
-  using TileT = Tile<TileType::Vec, T, 16, 16>;
-  using GShape = Shape<1, 1, 1, 16, 16>;
-  using GStride = BaseShape2D<T, 16, 16, Layout::ND>;
-  using GTensor = GlobalTensor<T, GShape, GStride, Layout::ND>;
-
-  GTensor gout(out);
-  TileT t;
-  TASSIGN(t, 0x1000);
-  TSTORE<TileT, GTensor, AtomicType::AtomicAdd>(gout, t);
-}
-```
-
-### Auto Mode
-
-```text
-# Auto mode: compiler/runtime-managed placement and scheduling.
-pto.tstore %src, %mem : (!pto.tile<...>, !pto.partition_tensor_view<MxNxdtype>) -> ()
-```
-
-### Manual Mode
-
-```text
-# Manual mode: bind resources explicitly before issuing the instruction.
-# Optional for tile operands:
-# pto.tassign %arg0, @tile(0x1000)
-# pto.tassign %arg1, @tile(0x2000)
-pto.tstore %src, %mem : (!pto.tile<...>, !pto.partition_tensor_view<MxNxdtype>) -> ()
-```
-
-### PTO Assembly Form
-
-```text
-tstore %t1, %sv_out[%c0, %c0]
-# IR Level 2 (DPS)
-pto.tstore ins(%src : !pto.tile_buf<...>) outs(%mem : !pto.partition_tensor_view<MxNxdtype>)
-```
-
-## Related Ops / Instruction Set Links
+## See Also
 
 - Instruction set overview: [Memory And Data Movement](../../memory-and-data-movement.md)
 - Previous op in instruction set: [pto.tprefetch](./tprefetch.md)
