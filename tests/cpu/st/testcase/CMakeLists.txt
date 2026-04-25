@@ -50,6 +50,7 @@ tassign_alias
 tand
 tands
 targreduceop
+taxpy
 tbroadcast
 tci
 tcmp
