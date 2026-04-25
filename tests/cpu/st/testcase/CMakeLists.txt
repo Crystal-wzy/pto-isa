@@ -128,6 +128,7 @@ trowmin
 trowprod
 trowreduceidx
 trowsum
+trowprod
 trsqrt
 tscatter
 tsel
