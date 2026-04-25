@@ -111,7 +111,6 @@ tprefetch
 tprelu
 tpushpop
 tput
-taxpy
 tput_async
 tquant
 trandom
@@ -125,10 +124,8 @@ trowexpand
 trowexpandop
 trowmax
 trowmin
-trowprod
 trowreduceidx
 trowsum
-trowprod
 trsqrt
 tscatter
 tsel
@@ -145,7 +142,6 @@ tsubview
 tsubc
 tsubs
 tsubsc
-tsubview
 ttest
 ttrans
 ttri

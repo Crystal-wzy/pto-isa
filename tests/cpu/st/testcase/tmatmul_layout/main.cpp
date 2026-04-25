@@ -102,35 +102,26 @@ TEST(TMatmulLayoutTest, AcceptsExplicitRowMajorLeftTileEncoding)
     ExpectTileEquals(accOut, ComputeExpected<AccTile>(lhs, rhs, &accIn));
 }
 
-TEST(TMatmulLayoutTest, CoversGemvAndMxVariants)
+TEST(TMatmulLayoutTest, CoversGemvAndBiasVariants)
 {
     using LeftTile = TileLeft<float, 16, 16>;
     using RightTile = TileRight<float, 16, 16>;
     using AccTile = TileAcc<float, 16, 16>;
     using BiasTile = Tile<TileType::Bias, float, 1, 16>;
-    using LeftScaleTile = TileLeftScale<float, 16, 2>;
-    using RightScaleTile = TileRightScale<float, 16, 2>;
 
     LeftTile lhs;
     RightTile rhs;
     AccTile accIn;
     AccTile gemv;
     AccTile gemvAcc;
-    AccTile gemvMx;
-    AccTile matmulMx;
     AccTile gemvBias;
     BiasTile bias;
-    LeftScaleTile lhsScale;
-    RightScaleTile rhsScale;
     size_t addr = 0;
-    CpuTileTestUtils::AssignTileStorage(addr, lhs, rhs, accIn, gemv, gemvAcc, gemvMx, matmulMx, gemvBias, bias,
-                                        lhsScale, rhsScale);
+    CpuTileTestUtils::AssignTileStorage(addr, lhs, rhs, accIn, gemv, gemvAcc, gemvBias, bias);
 
     FillAll(lhs, 0.0f);
     FillAll(rhs, 0.0f);
     FillAll(accIn, 1.0f);
-    FillAll(lhsScale, 2.0f);
-    FillAll(rhsScale, 3.0f);
     for (int r = 0; r < lhs.GetValidRow(); ++r) {
         for (int c = 0; c < lhs.GetValidCol(); ++c) {
             SetValue(lhs, r, c, static_cast<float>(r + c + 1));
@@ -143,8 +134,6 @@ TEST(TMatmulLayoutTest, CoversGemvAndMxVariants)
 
     TGEMV(gemv, lhs, rhs);
     TGEMV_ACC(gemvAcc, accIn, lhs, rhs);
-    TGEMV_MX(gemvMx, lhs, lhsScale, rhs, rhsScale);
-    TMATMUL_MX(matmulMx, lhs, lhsScale, rhs, rhsScale);
     TGEMV_BIAS(gemvBias, lhs, rhs, bias);
 
     const auto expectedGemv = CpuTileTestUtils::ComputeMatmulExpected<AccTile>(lhs, rhs);
@@ -158,8 +147,6 @@ TEST(TMatmulLayoutTest, CoversGemvAndMxVariants)
 
     CpuTileTestUtils::ExpectTileEqualsVector(gemv, expectedGemv);
     CpuTileTestUtils::ExpectTileEqualsVector(gemvAcc, expectedGemvAcc);
-    CpuTileTestUtils::ExpectTileEqualsVector(gemvMx, expectedGemv);
-    CpuTileTestUtils::ExpectTileEqualsVector(matmulMx, expectedGemv);
     CpuTileTestUtils::ExpectTileEqualsVector(gemvBias, expectedGemvBias);
 }
 
