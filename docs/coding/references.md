@@ -23,7 +23,7 @@ This document provides PTO development-related references, academic papers, onli
   - Hardware abstraction model
   - Programming model details
 
-- **[ISA Instruction Reference](../isa/README.md)**
+- **[ISA Instruction Reference](../isa/scalar/ops/micro-instruction/README.md)**
   - Detailed description of all PTO instructions
   - Instruction syntax and semantics
   - Usage examples
@@ -393,4 +393,3 @@ This documentation is licensed under [Apache License 2.0](https://github.com/PTO
 - **Email**: support@ascend.com
 - **Forum**: [Ascend Community Forum](https://www.hiascend.com/forum)
 - **GitHub**: [PTO-ISA Repository](https://github.com/PTO-ISA/pto-isa)
-

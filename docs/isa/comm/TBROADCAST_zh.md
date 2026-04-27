@@ -93,6 +93,6 @@ comm::TBROADCAST(group, srcG, pingTile, pongTile);
 
 ## 相关页面
 
-- [通信与运行时](../other/communication-and-runtime_zh.md)
+- [通信与运行时](communication-runtime_zh.md)
 - [TGATHER](./TGATHER_zh.md)
 - [TSCATTER](./TSCATTER_zh.md)

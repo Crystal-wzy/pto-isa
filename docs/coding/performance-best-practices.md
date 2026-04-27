@@ -17,7 +17,7 @@ This document summarizes performance tuning best practices for PTO operators, pr
 ### 1.1 Standard Optimization Process
 
 ```
-Correctness Verification → Performance Baseline → Bottleneck Analysis → 
+Correctness Verification → Performance Baseline → Bottleneck Analysis →
 Targeted Optimization → Verification → Iteration
 ```
 
@@ -191,10 +191,10 @@ TLOAD(tile[0], ...);
 for (int i = 0; i < N; i++) {
   int curr = i % 2;
   int next = (i + 1) % 2;
-  
+
   // Compute current
   TCOMPUTE(result[curr], tile[curr]);
-  
+
   // Load next simultaneously
   if (i + 1 < N) {
     TLOAD(tile[next], ...);
@@ -406,4 +406,3 @@ constexpr int baseN = 512;
 - [Debugging Guide](debug.md)
 - [GEMM Optimization Case](../../kernels/manual/a2a3/gemm_performance/README.md)
 - [Flash Attention Case](../../kernels/manual/common/flash_atten/README.md)
-
