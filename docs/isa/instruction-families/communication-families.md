@@ -86,17 +86,19 @@ Communication instructions consume:
 
 ## Constraints
 
-- All participating NPUs **must** call collective operations with matching `ParallelGroup` handles simultaneously.
-- Non-root ranks for broadcast/scatter must have destination tiles allocated and writable.
-- Async operations require subsequent `pto.twait` before the transferred data is safe to use.
-- **CPU simulator**: These instructions are not available. Programs using them on CPU produce a runtime error.
+!!! warning "Constraints"
+    - All participating NPUs **must** call collective operations with matching `ParallelGroup` handles simultaneously.
+    - Non-root ranks for broadcast/scatter must have destination tiles allocated and writable.
+    - Async operations require subsequent `pto.twait` before the transferred data is safe to use.
+    - **CPU simulator**: These instructions are not available. Programs using them on CPU produce a runtime error.
 
 ## Cases That Are Not Allowed
 
-- Calling collective operations with mismatched `ParallelGroup` handles across ranks.
-- Using uninitialized or improperly sized destination tiles for receive-side operations.
-- Accessing data from an async operation before `pto.twait` returns.
-- Using these instructions on the CPU simulator profile.
+!!! danger "Cases That Are Not Allowed"
+    - Calling collective operations with mismatched `ParallelGroup` handles across ranks.
+    - Using uninitialized or improperly sized destination tiles for receive-side operations.
+    - Accessing data from an async operation before `pto.twait` returns.
+    - Using these instructions on the CPU simulator profile.
 
 ## Syntax
 

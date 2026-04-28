@@ -85,18 +85,20 @@ When the GlobalTensor exceeds the UB tile capacity in rows and/or columns, trans
 
 ## Constraints
 
-- All participating NPUs must call the collective operation with matching `ParallelGroup` handles
-- Non-root ranks must not call broadcast/scatter operations
-- Root rank is identified by `parallelGroup.GetRootIdx()`
-- Destination/source tensors are assumed to have the same shape and strides across ranks
-- The staging tile must be pre-allocated in UB at non-overlapping offsets for ping-pong variants
+!!! warning "Constraints"
+    - All participating NPUs must call the collective operation with matching `ParallelGroup` handles
+    - Non-root ranks must not call broadcast/scatter operations
+    - Root rank is identified by `parallelGroup.GetRootIdx()`
+    - Destination/source tensors are assumed to have the same shape and strides across ranks
+    - The staging tile must be pre-allocated in UB at non-overlapping offsets for ping-pong variants
 
 ## Cases That Are Not Allowed
 
-- Calling collective operations with mismatched `ParallelGroup` handles across ranks
-- Calling broadcast/scatter on non-root ranks (undefined behavior)
-- Using uninitialized or improperly sized destination buffers
-- Using overlapping UB offsets for ping/pong staging tiles
+!!! danger "Cases That Are Not Allowed"
+    - Calling collective operations with mismatched `ParallelGroup` handles across ranks
+    - Calling broadcast/scatter on non-root ranks (undefined behavior)
+    - Using uninitialized or improperly sized destination buffers
+    - Using overlapping UB offsets for ping/pong staging tiles
 
 ## See Also
 

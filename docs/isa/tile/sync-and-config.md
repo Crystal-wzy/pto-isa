@@ -40,17 +40,19 @@ See [Producer-Consumer Ordering](../memory-model/producer-consumer-ordering.md) 
 
 ## Constraints
 
-- `TASSIGN` binds an address; using the same address for two non-alias tiles simultaneously results in undefined behavior.
-- `TSYNC` with no operands is a no-op.
-- Tile-side configuration operations affect subsequent operations until the next mode-setting operation of the same kind.
-- `SUBVIEW` creates a view with reduced shape; accessing elements outside the view's shape but within the underlying tile's shape is undefined behavior.
-- `TALIAS` shares storage with its source; writes through either view are visible through the other view according to the alias contract.
+!!! warning "Constraints"
+    - `TASSIGN` binds an address; using the same address for two non-alias tiles simultaneously results in undefined behavior.
+    - `TSYNC` with no operands is a no-op.
+    - Tile-side configuration operations affect subsequent operations until the next mode-setting operation of the same kind.
+    - `SUBVIEW` creates a view with reduced shape; accessing elements outside the view's shape but within the underlying tile's shape is undefined behavior.
+    - `TALIAS` shares storage with its source; writes through either view are visible through the other view according to the alias contract.
 
 ## Cases That Are Not Allowed
 
-- **MUST NOT** use the same physical tile register for two non-alias tiles without an intervening `TSYNC`.
-- **MUST NOT** wait on an event that has not been produced by a preceding operation.
-- **MUST NOT** configure mode registers while dependent operations are in-flight.
+!!! danger "Cases That Are Not Allowed"
+    - **MUST NOT** use the same physical tile register for two non-alias tiles without an intervening `TSYNC`.
+    - **MUST NOT** wait on an event that has not been produced by a preceding operation.
+    - **MUST NOT** configure mode registers while dependent operations are in-flight.
 
 ## C++ Intrinsic
 

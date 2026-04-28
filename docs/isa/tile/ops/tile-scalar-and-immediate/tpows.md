@@ -64,23 +64,26 @@ No architectural side effects beyond producing the destination tile. The `tmp` t
 
 ## Constraints
 
-- `dst` and `base` must use the same element type.
-- `dst` and `base` must have matching valid-row and valid-column extents.
-- In the current concrete implementation, both tiles must be row-major `TileType::Vec`.
-- The scalar exponent uses `typename DstTile::DType`.
-- `PowAlgorithm::DEFAULT` accepts `float`, `half`, `int32_t`, `uint32_t`, `int16_t`, `uint16_t`, `int8_t`, and `uint8_t`.
-- `PowAlgorithm::HIGH_PRECISION` accepts `float`, `half`, and `bfloat16_t`.
+!!! warning "Constraints"
+    - `dst` and `base` must use the same element type.
+    - `dst` and `base` must have matching valid-row and valid-column extents.
+    - In the current concrete implementation, both tiles must be row-major `TileType::Vec`.
+    - The scalar exponent uses `typename DstTile::DType`.
+    - `PowAlgorithm::DEFAULT` accepts `float`, `half`, `int32_t`, `uint32_t`, `int16_t`, `uint16_t`, `int8_t`, and `uint8_t`.
+    - `PowAlgorithm::HIGH_PRECISION` accepts `float`, `half`, and `bfloat16_t`.
 
 ## Exceptions
 
-- Unsupported type/layout combinations and mismatched valid regions are rejected by backend legality checks.
-- Programs must not infer CPU-simulator or A2/A3 support from the public template alone.
+!!! danger "Exceptions"
+    - Unsupported type/layout combinations and mismatched valid regions are rejected by backend legality checks.
+    - Programs must not infer CPU-simulator or A2/A3 support from the public template alone.
 
 ## Target-Profile Restrictions
 
-The current authored tree documents concrete `tpows` implementation behavior for A5. This checkout does not provide a stable documented CPU-simulator or A2/A3 implementation contract for `tpows`.
+??? info "Target-Profile Restrictions"
+    The current authored tree documents concrete `tpows` implementation behavior for A5. This checkout does not provide a stable documented CPU-simulator or A2/A3 implementation contract for `tpows`.
 
-Portable code should treat `pto.tpows` as A5-specific unless a target-profile page explicitly widens that guarantee.
+    Portable code should treat `pto.tpows` as A5-specific unless a target-profile page explicitly widens that guarantee.
 
 ## Examples
 

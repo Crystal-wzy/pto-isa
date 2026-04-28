@@ -59,14 +59,16 @@ This form is defined primarily by its ordering or configuration effect. It does 
 
 ## Constraints
 
-- The exact mode values and downstream hardware behavior are target-defined.
-- This instruction has control-state side effects and should be ordered appropriately relative to dependent compute instructions.
-- Programs must not treat this operation as tile-payload transformation; it only changes mode state.
+!!! warning "Constraints"
+    - The exact mode values and downstream hardware behavior are target-defined.
+    - This instruction has control-state side effects and should be ordered appropriately relative to dependent compute instructions.
+    - Programs must not treat this operation as tile-payload transformation; it only changes mode state.
 
 ## Cases That Are Not Allowed
 
-- Relying on HF32 behavior on a target profile that does not support HF32 transform mode.
-- Using mode values outside the selected target profile's supported set.
+!!! danger "Cases That Are Not Allowed"
+    - Relying on HF32 behavior on a target profile that does not support HF32 transform mode.
+    - Using mode values outside the selected target profile's supported set.
 
 ## Examples
 

@@ -35,9 +35,10 @@
 
 ## 不允许的情形
 
-- 集合操作中各 rank 的协议不一致
-- 依赖未声明的 backend 便利实现
-- 在 CPU simulator 上使用通信指令
+!!! danger "不允许的情形"
+    - 集合操作中各 rank 的协议不一致
+    - 依赖未声明的 backend 便利实现
+    - 在 CPU simulator 上使用通信指令
 
 ## 相关页面
 

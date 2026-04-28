@@ -63,13 +63,14 @@ PTO_INST RecordEvent TTRI(TileData &dst, int diagonal, WaitEvents &... events);
 
 ## 约束
 
-- `isUpperOrLower` 只能是：
-  - `0`：下三角
-  - `1`：上三角
-- `dst` 必须是 row-major Tile。
-- 支持的数据类型随目标略有差异：
-  - CPU / A2A3：`int32_t`、`int16_t`、`uint32_t`、`uint16_t`、`half`、`float` 等
-  - A5：额外覆盖 `int8_t`、`uint8_t`、`bfloat16_t`
+!!! warning "约束"
+    - `isUpperOrLower` 只能是：
+      - `0`：下三角
+      - `1`：上三角
+    - `dst` 必须是 row-major Tile。
+    - 支持的数据类型随目标略有差异：
+      - CPU / A2A3：`int32_t`、`int16_t`、`uint32_t`、`uint16_t`、`half`、`float` 等
+      - A5：额外覆盖 `int8_t`、`uint8_t`、`bfloat16_t`
 
 ## 示例
 

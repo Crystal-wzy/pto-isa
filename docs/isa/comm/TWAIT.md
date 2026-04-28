@@ -61,15 +61,17 @@ Halts the scalar unit. Does not affect other NPUs.
 
 ## Constraints
 
-- `GlobalSignalData::DType` must be `int32_t`.
-- `signalData` must point to local address on the current NPU.
-- For signal tensors: all elements must satisfy the condition simultaneously.
-- Up to 5-D tensor shapes are supported.
+!!! warning "Constraints"
+    - `GlobalSignalData::DType` must be `int32_t`.
+    - `signalData` must point to local address on the current NPU.
+    - For signal tensors: all elements must satisfy the condition simultaneously.
+    - Up to 5-D tensor shapes are supported.
 
 ## Exceptions
 
-- Using a non-local signal address is undefined behavior.
-- The signal address must be accessible throughout the wait duration.
+!!! danger "Exceptions"
+    - Using a non-local signal address is undefined behavior.
+    - The signal address must be accessible throughout the wait duration.
 
 ## Examples
 

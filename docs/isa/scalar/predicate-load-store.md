@@ -83,14 +83,15 @@ pto.psts %mask, %ub_saved : !pto.mask, !pto.ptr<i64, ub>
 
 ## Target-Profile Restrictions
 
-| Feature | CPU Simulator | A2/A3 | A5 |
-|---------|:------------:|:------:|:--:|
-| `plds` / `psts` | Simulated | Supported | Supported |
-| `pld` / `pst` (areg) | Simulated | Supported | Supported |
-| `pldi` / `psti` (immediate) | Simulated | Supported | Supported |
-| `pstu` stream form | Not supported | Supported | Supported |
-| `PK` distribution mode | Not supported | Supported | Supported |
-| Alignment relaxation (`pstu`) | Not applicable | Supported | Supported |
+??? info "Target-Profile Restrictions"
+    | Feature | CPU Simulator | A2/A3 | A5 |
+    |---------|:------------:|:------:|:--:|
+    | `plds` / `psts` | Simulated | Supported | Supported |
+    | `pld` / `pst` (areg) | Simulated | Supported | Supported |
+    | `pldi` / `psti` (immediate) | Simulated | Supported | Supported |
+    | `pstu` stream form | Not supported | Supported | Supported |
+    | `PK` distribution mode | Not supported | Supported | Supported |
+    | Alignment relaxation (`pstu`) | Not applicable | Supported | Supported |
 
 ## Per-Op Pages
 

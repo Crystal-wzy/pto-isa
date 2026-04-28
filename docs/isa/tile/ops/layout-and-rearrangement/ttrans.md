@@ -64,39 +64,42 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Constraints
 
-- **Temporary tile**:
-    - The C++ API requires `tmp`, but some implementations may not use it.
+!!! warning "Constraints"
+    - **Temporary tile**:
+        - The C++ API requires `tmp`, but some implementations may not use it.
 
-- **ConvTile**:
-    - Transpose of ConvTile for `TileType::Vec` is supported。 Element size must be `1`、`2` or `4` bytes. Supported element types are `uint32_t`、`int32_t`、`float`、`uint16_t`、`int16_t`、`half`、`bfloat16_t`、`uint8_t`、`int8_t`.
-    - Format transformation from `NCHW` to `NC1HWC0` is supported, while `C1 == (C + C0 - 1)/C0`，HW matches alignment constraint，which means `H*W*sizeof(T)==0`. C0 means `c0_size`, which `C0 * sizeof(T) == 32`。C0 can also be 4.
-    - Format transformation from `NC1HWC0` to `FRACTAL_Z` is supported， while `N1 == (N + N0 - 1)/N0`。N0 should be 16.
+    - **ConvTile**:
+        - Transpose of ConvTile for `TileType::Vec` is supported。 Element size must be `1`、`2` or `4` bytes. Supported element types are `uint32_t`、`int32_t`、`float`、`uint16_t`、`int16_t`、`half`、`bfloat16_t`、`uint8_t`、`int8_t`.
+        - Format transformation from `NCHW` to `NC1HWC0` is supported, while `C1 == (C + C0 - 1)/C0`，HW matches alignment constraint，which means `H*W*sizeof(T)==0`. C0 means `c0_size`, which `C0 * sizeof(T) == 32`。C0 can also be 4.
+        - Format transformation from `NC1HWC0` to `FRACTAL_Z` is supported， while `N1 == (N + N0 - 1)/N0`。N0 should be 16.
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
+!!! danger "Exceptions"
+    - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
+    - Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
 
 ## Target-Profile Restrictions
 
-- **Implementation checks (A2A3)**:
-    - `sizeof(TileDataSrc::DType) == sizeof(TileDataDst::DType)`.
-    - Source layout must be row-major (`TileDataSrc::isRowMajor`).
-    - Element size must be `1`, `2`, or `4` bytes.
-    - Supported element types are restricted per element width:
-    - 4 bytes: `uint32_t`, `int32_t`, `float`
-    - 2 bytes: `uint16_t`, `int16_t`, `half`, `bfloat16_t`
-    - 1 byte: `uint8_t`, `int8_t`
-    - The transpose size is taken from `src.GetValidRow()` / `src.GetValidCol()`.
+??? info "Target-Profile Restrictions"
+    - **Implementation checks (A2A3)**:
+        - `sizeof(TileDataSrc::DType) == sizeof(TileDataDst::DType)`.
+        - Source layout must be row-major (`TileDataSrc::isRowMajor`).
+        - Element size must be `1`, `2`, or `4` bytes.
+        - Supported element types are restricted per element width:
+        - 4 bytes: `uint32_t`, `int32_t`, `float`
+        - 2 bytes: `uint16_t`, `int16_t`, `half`, `bfloat16_t`
+        - 1 byte: `uint8_t`, `int8_t`
+        - The transpose size is taken from `src.GetValidRow()` / `src.GetValidCol()`.
 
-- **Implementation checks (A5)**:
-    - `sizeof(TileDataSrc::DType) == sizeof(TileDataDst::DType)`.
-    - 32-byte alignment constraints are enforced on the major dimension of both input and output (row-major checks `Cols * sizeof(T) % 32 == 0`, col-major checks `Rows * sizeof(T) % 32 == 0`).
-    - Supported element types are restricted per element width:
-    - 4 bytes: `uint32_t`, `int32_t`, `float`
-    - 2 bytes: `uint16_t`, `int16_t`, `half`, `bfloat16_t`
-    - 1 byte: `uint8_t`, `int8_t`
-    - The implementation operates over the static tile shape (`TileDataSrc::Rows/Cols`) and does not consult `GetValidRow/GetValidCol`.
+    - **Implementation checks (A5)**:
+        - `sizeof(TileDataSrc::DType) == sizeof(TileDataDst::DType)`.
+        - 32-byte alignment constraints are enforced on the major dimension of both input and output (row-major checks `Cols * sizeof(T) % 32 == 0`, col-major checks `Rows * sizeof(T) % 32 == 0`).
+        - Supported element types are restricted per element width:
+        - 4 bytes: `uint32_t`, `int32_t`, `float`
+        - 2 bytes: `uint16_t`, `int16_t`, `half`, `bfloat16_t`
+        - 1 byte: `uint8_t`, `int8_t`
+        - The implementation operates over the static tile shape (`TileDataSrc::Rows/Cols`) and does not consult `GetValidRow/GetValidCol`.
 
 ## Examples
 

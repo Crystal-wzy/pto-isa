@@ -66,16 +66,18 @@ $$ \mathrm{dst}_{\mathrm{index}_i} = \mathrm{src}_i \quad \text{(scatter)} $$
 
 ## 约束
 
-- 排序操作要求元素类型与具体排序变体兼容。
-- 量化要求 scale 非零，且 zero-point 落在合法范围内。
-- `TSCATTER` 要求索引非负且落在目标范围内。
-- `TPART*` 的具体行为可能随 profile 缩窄。
+!!! warning "约束"
+    - 排序操作要求元素类型与具体排序变体兼容。
+    - 量化要求 scale 非零，且 zero-point 落在合法范围内。
+    - `TSCATTER` 要求索引非负且落在目标范围内。
+    - `TPART*` 的具体行为可能随 profile 缩窄。
 
 ## 不允许的情形
 
-- 使用非法 scale 或越界 zero-point 做量化；
-- scatter 到目标 tile 形状之外；
-- 把某个 target 上偶然可接受的行为当成可移植合同。
+!!! danger "不允许的情形"
+    - 使用非法 scale 或越界 zero-point 做量化；
+    - scatter 到目标 tile 形状之外；
+    - 把某个 target 上偶然可接受的行为当成可移植合同。
 
 ## 相关页面
 

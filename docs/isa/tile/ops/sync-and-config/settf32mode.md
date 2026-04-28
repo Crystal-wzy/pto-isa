@@ -62,15 +62,17 @@ This form is defined primarily by its ordering or configuration effect. It does 
 
 ## Constraints
 
-- On A2/A3, calling `pto.settf32mode` is legal but has no effect.
-- On A5, `enable` must be `true` or `false` and `mode` must be a supported `RoundMode` (only `CAST_ROUND` is currently defined).
-- On CPU simulator, any combination of enable and mode is accepted without error.
-- This instruction has control-state side effects and should be ordered appropriately relative to dependent compute instructions.
+!!! warning "Constraints"
+    - On A2/A3, calling `pto.settf32mode` is legal but has no effect.
+    - On A5, `enable` must be `true` or `false` and `mode` must be a supported `RoundMode` (only `CAST_ROUND` is currently defined).
+    - On CPU simulator, any combination of enable and mode is accepted without error.
+    - This instruction has control-state side effects and should be ordered appropriately relative to dependent compute instructions.
 
 ## Cases That Are Not Allowed
 
-- Relying on TF32 precision behavior on A2/A3 (not supported).
-- Using modes other than `CAST_ROUND` (reserved/undefined).
+!!! danger "Cases That Are Not Allowed"
+    - Relying on TF32 precision behavior on A2/A3 (not supported).
+    - Using modes other than `CAST_ROUND` (reserved/undefined).
 
 ## Examples
 

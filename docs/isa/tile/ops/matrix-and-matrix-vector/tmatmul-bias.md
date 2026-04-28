@@ -86,22 +86,25 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Constraints
 
-- All constraints from `TMATMUL` apply to the `(cMatrix, aMatrix, bMatrix)` triple.
+!!! warning "Constraints"
+    - All constraints from `TMATMUL` apply to the `(cMatrix, aMatrix, bMatrix)` triple.
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
+!!! danger "Exceptions"
+    - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
+    - Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
 
 ## Target-Profile Restrictions
 
-- **Bias constraints (A2A3)**:
-    - `TileBias::DType` must match `TileRes::DType`.
-    - `TileBias::Loc == TileType::Bias` and `TileBias::Rows == 1`.
+??? info "Target-Profile Restrictions"
+    - **Bias constraints (A2A3)**:
+        - `TileBias::DType` must match `TileRes::DType`.
+        - `TileBias::Loc == TileType::Bias` and `TileBias::Rows == 1`.
 
-- **Bias constraints (A5)**:
-    - `TileBias::DType` must match `TileRes::DType`.
-    - `TileBias::Loc == TileType::Bias`, `TileBias::Rows == 1`, and `TileBias::isRowMajor`.
+    - **Bias constraints (A5)**:
+        - `TileBias::DType` must match `TileRes::DType`.
+        - `TileBias::Loc == TileType::Bias`, `TileBias::Rows == 1`, and `TileBias::isRowMajor`.
 
 ## Examples
 

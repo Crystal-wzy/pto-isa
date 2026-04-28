@@ -60,27 +60,30 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Constraints
 
-- `dst` and `src` must have matching valid-row and valid-column extents.
-- `scale` and `offset` must have row counts matching `dst.GetValidRow()`.
-- In this repo surface, `dst` is `float`/`float32_t`.
-- In this repo surface, `src` is `int8_t` or `int16_t`.
-- In this repo surface, `scale` and `offset` use the same floating-point element type as `dst`.
-- Current concrete implementations require row-major tiles.
+!!! warning "Constraints"
+    - `dst` and `src` must have matching valid-row and valid-column extents.
+    - `scale` and `offset` must have row counts matching `dst.GetValidRow()`.
+    - In this repo surface, `dst` is `float`/`float32_t`.
+    - In this repo surface, `src` is `int8_t` or `int16_t`.
+    - In this repo surface, `scale` and `offset` use the same floating-point element type as `dst`.
+    - Current concrete implementations require row-major tiles.
 
 ## Exceptions
 
-- Unsupported type pairs, incompatible layouts, or mismatched valid regions are rejected by the backend checks.
-- Programs must not assume column-wise scale or offset variation unless a target profile explicitly documents it.
+!!! danger "Exceptions"
+    - Unsupported type pairs, incompatible layouts, or mismatched valid regions are rejected by the backend checks.
+    - Programs must not assume column-wise scale or offset variation unless a target profile explicitly documents it.
 
 ## Target-Profile Restrictions
 
-| Feature | CPU Simulator | A2/A3 | A5 |
-|---------|:-------------:|:-----:|:--:|
-| `float <- int8_t` | Yes | Yes | Yes |
-| `float <- int16_t` | Yes | Yes | Yes |
-| Row-major tiles | Yes | Yes | Yes |
+??? info "Target-Profile Restrictions"
+    | Feature | CPU Simulator | A2/A3 | A5 |
+    |---------|:-------------:|:-----:|:--:|
+    | `float <- int8_t` | Yes | Yes | Yes |
+    | `float <- int16_t` | Yes | Yes | Yes |
+    | Row-major tiles | Yes | Yes | Yes |
 
-This checkout contains concrete implementations for CPU simulation, A2/A3, and A5.
+    This checkout contains concrete implementations for CPU simulation, A2/A3, and A5.
 
 ## Examples
 

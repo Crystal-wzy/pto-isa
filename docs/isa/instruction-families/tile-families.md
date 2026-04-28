@@ -85,20 +85,22 @@ See [Tiles And Valid Regions](../programming-model/tiles-and-valid-regions.md) f
 
 ## Constraints
 
-- **Tile legality** depends on more than dtype; shape, layout, role, and valid region all matter.
-- Operations with multiple tiles must define valid-region interaction explicitly.
-- Some tile instruction groups are profile-gated: MX block-scale tiles (`Left`, `Right`, `ScaleLeft`, `ScaleRight`) are A5-only; FP8/FP4-family element types are A5-only.
-- Tile instructions do **not** inherit vector-register semantics; they operate on architecturally visible tile state.
-- No implicit broadcasting: all source tiles must have shapes compatible with the destination tile.
+!!! warning "Constraints"
+    - **Tile legality** depends on more than dtype; shape, layout, role, and valid region all matter.
+    - Operations with multiple tiles must define valid-region interaction explicitly.
+    - Some tile instruction groups are profile-gated: MX block-scale tiles (`Left`, `Right`, `ScaleLeft`, `ScaleRight`) are A5-only; FP8/FP4-family element types are A5-only.
+    - Tile instructions do **not** inherit vector-register semantics; they operate on architecturally visible tile state.
+    - No implicit broadcasting: all source tiles must have shapes compatible with the destination tile.
 
 ## Cases That Are Not Allowed
 
-- Reading undefined out-of-valid-region data as if it were meaningful.
-- Assuming tile instructions inherit vector-register semantics.
-- Relying on target-specific support gaps as universal architecture rules.
-- Assuming implicit broadcasting, reshaping, or valid-region repair unless documented.
-- Using MX format tiles (`TileType::Left`/`Right`) on CPU or A2/A3 profiles.
-- Using FP8 element types on CPU or A2/A3 profiles.
+!!! danger "Cases That Are Not Allowed"
+    - Reading undefined out-of-valid-region data as if it were meaningful.
+    - Assuming tile instructions inherit vector-register semantics.
+    - Relying on target-specific support gaps as universal architecture rules.
+    - Assuming implicit broadcasting, reshaping, or valid-region repair unless documented.
+    - Using MX format tiles (`TileType::Left`/`Right`) on CPU or A2/A3 profiles.
+    - Using FP8 element types on CPU or A2/A3 profiles.
 
 ## Saturating Variants
 

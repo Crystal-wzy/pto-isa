@@ -44,20 +44,21 @@ PTO_INST RecordEvent SCATTER(ParallelGroupType &parallelGroup, GlobalSrcData &sr
 
 ## Constraints
 
-- **Type constraints**:
-    - `ParallelGroup::value_type::RawDType` must equal `GlobalSrcData::RawDType`.
-    - `TileData::DType` must equal `GlobalSrcData::RawDType`.
-- **Memory constraints**:
-    - `srcGlobalData` must point to local memory (current NPU) and be large enough to hold data for all ranks. Specifically, `srcGlobalData.GetShape(DIM_3)` must be $\geq N \times H$ where $H$ is each rank's `GetShape(DIM_3)`.
-    - If `srcGlobalData.GetShape(DIM_3) > N × H`, only the first `N × H` rows are read; remaining rows are ignored.
-    - `stagingTileData` (or `pingTile` / `pongTile`) must be pre-allocated in UB.
-- **ParallelGroup constraints**:
-    - `parallelGroup.tensors[r]` must refer to rank `r`'s destination buffer (remote GM as seen by the root).
-    - `parallelGroup.GetRootIdx()` identifies the calling NPU as the scatter root.
-    - All destination tensors are assumed to have the same shape and strides; behavior is undefined if they differ.
-- **Chunked mode constraints** (when per-rank data exceeds a single UB tile):
-    - If `TileData` has static `ValidRow`, `GetShape(DIM_3)` of each rank's destination must be divisible by `ValidRow`. Use a Tile with `DYNAMIC` ValidRow for partial row support.
-    - If `TileData` has static `ValidCol`, `GetShape(DIM_4)` must be divisible by `ValidCol`. Use a Tile with `DYNAMIC` ValidCol for partial column support.
+!!! warning "Constraints"
+    - **Type constraints**:
+        - `ParallelGroup::value_type::RawDType` must equal `GlobalSrcData::RawDType`.
+        - `TileData::DType` must equal `GlobalSrcData::RawDType`.
+    - **Memory constraints**:
+        - `srcGlobalData` must point to local memory (current NPU) and be large enough to hold data for all ranks. Specifically, `srcGlobalData.GetShape(DIM_3)` must be $\geq N \times H$ where $H$ is each rank's `GetShape(DIM_3)`.
+        - If `srcGlobalData.GetShape(DIM_3) > N × H`, only the first `N × H` rows are read; remaining rows are ignored.
+        - `stagingTileData` (or `pingTile` / `pongTile`) must be pre-allocated in UB.
+    - **ParallelGroup constraints**:
+        - `parallelGroup.tensors[r]` must refer to rank `r`'s destination buffer (remote GM as seen by the root).
+        - `parallelGroup.GetRootIdx()` identifies the calling NPU as the scatter root.
+        - All destination tensors are assumed to have the same shape and strides; behavior is undefined if they differ.
+    - **Chunked mode constraints** (when per-rank data exceeds a single UB tile):
+        - If `TileData` has static `ValidRow`, `GetShape(DIM_3)` of each rank's destination must be divisible by `ValidRow`. Use a Tile with `DYNAMIC` ValidRow for partial row support.
+        - If `TileData` has static `ValidCol`, `GetShape(DIM_4)` must be divisible by `ValidCol`. Use a Tile with `DYNAMIC` ValidCol for partial column support.
 
 ## Examples
 

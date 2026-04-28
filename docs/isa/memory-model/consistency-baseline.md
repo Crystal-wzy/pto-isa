@@ -115,11 +115,12 @@ CPU, A2/A3, and A5 may differ in implementation detail and support subsets, but 
 
 ## Cases That Are Not Allowed
 
-- Documenting implementation detail as though it were the portable memory model.
-- Hiding visibility requirements inside vague words like "usually ordered."
-- Mixing memory-model guarantees with scheduling heuristics.
-- Claiming that data is visible across blocks without an explicit synchronization operation.
-- Assuming that "the hardware does it automatically" without specifying which operation provides the guarantee.
+!!! danger "Cases That Are Not Allowed"
+    - Documenting implementation detail as though it were the portable memory model.
+    - Hiding visibility requirements inside vague words like "usually ordered."
+    - Mixing memory-model guarantees with scheduling heuristics.
+    - Claiming that data is visible across blocks without an explicit synchronization operation.
+    - Assuming that "the hardware does it automatically" without specifying which operation provides the guarantee.
 
 ## See Also
 

@@ -51,13 +51,14 @@ PTO_INST void TRANDOM_IMPL(DstTile &dst, TRandomKey &key, TRandomCounter &counte
 
 ## Constraints
 
-- **Implementation checks (A5)**:
-    - `DstTile::DType` must be one of: `int32_t`, `uint32_t`.
-    - Tile layout must be row-major (`DstTile::isRowMajor`).
-    - `Rounds` must be either 7 or 10 (default: 10).
-    - `key` and `counter` must not be null.
-- **Valid region**:
-    - The op uses `dst.GetValidRow()` / `dst.GetValidCol()` as the iteration domain.
+!!! warning "Constraints"
+    - **Implementation checks (A5)**:
+        - `DstTile::DType` must be one of: `int32_t`, `uint32_t`.
+        - Tile layout must be row-major (`DstTile::isRowMajor`).
+        - `Rounds` must be either 7 or 10 (default: 10).
+        - `key` and `counter` must not be null.
+    - **Valid region**:
+        - The op uses `dst.GetValidRow()` / `dst.GetValidCol()` as the iteration domain.
 
 ## Examples
 

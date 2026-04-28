@@ -58,9 +58,10 @@ PTO_INST RecordEvent SETTF32MODE(WaitEvents &... events);
 
 ## 约束
 
-- 在 A2/A3 上调用 `pto.settf32mode` 合法但无效果。
-- 在 A5 上，`enable` 必须为 `true` 或 `false`，`mode` 必须是受支持的 `RoundMode`。
-- 该指令具有控制状态副作用，应当相对于依赖它的计算指令正确排序。
+!!! warning "约束"
+    - 在 A2/A3 上调用 `pto.settf32mode` 合法但无效果。
+    - 在 A5 上，`enable` 必须为 `true` 或 `false`，`mode` 必须是受支持的 `RoundMode`。
+    - 该指令具有控制状态副作用，应当相对于依赖它的计算指令正确排序。
 
 ## 示例
 

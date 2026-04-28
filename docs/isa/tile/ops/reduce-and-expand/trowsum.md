@@ -67,27 +67,28 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Constraints
 
-### Tile Types
+!!! warning "Constraints"
+    ### Tile Types
 
-- `src` and `dst` must both be `TileType::Vec`.
+    - `src` and `dst` must both be `TileType::Vec`.
 
-### Layout
+    ### Layout
 
-- `src` must use standard ND layout: `BLayout::RowMajor`, `SLayout::NoneBox`.
-- `dst` must use one of:
-  - ND layout: `BLayout::RowMajor`, `SLayout::NoneBox`, `Cols == 1`, or
-  - DN layout: `BLayout::ColMajor`, `SLayout::NoneBox`, `Cols == 1`.
-- `src` and `dst` must have the same element type.
+    - `src` must use standard ND layout: `BLayout::RowMajor`, `SLayout::NoneBox`.
+    - `dst` must use one of:
+      - ND layout: `BLayout::RowMajor`, `SLayout::NoneBox`, `Cols == 1`, or
+      - DN layout: `BLayout::ColMajor`, `SLayout::NoneBox`, `Cols == 1`.
+    - `src` and `dst` must have the same element type.
 
-### Valid Region
+    ### Valid Region
 
-- `src.GetValidRow() > 0`
-- `src.GetValidCol() > 0`
-- `dst.GetValidRow() == src.GetValidRow()`
+    - `src.GetValidRow() > 0`
+    - `src.GetValidCol() > 0`
+    - `dst.GetValidRow() == src.GetValidRow()`
 
-### Element Types
+    ### Element Types
 
-Supported: `half`, `float`, `int32_t`, `int16_t`.
+    Supported: `half`, `float`, `int32_t`, `int16_t`.
 
 ## Performance
 
@@ -132,8 +133,9 @@ Integer types (int16_t/int32_t): Use simplified path with direct `vadd`/`vmax`/`
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain.
+!!! danger "Exceptions"
+    - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
+    - Programs must not rely on behavior outside the documented legal domain.
 
 ## Examples
 

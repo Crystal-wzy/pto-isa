@@ -33,7 +33,8 @@ Declared in `include/pto/common/pto_instr.hpp`.
 
 ## Constraints
 
-Refer to backend-specific legality checks for data type/layout/location/shape constraints.
+!!! warning "Constraints"
+    Refer to backend-specific legality checks for data type/layout/location/shape constraints.
 
 ## Examples
 

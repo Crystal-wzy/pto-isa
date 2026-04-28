@@ -48,19 +48,20 @@ PTO_INST RecordEvent REDUCE(ParallelGroupType &parallelGroup, GlobalDstData &dst
 
 ## Constraints
 
-- **Type constraints**:
-    - `ParallelGroup::value_type::RawDType` must equal `GlobalDstData::RawDType`.
-    - `TileData::DType` must equal `GlobalDstData::RawDType`.
-- **Memory constraints**:
-    - `dstGlobalData` must point to local address (on current NPU).
-    - `accTileData`, `recvTileData` (or `accTileData`, `pingTileData`, `pongTileData`) must be pre-allocated UB tiles.
-- **ParallelGroup constraints**:
-    - `parallelGroup.tensors[r]` must refer to rank `r`'s source buffer (remote GM as seen by the root).
-    - `parallelGroup.GetRootIdx()` identifies the calling NPU as the reduce root.
-    - All source tensors are assumed to have the same shape and strides.
-- **Chunked mode constraints** (when data exceeds a single UB tile):
-    - If `TileData` has static `ValidRow`, `GetShape(DIM_3)` must be divisible by `ValidRow`. Use a Tile with `DYNAMIC` ValidRow for partial row support.
-    - If `TileData` has static `ValidCol`, `GetShape(DIM_4)` must be divisible by `ValidCol`. Use a Tile with `DYNAMIC` ValidCol for partial column support.
+!!! warning "Constraints"
+    - **Type constraints**:
+        - `ParallelGroup::value_type::RawDType` must equal `GlobalDstData::RawDType`.
+        - `TileData::DType` must equal `GlobalDstData::RawDType`.
+    - **Memory constraints**:
+        - `dstGlobalData` must point to local address (on current NPU).
+        - `accTileData`, `recvTileData` (or `accTileData`, `pingTileData`, `pongTileData`) must be pre-allocated UB tiles.
+    - **ParallelGroup constraints**:
+        - `parallelGroup.tensors[r]` must refer to rank `r`'s source buffer (remote GM as seen by the root).
+        - `parallelGroup.GetRootIdx()` identifies the calling NPU as the reduce root.
+        - All source tensors are assumed to have the same shape and strides.
+    - **Chunked mode constraints** (when data exceeds a single UB tile):
+        - If `TileData` has static `ValidRow`, `GetShape(DIM_3)` must be divisible by `ValidRow`. Use a Tile with `DYNAMIC` ValidRow for partial row support.
+        - If `TileData` has static `ValidCol`, `GetShape(DIM_4)` must be divisible by `ValidCol`. Use a Tile with `DYNAMIC` ValidCol for partial column support.
 
 ## Examples
 

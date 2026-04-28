@@ -167,19 +167,21 @@ wait_flag(PIPE_MTE2, PIPE_V, ID);
 
 ## Constraints
 
-- A consumer may only rely on visibility after the required producer-consumer edge is established.
-- The exact synchronization mechanism may vary by instruction set or target profile.
-- Instruction Set docs and per-op pages must state the relevant ordering expectations explicitly.
-- An operation's `RecordEvent` return value is only valid for chaining to operations that execute AFTER the current operation in program order.
+!!! warning "Constraints"
+    - A consumer may only rely on visibility after the required producer-consumer edge is established.
+    - The exact synchronization mechanism may vary by instruction set or target profile.
+    - Instruction Set docs and per-op pages must state the relevant ordering expectations explicitly.
+    - An operation's `RecordEvent` return value is only valid for chaining to operations that execute AFTER the current operation in program order.
 
 ## Cases That Are Not Allowed
 
-- Describing a consumer as legal without saying how producer visibility is established.
-- Assuming a target's convenient scheduling behavior is the architecture contract.
-- Leaving cross-instruction set handoff rules implicit.
-- Issuing `vlds` before `copy_gm_to_ubuf` completes without an intervening `wait_flag`.
-- Issuing `copy_ubuf_to_gm` before `vsts` completes without an intervening `wait_flag`.
-- Passing a `RecordEvent` from a later operation to an earlier operation (wrong direction) — this is illegal and produces a verification error.
+!!! danger "Cases That Are Not Allowed"
+    - Describing a consumer as legal without saying how producer visibility is established.
+    - Assuming a target's convenient scheduling behavior is the architecture contract.
+    - Leaving cross-instruction set handoff rules implicit.
+    - Issuing `vlds` before `copy_gm_to_ubuf` completes without an intervening `wait_flag`.
+    - Issuing `copy_ubuf_to_gm` before `vsts` completes without an intervening `wait_flag`.
+    - Passing a `RecordEvent` from a later operation to an earlier operation (wrong direction) — this is illegal and produces a verification error.
 
 ## See Also
 

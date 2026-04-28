@@ -72,20 +72,23 @@ This operation may read from global memory. Prefetch hints may be ignored by som
 
 ## Constraints
 
-- Semantics and caching behavior vary by target: on A2/A3, the prefetch issues a DMA read into the tile buffer with no additional caching layer beyond the scratchpad; on A5, the DMA engine may use different memory-transaction scheduling and the hint may be treated as a non-blocking request that does not block subsequent tile operations; on the CPU simulator, the prefetch is a blocking copy that copies data from the source GlobalTensor into the destination tile.
+!!! warning "Constraints"
+    - Semantics and caching behavior vary by target: on A2/A3, the prefetch issues a DMA read into the tile buffer with no additional caching layer beyond the scratchpad; on A5, the DMA engine may use different memory-transaction scheduling and the hint may be treated as a non-blocking request that does not block subsequent tile operations; on the CPU simulator, the prefetch is a blocking copy that copies data from the source GlobalTensor into the destination tile.
 
-- Some targets may ignore prefetches or treat them as hints.
+    - Some targets may ignore prefetches or treat them as hints.
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
+!!! danger "Exceptions"
+    - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
+    - Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
 
 ## Target-Profile Restrictions
 
-- `pto.tprefetch` preserves PTO-visible semantics across CPU simulation, A2/A3-class targets, and A5-class targets, but concrete support subsets may differ by profile.
+??? info "Target-Profile Restrictions"
+    - `pto.tprefetch` preserves PTO-visible semantics across CPU simulation, A2/A3-class targets, and A5-class targets, but concrete support subsets may differ by profile.
 
-- Portable code must rely only on the documented type, layout, shape, and mode combinations that the selected target profile guarantees.
+    - Portable code must rely only on the documented type, layout, shape, and mode combinations that the selected target profile guarantees.
 
 ## Examples
 

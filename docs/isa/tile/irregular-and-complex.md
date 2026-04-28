@@ -64,16 +64,18 @@ Partial reductions compute intermediate results that are later combined across t
 
 ## Constraints
 
-- Sort operations require compatible element types (bit-width appropriate for the sort variant).
-- Quantization requires valid scale (non-zero) and zero-point values within representable range.
-- Scatter requires a valid index tile with non-negative indices within the destination bounds.
-- Partial reductions may have different behavior across profiles.
+!!! warning "Constraints"
+    - Sort operations require compatible element types (bit-width appropriate for the sort variant).
+    - Quantization requires valid scale (non-zero) and zero-point values within representable range.
+    - Scatter requires a valid index tile with non-negative indices within the destination bounds.
+    - Partial reductions may have different behavior across profiles.
 
 ## Cases That Are Not Allowed
 
-- **MUST NOT** use quantization with invalid scale (zero or NaN) or out-of-range zero-point.
-- **MUST NOT** scatter to indices outside the destination tile's declared shape bounds.
-- **MUST NOT** use sort operations with element types incompatible with the sort variant (e.g., `TSORT32` on i8).
+!!! danger "Cases That Are Not Allowed"
+    - **MUST NOT** use quantization with invalid scale (zero or NaN) or out-of-range zero-point.
+    - **MUST NOT** scatter to indices outside the destination tile's declared shape bounds.
+    - **MUST NOT** use sort operations with element types incompatible with the sort variant (e.g., `TSORT32` on i8).
 
 ## Performance Notes
 

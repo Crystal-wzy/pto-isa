@@ -54,9 +54,10 @@ PTO_INST RecordEvent SETFMATRIX(TileData &tile, WaitEvents &... events);
 
 ## 约束
 
-- tile 必须是目标 profile 要求的有效矩阵 tile 类型。
-- 在 A5 上，tile 形状必须与 FMATRIX 槽尺寸兼容。
-- 应在依赖它的矩阵乘操作之前执行。
+!!! warning "约束"
+    - tile 必须是目标 profile 要求的有效矩阵 tile 类型。
+    - 在 A5 上，tile 形状必须与 FMATRIX 槽尺寸兼容。
+    - 应在依赖它的矩阵乘操作之前执行。
 
 ## 另请参阅
 

@@ -80,19 +80,21 @@ Readers MUST NOT infer saturating semantics from the suffix alone; always treat 
 
 ## Constraints
 
-- Tile layout, shape, and valid-region state affect legality.
-- Type support varies by target profile (see per-op pages for exact restrictions).
-- Comparison operations (`TCMP`) produce a **predicate tile**; arithmetic operations produce a **numeric tile**.
-- Conversion operations (`TCVT`) may change element type between source and destination; dtype sizes may differ.
-- All source and destination tiles MUST have the same physical shape `(Rows, Cols)`.
-- Shift operations (`TSHL`, `TSHR`) interpret the second operand as an unsigned shift count; shift count MUST be `<` element bit-width.
+!!! warning "Constraints"
+    - Tile layout, shape, and valid-region state affect legality.
+    - Type support varies by target profile (see per-op pages for exact restrictions).
+    - Comparison operations (`TCMP`) produce a **predicate tile**; arithmetic operations produce a **numeric tile**.
+    - Conversion operations (`TCVT`) may change element type between source and destination; dtype sizes may differ.
+    - All source and destination tiles MUST have the same physical shape `(Rows, Cols)`.
+    - Shift operations (`TSHL`, `TSHR`) interpret the second operand as an unsigned shift count; shift count MUST be `<` element bit-width.
 
 ## Cases That Are Not Allowed
 
-- **MUST NOT** assume implicit broadcasting, reshaping, or valid-region repair.
-- **MUST NOT** rely on a defined value from a source tile lane outside its valid region.
-- **MUST NOT** infer a generic saturating-arithmetic meaning from the `_c` suffix alone.
-- **MUST NOT** use a shift count `>=` element bit-width.
+!!! danger "Cases That Are Not Allowed"
+    - **MUST NOT** assume implicit broadcasting, reshaping, or valid-region repair.
+    - **MUST NOT** rely on a defined value from a source tile lane outside its valid region.
+    - **MUST NOT** infer a generic saturating-arithmetic meaning from the `_c` suffix alone.
+    - **MUST NOT** use a shift count `>=` element bit-width.
 
 ## C++ Intrinsic
 

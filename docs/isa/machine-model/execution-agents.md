@@ -195,16 +195,18 @@ The **A5 profile** targets Ascend 950 PR and Ascend 950 DT. These targets suppor
 
 ## Constraints
 
-- Architecture-visible dependence order MUST survive target scheduling
-- Target profiles may narrow support, but MUST NOT redefine legal PTO semantics
-- Machine-model documentation MUST state clearly which facts are portable and which are profile-specific
-- Programs that depend on profile-specific features (e.g., MX format, FP8, unaligned vector store) are NOT portable across profiles
+!!! warning "Constraints"
+    - Architecture-visible dependence order MUST survive target scheduling
+    - Target profiles may narrow support, but MUST NOT redefine legal PTO semantics
+    - Machine-model documentation MUST state clearly which facts are portable and which are profile-specific
+    - Programs that depend on profile-specific features (e.g., MX format, FP8, unaligned vector store) are NOT portable across profiles
 
 ## Cases That Are Not Allowed
 
-- Documenting A5-only features as general PTO guarantees
-- Assuming the CPU simulator's emulation behavior matches hardware performance or cycle-accurate timing
-- Treating a profile restriction as a contradiction of the ISA (profiles only narrow, never contradict)
+!!! danger "Cases That Are Not Allowed"
+    - Documenting A5-only features as general PTO guarantees
+    - Assuming the CPU simulator's emulation behavior matches hardware performance or cycle-accurate timing
+    - Treating a profile restriction as a contradiction of the ISA (profiles only narrow, never contradict)
 
 ## See Also
 

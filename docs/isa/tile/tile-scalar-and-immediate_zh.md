@@ -47,17 +47,19 @@ $$ \mathrm{dst}_{r,c} = \mathrm{src0}_{r,c} \times \mathrm{scalar} + \mathrm{src
 
 ## 约束
 
-- 标量类型必须与 tile 元素类型兼容。
-- `TSHLS` / `TSHRS` 将标量解释为无符号 shift count。
-- `TCMPS` 的结果不应被当成普通数值 tile 使用，除非对应 target/profile 明确约定其编码。
-- 需要保持 valid region 语义的操作，迭代域都以 `dst` 的 valid row / col 为准。
+!!! warning "约束"
+    - 标量类型必须与 tile 元素类型兼容。
+    - `TSHLS` / `TSHRS` 将标量解释为无符号 shift count。
+    - `TCMPS` 的结果不应被当成普通数值 tile 使用，除非对应 target/profile 明确约定其编码。
+    - 需要保持 valid region 语义的操作，迭代域都以 `dst` 的 valid row / col 为准。
 
 ## 不允许的情形
 
-- 使用与 tile 元素类型不兼容的标量。
-- 依赖隐式类型提升。
-- 对位移类操作传入超出元素位宽的移位量。
-- 把不同 target profile 的实现细节当成跨目标保证。
+!!! danger "不允许的情形"
+    - 使用与 tile 元素类型不兼容的标量。
+    - 依赖隐式类型提升。
+    - 对位移类操作传入超出元素位宽的移位量。
+    - 把不同 target profile 的实现细节当成跨目标保证。
 
 ## 相关页面
 

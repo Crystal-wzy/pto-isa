@@ -146,17 +146,19 @@ Tile-producing operations yield a destination tile whose payload, valid region, 
 
 ## Constraints
 
-- Semantics are defined only inside the declared valid region unless an instruction page says otherwise
-- Multi-input tile instructions iterate over the **destination** valid region, reading source tiles lane-by-lane at the corresponding indices regardless of the source's own valid region (hardware-specific, undefined values for out-of-region source lanes on A2/A3 and A5; raw memory reads on CPU simulator)
-- A legal tile type is not enough by itself; shape, layout, location intent, and target profile also matter
-- The combination of `TileType`, `BLayout`, `SLayout`, and `Fractal` MUST match one of the supported combinations in the layout table above
+!!! warning "Constraints"
+    - Semantics are defined only inside the declared valid region unless an instruction page says otherwise
+    - Multi-input tile instructions iterate over the **destination** valid region, reading source tiles lane-by-lane at the corresponding indices regardless of the source's own valid region (hardware-specific, undefined values for out-of-region source lanes on A2/A3 and A5; raw memory reads on CPU simulator)
+    - A legal tile type is not enough by itself; shape, layout, location intent, and target profile also matter
+    - The combination of `TileType`, `BLayout`, `SLayout`, and `Fractal` MUST match one of the supported combinations in the layout table above
 
 ## Cases That Are Not Allowed
 
-- Treating out-of-valid-region elements as architecturally meaningful data
-- Assuming every backend will silently repair mismatched valid-region use
-- Using tile roles or layouts that an instruction set or target profile does not permit
-- Relying on any specific value from a source tile lane outside its valid region (undefined on A2/A3 and A5; raw memory on CPU simulator)
+!!! danger "Cases That Are Not Allowed"
+    - Treating out-of-valid-region elements as architecturally meaningful data
+    - Assuming every backend will silently repair mismatched valid-region use
+    - Using tile roles or layouts that an instruction set or target profile does not permit
+    - Relying on any specific value from a source tile lane outside its valid region (undefined on A2/A3 and A5; raw memory on CPU simulator)
 
 ## Examples
 

@@ -64,24 +64,27 @@ None. Does not implicitly fence or synchronize with any pipeline.
 
 ## Constraints
 
-- **UB address space**: `%ub_ptr` MUST have address space `ub`. Pointers to other spaces are illegal.
-- **Alignment**: The effective address MUST be 64-bit aligned. Misaligned addresses are **illegal**.
-- **Predicate width**: The load transfers exactly 64 bits. The caller MUST ensure this matches the active element type context.
-- **Single active predicate**: Loading a new predicate does not implicitly clear or save a prior predicate. Programs that need to preserve predicate state MUST save it to UB before loading.
+!!! warning "Constraints"
+    - **UB address space**: `%ub_ptr` MUST have address space `ub`. Pointers to other spaces are illegal.
+    - **Alignment**: The effective address MUST be 64-bit aligned. Misaligned addresses are **illegal**.
+    - **Predicate width**: The load transfers exactly 64 bits. The caller MUST ensure this matches the active element type context.
+    - **Single active predicate**: Loading a new predicate does not implicitly clear or save a prior predicate. Programs that need to preserve predicate state MUST save it to UB before loading.
 
 ## Exceptions
 
-- Illegal if `%ub_ptr` is not a UB-space pointer.
-- Illegal if the effective address is not 64-bit aligned.
-- Illegal if predicate width does not match the active element type context.
+!!! danger "Exceptions"
+    - Illegal if `%ub_ptr` is not a UB-space pointer.
+    - Illegal if the effective address is not 64-bit aligned.
+    - Illegal if predicate width does not match the active element type context.
 
 ## Target-Profile Restrictions
 
-| Aspect | CPU Sim | A2/A3 | A5 |
-|--------|:-------:|:------:|:--:|
-| Contiguous load | Simulated | Supported | Supported |
-| 64-bit alignment requirement | Enforced | Enforced | Enforced |
-| Predicate width (f32 / f16,bf16 / i8) | N=64/128/256 | N=64/128/256 | N=64/128/256 |
+??? info "Target-Profile Restrictions"
+    | Aspect | CPU Sim | A2/A3 | A5 |
+    |--------|:-------:|:------:|:--:|
+    | Contiguous load | Simulated | Supported | Supported |
+    | 64-bit alignment requirement | Enforced | Enforced | Enforced |
+    | Predicate width (f32 / f16,bf16 / i8) | N=64/128/256 | N=64/128/256 | N=64/128/256 |
 
 ## Examples
 

@@ -129,15 +129,17 @@ Target profile 只会缩窄 PTO ISA，不会引入新的 ISA 语义。
 
 ## 约束
 
-- 架构可见的依赖顺序必须在目标调度后保留
-- target profile 可以缩窄支持集合，但不能重定义合法 PTO 语义
-- profile 专属特性不能写成通用 PTO 保证
+!!! warning "约束"
+    - 架构可见的依赖顺序必须在目标调度后保留
+    - target profile 可以缩窄支持集合，但不能重定义合法 PTO 语义
+    - profile 专属特性不能写成通用 PTO 保证
 
 ## 不允许的情形
 
-- 把 A5 专属特性写成 PTO 普遍保证
-- 把 CPU 模拟器的行为或性能当成硬件 profile 契约
-- 把 profile 限制写成 ISA 自相矛盾
+!!! danger "不允许的情形"
+    - 把 A5 专属特性写成 PTO 普遍保证
+    - 把 CPU 模拟器的行为或性能当成硬件 profile 契约
+    - 把 profile 限制写成 ISA 自相矛盾
 
 ## 相关页面
 

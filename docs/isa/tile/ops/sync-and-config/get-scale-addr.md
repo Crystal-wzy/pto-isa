@@ -64,13 +64,15 @@ PTO_INST RecordEvent GET_SCALE_ADDR(TileDataDst &dst, TileDataSrc &src, WaitEven
 
 ## Constraints
 
-- **Both `src` and `dst` must be Tile instances**.
-- Currently only works in Auto mode (Manual mode support planned for future releases).
+!!! warning "Constraints"
+    - **Both `src` and `dst` must be Tile instances**.
+    - Currently only works in Auto mode (Manual mode support planned for future releases).
 
 ## Cases That Are Not Allowed
 
-- Calling `pto.get_scale_addr` on A2/A3 profiles (unsupported).
-- Using `pto.get_scale_addr` in Manual mode (not yet supported).
+!!! danger "Cases That Are Not Allowed"
+    - Calling `pto.get_scale_addr` on A2/A3 profiles (unsupported).
+    - Using `pto.get_scale_addr` in Manual mode (not yet supported).
 
 ## Examples
 

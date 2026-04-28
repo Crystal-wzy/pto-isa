@@ -74,20 +74,22 @@ See [Producer Consumer Ordering](../memory-model/producer-consumer-ordering.md) 
 
 ## Constraints
 
-- Source and destination element types MUST have the same size: `sizeof(tile.dtype) == sizeof(gtensor.dtype)`.
-- Transfer size is determined by the destination tile's valid region for `TLOAD`, or source tile's valid region for `TSTORE`.
-- Layout compatibility between GM layout and tile layout is profile-dependent (see layout compatibility table above).
-- Gather/scatter index tiles must have compatible shapes.
-- `TSTORE` with `TileType::Acc` supports `AtomicType`: `AtomicNone`, `AtomicAdd`, `AtomicMax`, `AtomicMin` (A5 only).
-- `TSTORE_FP` is only legal for `TileType::Acc` on A2A3 and A5 and uses the fix-pipe sideband state carried by the auxiliary `fp` tile argument.
+!!! warning "Constraints"
+    - Source and destination element types MUST have the same size: `sizeof(tile.dtype) == sizeof(gtensor.dtype)`.
+    - Transfer size is determined by the destination tile's valid region for `TLOAD`, or source tile's valid region for `TSTORE`.
+    - Layout compatibility between GM layout and tile layout is profile-dependent (see layout compatibility table above).
+    - Gather/scatter index tiles must have compatible shapes.
+    - `TSTORE` with `TileType::Acc` supports `AtomicType`: `AtomicNone`, `AtomicAdd`, `AtomicMax`, `AtomicMin` (A5 only).
+    - `TSTORE_FP` is only legal for `TileType::Acc` on A2A3 and A5 and uses the fix-pipe sideband state carried by the auxiliary `fp` tile argument.
 
 ## Cases That Are Not Allowed
 
-- Transferring to or from an uninitialized tile register.
-- Using a GlobalTensor with strides incompatible with the transfer pattern.
-- Accessing GM addresses outside the tensor's declared shape.
-- Using `TSTORE_FP` with a non-Acc tile type.
-- Using atomic store variants on CPU simulator.
+!!! danger "Cases That Are Not Allowed"
+    - Transferring to or from an uninitialized tile register.
+    - Using a GlobalTensor with strides incompatible with the transfer pattern.
+    - Accessing GM addresses outside the tensor's declared shape.
+    - Using `TSTORE_FP` with a non-Acc tile type.
+    - Using atomic store variants on CPU simulator.
 
 ## C++ Intrinsic
 

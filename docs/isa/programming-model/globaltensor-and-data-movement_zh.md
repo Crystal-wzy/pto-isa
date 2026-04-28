@@ -136,17 +136,19 @@ vreg -> vsts/vscatter -> UB -> copy_ubuf_to_gm -> GM
 
 ## 约束
 
-- 数据移动的合法性依赖源/目标指令集、布局和 target profile
-- 数据移动不会抹掉 valid-region 语义
-- 向量路径的 buffer/register 规则与 tile 路径不同，不能混用
-- DMA 完成前，不得假设向量计算已经看见数据
+!!! warning "约束"
+    - 数据移动的合法性依赖源/目标指令集、布局和 target profile
+    - 数据移动不会抹掉 valid-region 语义
+    - 向量路径的 buffer/register 规则与 tile 路径不同，不能混用
+    - DMA 完成前，不得假设向量计算已经看见数据
 
 ## 不允许的情形
 
-- 把需要显式移动的数据路径写成“自动可见”
-- 把 vector 路径和 tile 路径写成同一套合法性契约
-- 把 target-specific 快捷路径写成架构保证
-- 在 `copy_gm_to_ubuf` 完成前直接 `vlds`
+!!! danger "不允许的情形"
+    - 把需要显式移动的数据路径写成“自动可见”
+    - 把 vector 路径和 tile 路径写成同一套合法性契约
+    - 把 target-specific 快捷路径写成架构保证
+    - 在 `copy_gm_to_ubuf` 完成前直接 `vlds`
 
 ## 示例
 

@@ -36,9 +36,10 @@
 
 ## 不允许的情形
 
-- 等待未建立事件
-- 使用目标不支持的 pipe / event
-- 在缺少同步的情况下跨越 producer-consumer 边
+!!! danger "不允许的情形"
+    - 等待未建立事件
+    - 使用目标不支持的 pipe / event
+    - 在缺少同步的情况下跨越 producer-consumer 边
 
 ## 相关页面
 

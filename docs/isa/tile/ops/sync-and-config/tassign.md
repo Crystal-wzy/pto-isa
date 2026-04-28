@@ -96,15 +96,17 @@ Binds the tile variable to a physical address. Using the same physical address f
 
 ## Constraints
 
-- Two non-alias tiles must not use the same physical address without an intervening `TSYNC`.
-- Configuration state must only be used where later instructions document the dependency.
-- Programs must not treat manual placement as a portable substitute for legal PTO behavior.
+!!! warning "Constraints"
+    - Two non-alias tiles must not use the same physical address without an intervening `TSYNC`.
+    - Configuration state must only be used where later instructions document the dependency.
+    - Programs must not treat manual placement as a portable substitute for legal PTO behavior.
 
 ## Exceptions
 
-- In Auto mode, `TASSIGN(tile, addr)` is a no-op because the compiler/runtime manages placement.
-- If `obj` is a `GlobalTensor`, `addr` must be a pointer type matching `GlobalTensor::DType`.
-- Using `TASSIGN` with an out-of-bounds address triggers a compile-time error (Form 2) or undefined behavior (Form 1).
+!!! danger "Exceptions"
+    - In Auto mode, `TASSIGN(tile, addr)` is a no-op because the compiler/runtime manages placement.
+    - If `obj` is a `GlobalTensor`, `addr` must be a pointer type matching `GlobalTensor::DType`.
+    - Using `TASSIGN` with an out-of-bounds address triggers a compile-time error (Form 2) or undefined behavior (Form 1).
 
 ## Examples
 

@@ -67,25 +67,27 @@ Participates in collective communication over the interconnect. Only the root ra
 
 ## Constraints
 
-- **Type constraints**:
-  - `ParallelGroup::value_type::RawDType` must equal `GlobalSrcData::RawDType`.
-  - `TileData::DType` must equal `GlobalSrcData::RawDType`.
-- **Memory constraints**:
-  - `srcGlobalData` must point to local memory (current NPU).
-  - Staging tiles must be pre-allocated in UB.
-- **ParallelGroup constraints**:
-  - `parallelGroup.tensors[k]` must refer to rank `k`'s destination buffer.
-  - `parallelGroup.GetRootIdx()` identifies the broadcast root.
-  - All destination tensors are assumed to have the same shape and strides.
-- **Chunked mode constraints** (when data exceeds a single UB tile):
-  - If `TileData` has static `ValidRow`, `GetShape(DIM_3)` must be divisible by `ValidRow`. Use a tile with `DYNAMIC` ValidRow for partial row support.
-  - If `TileData` has static `ValidCol`, `GetShape(DIM_4)` must be divisible by `ValidCol`. Use a tile with `DYNAMIC` ValidCol for partial column support.
+!!! warning "Constraints"
+    - **Type constraints**:
+      - `ParallelGroup::value_type::RawDType` must equal `GlobalSrcData::RawDType`.
+      - `TileData::DType` must equal `GlobalSrcData::RawDType`.
+    - **Memory constraints**:
+      - `srcGlobalData` must point to local memory (current NPU).
+      - Staging tiles must be pre-allocated in UB.
+    - **ParallelGroup constraints**:
+      - `parallelGroup.tensors[k]` must refer to rank `k`'s destination buffer.
+      - `parallelGroup.GetRootIdx()` identifies the broadcast root.
+      - All destination tensors are assumed to have the same shape and strides.
+    - **Chunked mode constraints** (when data exceeds a single UB tile):
+      - If `TileData` has static `ValidRow`, `GetShape(DIM_3)` must be divisible by `ValidRow`. Use a tile with `DYNAMIC` ValidRow for partial row support.
+      - If `TileData` has static `ValidCol`, `GetShape(DIM_4)` must be divisible by `ValidCol`. Use a tile with `DYNAMIC` ValidCol for partial column support.
 
 ## Exceptions
 
-- Non-root ranks calling `pto.tbroadcast` produces undefined behavior.
-- Using incompatible tensor types or ranks is rejected by the verifier.
-- Accessing a rank's destination buffer outside its declared shape is undefined.
+!!! danger "Exceptions"
+    - Non-root ranks calling `pto.tbroadcast` produces undefined behavior.
+    - Using incompatible tensor types or ranks is rejected by the verifier.
+    - Accessing a rank's destination buffer outside its declared shape is undefined.
 
 ## Examples
 

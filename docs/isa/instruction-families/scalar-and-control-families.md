@@ -107,20 +107,22 @@ Some scalar/control ops belong to shared dialect instruction sets (e.g., `scf.if
 
 ## Constraints
 
-- **Pipe/event spaces** differ between A2/A3 and A5 profiles; portable code must use the documented PTO contract plus the selected profile.
-- **Event ordering** requires matching `set_flag`/`wait_flag` pairs; waiting on an unestablished event is illegal.
-- **DMA parameters** must be configured before initiating transfer; incorrect loop sizes or strides produce undefined results.
-- **Predicate width** must match the expected mask width for the target profile.
-- **Pipe identifiers** not supported by the target profile produce verification errors.
+!!! warning "Constraints"
+    - **Pipe/event spaces** differ between A2/A3 and A5 profiles; portable code must use the documented PTO contract plus the selected profile.
+    - **Event ordering** requires matching `set_flag`/`wait_flag` pairs; waiting on an unestablished event is illegal.
+    - **DMA parameters** must be configured before initiating transfer; incorrect loop sizes or strides produce undefined results.
+    - **Predicate width** must match the expected mask width for the target profile.
+    - **Pipe identifiers** not supported by the target profile produce verification errors.
 
 ## Cases That Are Not Allowed
 
-- Using pipe or event identifiers not supported by the target profile.
-- Waiting on an event that was never established by a matching producer.
-- Configuring DMA with inconsistent loop sizes and strides.
-- Mixing predicate widths that do not match the target operation.
-- Issuing a vector load before `copy_gm_to_ubuf` completes without an intervening `wait_flag`.
-- Issuing `copy_ubuf_to_gm` before vector store completes without an intervening `wait_flag`.
+!!! danger "Cases That Are Not Allowed"
+    - Using pipe or event identifiers not supported by the target profile.
+    - Waiting on an event that was never established by a matching producer.
+    - Configuring DMA with inconsistent loop sizes and strides.
+    - Mixing predicate widths that do not match the target operation.
+    - Issuing a vector load before `copy_gm_to_ubuf` completes without an intervening `wait_flag`.
+    - Issuing `copy_ubuf_to_gm` before vector store completes without an intervening `wait_flag`.
 
 ## Syntax
 

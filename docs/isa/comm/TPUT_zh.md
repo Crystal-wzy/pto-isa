@@ -54,23 +54,24 @@ PTO_INST RecordEvent TPUT(GlobalDstData &dstGlobalData, GlobalSrcData &srcGlobal
 
 ## 约束
 
-### 类型约束
+!!! warning "约束"
+    ### 类型约束
 
-- `GlobalSrcData::RawDType` 必须等于 `GlobalDstData::RawDType`
-- `TileData::DType` 必须等于 `GlobalSrcData::RawDType`
-- `GlobalSrcData::layout` 必须等于 `GlobalDstData::layout`
+    - `GlobalSrcData::RawDType` 必须等于 `GlobalDstData::RawDType`
+    - `TileData::DType` 必须等于 `GlobalSrcData::RawDType`
+    - `GlobalSrcData::layout` 必须等于 `GlobalDstData::layout`
 
-### 内存约束
+    ### 内存约束
 
-- `dstGlobalData` 必须指向远端地址（目标 NPU）
-- `srcGlobalData` 必须指向本地地址（当前 NPU）
-- `stagingTileData`、`pingTile`、`pongTile` 必须预先在 UB 中分配
+    - `dstGlobalData` 必须指向远端地址（目标 NPU）
+    - `srcGlobalData` 必须指向本地地址（当前 NPU）
+    - `stagingTileData`、`pingTile`、`pongTile` 必须预先在 UB 中分配
 
-### 原子与双缓冲约束
+    ### 原子与双缓冲约束
 
-- 当前接口支持 `AtomicNone` 与 `AtomicAdd`
-- `pingTile` 与 `pongTile` 的类型和维度必须一致
-- 两者必须位于不重叠的 UB 偏移处
+    - 当前接口支持 `AtomicNone` 与 `AtomicAdd`
+    - `pingTile` 与 `pongTile` 的类型和维度必须一致
+    - 两者必须位于不重叠的 UB 偏移处
 
 ## 示例
 

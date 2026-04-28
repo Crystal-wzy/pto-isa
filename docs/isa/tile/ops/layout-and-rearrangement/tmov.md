@@ -198,12 +198,13 @@ PTO_INST RecordEvent TMOV_FP(DstTileData &dst, SrcTileData &src, FpTileData &fp,
 
 ## Constraints
 
-- **Shape**: `SrcTileData::Rows == DstTileData::Rows` and `SrcTileData::Cols == DstTileData::Cols`
-- **`reluMode`**: `ReluPreMode::{NoRelu, NormalRelu}`
-- **`mode`**: `AccToVecMode::{SingleModeVec0, SingleModeVec1, DualModeSplitM, DualModeSplitN}`
-- **`FpTileData::Loc`**: Must be `TileType::Scaling` on both A2/A3 and A5 (verified by `static_assert`)
-- **Vec→Vec**: Shape must match exactly
-- **Mat→Left/Right/Bias/Scaling**: Compile-time restricted by tile type
+!!! warning "Constraints"
+    - **Shape**: `SrcTileData::Rows == DstTileData::Rows` and `SrcTileData::Cols == DstTileData::Cols`
+    - **`reluMode`**: `ReluPreMode::{NoRelu, NormalRelu}`
+    - **`mode`**: `AccToVecMode::{SingleModeVec0, SingleModeVec1, DualModeSplitM, DualModeSplitN}`
+    - **`FpTileData::Loc`**: Must be `TileType::Scaling` on both A2/A3 and A5 (verified by `static_assert`)
+    - **Vec→Vec**: Shape must match exactly
+    - **Mat→Left/Right/Bias/Scaling**: Compile-time restricted by tile type
 
 ## Common Patterns
 

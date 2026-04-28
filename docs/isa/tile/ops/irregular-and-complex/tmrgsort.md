@@ -96,25 +96,28 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Constraints
 
-- **Single-list variant (`TMRGSORT(dst, src, blockLen)`)**:
-    - `blockLen` must be a multiple of 64 (as checked by the implementation).
-    - `src.GetValidCol()` must be an integer multiple of `blockLen * 4`.
-    - `repeatTimes = src.GetValidCol() / (blockLen * 4)` must be in `[1, 255]`.
+!!! warning "Constraints"
+    - **Single-list variant (`TMRGSORT(dst, src, blockLen)`)**:
+        - `blockLen` must be a multiple of 64 (as checked by the implementation).
+        - `src.GetValidCol()` must be an integer multiple of `blockLen * 4`.
+        - `repeatTimes = src.GetValidCol() / (blockLen * 4)` must be in `[1, 255]`.
 
-- **Multi-list variants**:
-    - `tmp` is required and `executedNumList` is written by the implementation; supported list counts and exact semantics are target-defined.
+    - **Multi-list variants**:
+        - `tmp` is required and `executedNumList` is written by the implementation; supported list counts and exact semantics are target-defined.
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
-- Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
+!!! danger "Exceptions"
+    - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier or by the selected backend instruction set.
+    - Programs must not rely on behavior outside the documented legal domain of this operation, even if one backend currently accepts it.
 
 ## Target-Profile Restrictions
 
-- **Implementation checks (A2A3/A5)**:
-    - Element type must be `half` or `float` and must match across `dst/tmp/src*` tiles.
-    - All tiles must be `TileType::Vec`, row-major, and have `Rows == 1` (list stored in a single row).
-    - UB memory usage is checked (compile-time and runtime) against target limits (single `Cols` across inputs plus `tmp`/`dst`).
+??? info "Target-Profile Restrictions"
+    - **Implementation checks (A2A3/A5)**:
+        - Element type must be `half` or `float` and must match across `dst/tmp/src*` tiles.
+        - All tiles must be `TileType::Vec`, row-major, and have `Rows == 1` (list stored in a single row).
+        - UB memory usage is checked (compile-time and runtime) against target limits (single `Cols` across inputs plus `tmp`/`dst`).
 
 ## Examples
 

@@ -63,17 +63,19 @@
 
 ## 约束
 
-- `TRESHAPE` 要求总元素数保持不变。
-- `TEXTRACT` 的 offset 与子形状必须落在源 tile 声明范围内。
-- `TINSERT` 插入后的区域必须落在目标 tile 声明范围内。
-- `*_fp` 变体要求填充值与 tile 元素类型兼容。
-- `TIMG2COL` 依赖 kernel、padding、stride 等配置，且会被具体 profile 收窄。
+!!! warning "约束"
+    - `TRESHAPE` 要求总元素数保持不变。
+    - `TEXTRACT` 的 offset 与子形状必须落在源 tile 声明范围内。
+    - `TINSERT` 插入后的区域必须落在目标 tile 声明范围内。
+    - `*_fp` 变体要求填充值与 tile 元素类型兼容。
+    - `TIMG2COL` 依赖 kernel、padding、stride 等配置，且会被具体 profile 收窄。
 
 ## 不允许的情形
 
-- reshape 到不同总元素数的形状；
-- 用越界 offset 做 extract / insert；
-- 在不支持的 profile 上把 FP8 与 `TIMG2COL` 组合使用。
+!!! danger "不允许的情形"
+    - reshape 到不同总元素数的形状；
+    - 用越界 offset 做 extract / insert；
+    - 在不支持的 profile 上把 FP8 与 `TIMG2COL` 组合使用。
 
 ## 相关页面
 

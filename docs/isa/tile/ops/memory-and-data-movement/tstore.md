@@ -118,63 +118,64 @@ After the store completes, the data is written to `dst`. With atomic modes, valu
 
 ## Constraints
 
-- **Valid region**: Transfer size is `src.GetValidRow()` × `src.GetValidCol()`.
-- **Element size match**: `sizeof(tile.dtype) == sizeof(gtensor.dtype)`.
-- **Layout compatibility**: Tile layout and GM layout must be a supported combination. See target-specific restrictions below.
-- **Atomic modes**: Only supported on `TileType::Acc`. Supported modes: `AtomicNone`, `AtomicAdd`, `AtomicMax`, `AtomicMin` (A5 only).
-- **Fix-pipe**: Only `TileType::Acc` is supported as the source. The `fp` tile must be `TileType::Scaling`. The fix-pipe path does not support arbitrary `ReluPreMode` on all backends — see target restrictions.
+!!! warning "Constraints"
+    - **Valid region**: Transfer size is `src.GetValidRow()` × `src.GetValidCol()`.
+    - **Element size match**: `sizeof(tile.dtype) == sizeof(gtensor.dtype)`.
+    - **Layout compatibility**: Tile layout and GM layout must be a supported combination. See target-specific restrictions below.
+    - **Atomic modes**: Only supported on `TileType::Acc`. Supported modes: `AtomicNone`, `AtomicAdd`, `AtomicMax`, `AtomicMin` (A5 only).
+    - **Fix-pipe**: Only `TileType::Acc` is supported as the source. The `fp` tile must be `TileType::Scaling`. The fix-pipe path does not support arbitrary `ReluPreMode` on all backends — see target restrictions.
 
 ## Target-Profile Restrictions
 
-### A2/A3
+??? info "Target-Profile Restrictions"
+    === "A2/A3"
+        **Standard store:**
 
-**Standard store:**
+        | Source Tile Type | Requirements |
+        |-----------------|-------------|
+        | `Vec` / `Mat` | `sizeof(TileData::DType)` must match `sizeof(GlobalData::DType)`. Supported dtypes: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `half`, `bfloat16_t`, `float`. |
+        | `Acc` (non-quantized) | Destination dtype must be `__gm__ int32_t / float / half / bfloat16_t`. |
+        | `Acc` (atomic) | AtomicAdd on `int32_t` or `float`. |
+        | `int64_t/uint64_t` | Only ND→ND or DN→DN layout. |
 
-| Source Tile Type | Requirements |
-|-----------------|-------------|
-| `Vec` / `Mat` | `sizeof(TileData::DType)` must match `sizeof(GlobalData::DType)`. Supported dtypes: `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int32_t`, `uint32_t`, `int64_t`, `uint64_t`, `half`, `bfloat16_t`, `float`. |
-| `Acc` (non-quantized) | Destination dtype must be `__gm__ int32_t / float / half / bfloat16_t`. |
-| `Acc` (atomic) | AtomicAdd on `int32_t` or `float`. |
-| `int64_t/uint64_t` | Only ND→ND or DN→DN layout. |
+        **Accumulator shape constraints (A2/A3):**
+        - `1 <= TileData::Cols <= 4095`
+        - If ND layout: `1 <= TileData::Rows <= 8192`
+        - If NZ layout: `1 <= TileData::Rows <= 65535` and `TileData::Cols % 16 == 0`
 
-**Accumulator shape constraints (A2/A3):**
-- `1 <= TileData::Cols <= 4095`
-- If ND layout: `1 <= TileData::Rows <= 8192`
-- If NZ layout: `1 <= TileData::Rows <= 65535` and `TileData::Cols % 16 == 0`
+        **Fix-pipe store (TSTORE_FP on A2/A3):**
 
-**Fix-pipe store (TSTORE_FP on A2/A3):**
+        | Requirement | Value |
+        |------------|-------|
+        | Destination layout | ND or NZ only |
+        | Source dtype | `int32_t` or `float` |
+        | Static row constraint | `1 <= TileData::Cols <= 4095`; ND: `Rows <= 8192`; NZ: `Rows <= 65535`, `Cols % 16 == 0` |
+        | Runtime col constraint | `1 <= src.GetValidCol() <= 4095` |
+        | FpTileData | No explicit `static_assert`; used via `set_fpc(...)` internally |
 
-| Requirement | Value |
-|------------|-------|
-| Destination layout | ND or NZ only |
-| Source dtype | `int32_t` or `float` |
-| Static row constraint | `1 <= TileData::Cols <= 4095`; ND: `Rows <= 8192`; NZ: `Rows <= 65535`, `Cols % 16 == 0` |
-| Runtime col constraint | `1 <= src.GetValidCol() <= 4095` |
-| FpTileData | No explicit `static_assert`; used via `set_fpc(...)` internally |
+    === "A5"
+        **Standard store:**
 
-### A5
+        | Source Tile Type | Notes |
+        |-----------------|-------|
+        | `Vec` | `sizeof(TileData::DType)` must match `sizeof(GlobalData::DType)`. Additional dtypes on A5: `float8_e4m3_t`, `float8_e5m2_t`, `hifloat8_t`, `float4_e1m2x2_t`, `float4_e2m1x2_t`. |
+        | `Acc` | Destination layout must be ND or NZ. Source dtype must be `int32_t` or `float`. Additional alignment: ND row-major width in bytes must be a multiple of 32. |
+        | `Acc` (atomic) | `AtomicAdd`, `AtomicMax`, `AtomicMin` on `int32_t`. |
 
-**Standard store:**
+        **Fix-pipe store (TSTORE_FP on A5):**
 
-| Source Tile Type | Notes |
-|-----------------|-------|
-| `Vec` | `sizeof(TileData::DType)` must match `sizeof(GlobalData::DType)`. Additional dtypes on A5: `float8_e4m3_t`, `float8_e5m2_t`, `hifloat8_t`, `float4_e1m2x2_t`, `float4_e2m1x2_t`. |
-| `Acc` | Destination layout must be ND or NZ. Source dtype must be `int32_t` or `float`. Additional alignment: ND row-major width in bytes must be a multiple of 32. |
-| `Acc` (atomic) | `AtomicAdd`, `AtomicMax`, `AtomicMin` on `int32_t`. |
-
-**Fix-pipe store (TSTORE_FP on A5):**
-
-| Requirement | Value |
-|------------|-------|
-| Destination layout | ND or NZ |
-| Source dtype | `int32_t` or `float` |
-| FpTileData | Used via `CheckStaticAcc<..., true>()` validation |
+        | Requirement | Value |
+        |------------|-------|
+        | Destination layout | ND or NZ |
+        | Source dtype | `int32_t` or `float` |
+        | FpTileData | Used via `CheckStaticAcc<..., true>()` validation |
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier.
-- Programs must not rely on behavior outside the documented legal domain.
-- Calling `TSTORE_FP` on a non-accumulator tile is rejected by the backend.
+!!! danger "Exceptions"
+    - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier.
+    - Programs must not rely on behavior outside the documented legal domain.
+    - Calling `TSTORE_FP` on a non-accumulator tile is rejected by the backend.
 
 ## Common Patterns
 

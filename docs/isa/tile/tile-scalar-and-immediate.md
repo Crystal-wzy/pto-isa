@@ -68,16 +68,18 @@ The scalar type must be compatible with the tile element type. No implicit type 
 
 ## Constraints
 
-- The scalar type MUST be compatible with the tile element type.
-- Shift operations (`TSHLS`, `TSHRS`) interpret the scalar as an unsigned integer shift count.
-- Saturating variants (`TADDSC`, `TSUBSC`) clamp results to type min/max on overflow/underflow.
-- Comparison variants produce a predicate tile, not a numeric tile.
+!!! warning "Constraints"
+    - The scalar type MUST be compatible with the tile element type.
+    - Shift operations (`TSHLS`, `TSHRS`) interpret the scalar as an unsigned integer shift count.
+    - Saturating variants (`TADDSC`, `TSUBSC`) clamp results to type min/max on overflow/underflow.
+    - Comparison variants produce a predicate tile, not a numeric tile.
 
 ## Cases That Are Not Allowed
 
-- **MUST NOT** use a scalar type that is not compatible with the tile element type.
-- **MUST NOT** use a shift count `>=` element bit-width.
-- **MUST NOT** rely on implicit type promotion between scalar and tile types.
+!!! danger "Cases That Are Not Allowed"
+    - **MUST NOT** use a scalar type that is not compatible with the tile element type.
+    - **MUST NOT** use a shift count `>=` element bit-width.
+    - **MUST NOT** rely on implicit type promotion between scalar and tile types.
 
 ## C++ Intrinsic
 

@@ -130,22 +130,24 @@ copy_gm_to_ubuf ──(set_flag)──► wait_flag ──► vlds ──► vad
 
 ## Constraints
 
-- **Vector length** (`N`) is determined by the element type (see table above); programs do not choose `N` directly.
-- **Predicate width** must match the vector length `N` for predicate-gated operations.
-- **Alignment requirements** vary by operation and target profile:
-  - `vlds` / `vsld`: A5 requires 32B alignment for NORM mode; other profiles may be more permissive.
-  - `vstu` / `vstus` / `vstur`: **A5-only**; not supported on CPU or A2/A3.
-- **Type combinations** for conversion and arithmetic operations are defined per-op.
-- No implicit type promotion: all operands must have compatible types.
+!!! warning "Constraints"
+    - **Vector length** (`N`) is determined by the element type (see table above); programs do not choose `N` directly.
+    - **Predicate width** must match the vector length `N` for predicate-gated operations.
+    - **Alignment requirements** vary by operation and target profile:
+      - `vlds` / `vsld`: A5 requires 32B alignment for NORM mode; other profiles may be more permissive.
+      - `vstu` / `vstus` / `vstur`: **A5-only**; not supported on CPU or A2/A3.
+    - **Type combinations** for conversion and arithmetic operations are defined per-op.
+    - No implicit type promotion: all operands must have compatible types.
 
 ## Cases That Are Not Allowed
 
-- Using a predicate mask whose width does not match the target vector length.
-- Accessing memory with an illegal alignment for the target profile.
-- Relying on undefined lane behavior when predicates mask some lanes (must not depend on the identity-element value).
-- Using `vstu` / `vstus` / `vstur` on CPU or A2/A3 (A5-only ops).
-- Mixing vector types within a single operation unless the operation explicitly supports it.
-- Issuing a vector store before the corresponding DMA copy is complete without an intervening `wait_flag`.
+!!! danger "Cases That Are Not Allowed"
+    - Using a predicate mask whose width does not match the target vector length.
+    - Accessing memory with an illegal alignment for the target profile.
+    - Relying on undefined lane behavior when predicates mask some lanes (must not depend on the identity-element value).
+    - Using `vstu` / `vstus` / `vstur` on CPU or A2/A3 (A5-only ops).
+    - Mixing vector types within a single operation unless the operation explicitly supports it.
+    - Issuing a vector store before the corresponding DMA copy is complete without an intervening `wait_flag`.
 
 ## A5-Only Operations
 

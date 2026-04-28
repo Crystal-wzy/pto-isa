@@ -142,19 +142,21 @@ void consumer_mat(MatTile& matTile) {
 
 ## Constraints
 
-- `TileCons::Loc` must be `TileType::Vec` or `TileType::Mat`.
-- For GM-path consumers on A5 with `useLocalFiFo = true`: `TASSIGN` is issued to the local FIFO buffer base; `TLOAD` then reads from GM into that local address.
-- `FlagID` must be in range and unused by any other synchronization operation on the same pipeline.
-- The producer must have issued a matching `TPUSH` before the consumer calls `TPOP`; otherwise the consumer waits indefinitely.
-- Slot index: `tileIndex % SlotNum` — the ring wraps around.
-- When `isWait = false`, the consumer skips the wait; caller must ensure data is already ready.
-- When `isFree = false`, the consumer skips the free signal; caller must ensure the producer's next allocation wait succeeds.
+!!! warning "Constraints"
+    - `TileCons::Loc` must be `TileType::Vec` or `TileType::Mat`.
+    - For GM-path consumers on A5 with `useLocalFiFo = true`: `TASSIGN` is issued to the local FIFO buffer base; `TLOAD` then reads from GM into that local address.
+    - `FlagID` must be in range and unused by any other synchronization operation on the same pipeline.
+    - The producer must have issued a matching `TPUSH` before the consumer calls `TPOP`; otherwise the consumer waits indefinitely.
+    - Slot index: `tileIndex % SlotNum` — the ring wraps around.
+    - When `isWait = false`, the consumer skips the wait; caller must ensure data is already ready.
+    - When `isFree = false`, the consumer skips the free signal; caller must ensure the producer's next allocation wait succeeds.
 
 ## Target-Profile Restrictions
 
-- **CPU simulator**: Not available. Requires NPU inter-core synchronization infrastructure.
-- **A2/A3**: `DIR_C2V`, `DIR_V2C`, `DIR_BOTH`, `DIR_V2C_CTRL`. Synchronization via `wait_flag_dev` and `ffts_cross_core_sync`.
-- **A5**: All direction types. Synchronization via `wait_intra_block` and `set_intra_block`. Additional `*_GM` paths with GM load. Sub-block support (`FlagID + 16`) for 2-Vec-core configurations.
+??? info "Target-Profile Restrictions"
+    - **CPU simulator**: Not available. Requires NPU inter-core synchronization infrastructure.
+    - **A2/A3**: `DIR_C2V`, `DIR_V2C`, `DIR_BOTH`, `DIR_V2C_CTRL`. Synchronization via `wait_flag_dev` and `ffts_cross_core_sync`.
+    - **A5**: All direction types. Synchronization via `wait_intra_block` and `set_intra_block`. Additional `*_GM` paths with GM load. Sub-block support (`FlagID + 16`) for 2-Vec-core configurations.
 
 ## Common Patterns
 

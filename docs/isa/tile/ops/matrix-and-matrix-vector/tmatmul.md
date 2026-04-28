@@ -82,37 +82,40 @@ No architectural side effects beyond producing the destination tile. Does not im
 
 ## Constraints
 
-- **Shape constraints**:
-  - `aMatrix.GetValidRow()` = `cMatrix.GetValidRow()` = `M`
-  - `aMatrix.GetValidCol()` = `bMatrix.GetValidRow()` = `K`
-  - `bMatrix.GetValidCol()` = `cMatrix.GetValidCol()` = `N`
-  - Runtime `m/k/n` must be in `[1, 4095]`
-- **Tile roles**: `aMatrix.Loc == Left`, `bMatrix.Loc == Right`, `cMatrix.Loc == Acc`.
-- Programs must not assume implicit broadcasting, reshaping, or valid-region repair.
+!!! warning "Constraints"
+    - **Shape constraints**:
+      - `aMatrix.GetValidRow()` = `cMatrix.GetValidRow()` = `M`
+      - `aMatrix.GetValidCol()` = `bMatrix.GetValidRow()` = `K`
+      - `bMatrix.GetValidCol()` = `cMatrix.GetValidCol()` = `N`
+      - Runtime `m/k/n` must be in `[1, 4095]`
+    - **Tile roles**: `aMatrix.Loc == Left`, `bMatrix.Loc == Right`, `cMatrix.Loc == Acc`.
+    - Programs must not assume implicit broadcasting, reshaping, or valid-region repair.
 
 ## Exceptions
 
-- Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier.
-- Programs must not rely on behavior outside the documented legal domain.
+!!! danger "Exceptions"
+    - Illegal operand tuples, unsupported types, invalid layout combinations, or unsupported target-profile modes are rejected by the verifier.
+    - Programs must not rely on behavior outside the documented legal domain.
 
 ## Target-Profile Restrictions
 
-**A2/A3**:
-- Supported `(CType, AType, BType)` triples:
-  - `(int32_t, int8_t, int8_t)`
-  - `(float, half, half)`
-  - `(float, float, float)`
-  - `(float, bfloat16_t, bfloat16_t)`
-- Static shape: `TileLeft::Rows == TileRes::Rows`, `TileLeft::Cols == TileRight::Rows`, `TileRight::Cols == TileRes::Cols`.
+??? info "Target-Profile Restrictions"
+    **A2/A3**:
+    - Supported `(CType, AType, BType)` triples:
+      - `(int32_t, int8_t, int8_t)`
+      - `(float, half, half)`
+      - `(float, float, float)`
+      - `(float, bfloat16_t, bfloat16_t)`
+    - Static shape: `TileLeft::Rows == TileRes::Rows`, `TileLeft::Cols == TileRight::Rows`, `TileRight::Cols == TileRes::Cols`.
 
-**A5**:
-- Accumulator type: `int32_t` or `float`.
-- If `int32_t`: `AType == int8_t` and `BType == int8_t`.
-- If `float`: supports `half/bfloat16_t/float` and selected fp8 pairs.
-- Fractal/layout constraints:
-  - Left: `Loc == Left`, `!isRowMajor`, `SFractal == RowMajor`
-  - Right: `Loc == Right`, `isRowMajor`, `SFractal == ColMajor`
-  - Acc: `Loc == Acc`, `!isRowMajor`, `SFractal == RowMajor`
+    **A5**:
+    - Accumulator type: `int32_t` or `float`.
+    - If `int32_t`: `AType == int8_t` and `BType == int8_t`.
+    - If `float`: supports `half/bfloat16_t/float` and selected fp8 pairs.
+    - Fractal/layout constraints:
+      - Left: `Loc == Left`, `!isRowMajor`, `SFractal == RowMajor`
+      - Right: `Loc == Right`, `isRowMajor`, `SFractal == ColMajor`
+      - Acc: `Loc == Acc`, `!isRowMajor`, `SFractal == RowMajor`
 
 ## Examples
 

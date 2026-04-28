@@ -125,18 +125,20 @@ The FTZ (flush-to-zero) behavior for denormals is **hardware-specific**:
 
 ## Constraints
 
-- Instruction set pages must define accepted operand/result classes.
-- Type errors must stay distinguishable from deeper legality failures (shape, layout, location intent, target profile).
-- Vector instruction docs must make vector-register, mask, pointer, and alignment state explicit.
-- Tile instruction docs must make tile role, shape, and valid-region interactions explicit.
-- No implicit type promotion: `tadd(t, i8_tile, f32_immediate)` is illegal unless an explicit `tcvt` converts one operand first.
+!!! warning "Constraints"
+    - Instruction set pages must define accepted operand/result classes.
+    - Type errors must stay distinguishable from deeper legality failures (shape, layout, location intent, target profile).
+    - Vector instruction docs must make vector-register, mask, pointer, and alignment state explicit.
+    - Tile instruction docs must make tile role, shape, and valid-region interactions explicit.
+    - No implicit type promotion: `tadd(t, i8_tile, f32_immediate)` is illegal unless an explicit `tcvt` converts one operand first.
 
 ## Cases That Are Not Allowed
 
-- Treating type class checks as though they cover every backend legality fact.
-- Conflating scalar state with tile or vector payload state.
-- Documenting vector and tile payload classes as if they were interchangeable.
-- Relying on implicit type conversion without an explicit `tcvt`/`vcvt`.
+!!! danger "Cases That Are Not Allowed"
+    - Treating type class checks as though they cover every backend legality fact.
+    - Conflating scalar state with tile or vector payload state.
+    - Documenting vector and tile payload classes as if they were interchangeable.
+    - Relying on implicit type conversion without an explicit `tcvt`/`vcvt`.
 
 ## See Also
 

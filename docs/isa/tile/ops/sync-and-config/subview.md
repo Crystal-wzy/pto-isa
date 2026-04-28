@@ -64,17 +64,19 @@ PTO_INST RecordEvent SUBVIEW(TileDataDst &dst, TileDataSrc &src, uint16_t rowIdx
 
 ## Constraints
 
-Enforced by `SUBVIEW_IMPL`:
+!!! warning "Constraints"
+    Enforced by `SUBVIEW_IMPL`:
 
-- **Tile type must match**: `TileDataSrc::Loc == TileDataDst::Loc`
-- **Both tiles must have the same static capacity**: `TileDataSrc::Rows == TileDataDst::Rows` and `TileDataSrc::Cols == TileDataDst::Cols`
-- **Both tiles must have the same BLayout**: `TileDataSrc::BFractal == TileDataDst::BFractal`
-- **Source valid region must contain destination**: The source tile's `validRow` (`validCol`) must be at least as big as the destination tile's `validRow` (`validCol`)
+    - **Tile type must match**: `TileDataSrc::Loc == TileDataDst::Loc`
+    - **Both tiles must have the same static capacity**: `TileDataSrc::Rows == TileDataDst::Rows` and `TileDataSrc::Cols == TileDataDst::Cols`
+    - **Both tiles must have the same BLayout**: `TileDataSrc::BFractal == TileDataDst::BFractal`
+    - **Source valid region must contain destination**: The source tile's `validRow` (`validCol`) must be at least as big as the destination tile's `validRow` (`validCol`)
 
 ## Cases That Are Not Allowed
 
-- Creating a subview where `rowIdx + dst.validRow > src.validRow` or `colIdx + dst.validCol > src.validCol`.
-- Mismatched tile types or layouts between `src` and `dst`.
+!!! danger "Cases That Are Not Allowed"
+    - Creating a subview where `rowIdx + dst.validRow > src.validRow` or `colIdx + dst.validCol > src.validCol`.
+    - Mismatched tile types or layouts between `src` and `dst`.
 
 ## Examples
 

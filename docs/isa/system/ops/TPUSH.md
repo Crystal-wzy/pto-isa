@@ -185,19 +185,21 @@ void producer_vec(VecTile& vTile) {
 
 ## Constraints
 
-- `TileProd::Loc` must be `TileType::Acc` or `TileType::Vec`.
-- `DirType` must be compatible with `TileProd::Loc` and `TileDataCons::Loc`.
-- `SlotNum × SlotSize` must not exceed the available GM region for the FIFO.
-- `FlagID` range: 0–7 per pipe type on A2/A3; 0–15 on A5 with intra-block flags.
-- When `isAllocate = false`, the producer skips the allocation wait; the caller must ensure the slot is free.
-- When `isRecord = false`, the producer skips the ready signal; the caller must ensure the consumer waits externally.
-- Pairing: each `TPUSH` should have a corresponding `TPOP` on the consumer side; skipping allocation or record breaks the protocol.
+!!! warning "Constraints"
+    - `TileProd::Loc` must be `TileType::Acc` or `TileType::Vec`.
+    - `DirType` must be compatible with `TileProd::Loc` and `TileDataCons::Loc`.
+    - `SlotNum × SlotSize` must not exceed the available GM region for the FIFO.
+    - `FlagID` range: 0–7 per pipe type on A2/A3; 0–15 on A5 with intra-block flags.
+    - When `isAllocate = false`, the producer skips the allocation wait; the caller must ensure the slot is free.
+    - When `isRecord = false`, the producer skips the ready signal; the caller must ensure the consumer waits externally.
+    - Pairing: each `TPUSH` should have a corresponding `TPOP` on the consumer side; skipping allocation or record breaks the protocol.
 
 ## Target-Profile Restrictions
 
-- **CPU simulator**: Not available. `TPUSH` and `TPOP` require the NPU inter-core synchronization infrastructure.
-- **A2/A3**: Supports `DIR_C2V`, `DIR_V2C`, `DIR_BOTH`, `DIR_V2C_CTRL`. FIFO paths: GM and local UB/MAT. Does not support `DIR_*_GM` variants.
-- **A5**: Supports all direction types including `DIR_C2V_GM`, `DIR_V2C_GM`, `DIR_BOTH_GM`. FIFO paths: GM, VEC_FIFO, MAT_FIFO, CTRL_FIFO. Intra-block synchronization uses `set_intra_block`/`wait_intra_block` instead of cross-core `ffts_*`.
+??? info "Target-Profile Restrictions"
+    - **CPU simulator**: Not available. `TPUSH` and `TPOP` require the NPU inter-core synchronization infrastructure.
+    - **A2/A3**: Supports `DIR_C2V`, `DIR_V2C`, `DIR_BOTH`, `DIR_V2C_CTRL`. FIFO paths: GM and local UB/MAT. Does not support `DIR_*_GM` variants.
+    - **A5**: Supports all direction types including `DIR_C2V_GM`, `DIR_V2C_GM`, `DIR_BOTH_GM`. FIFO paths: GM, VEC_FIFO, MAT_FIFO, CTRL_FIFO. Intra-block synchronization uses `set_intra_block`/`wait_intra_block` instead of cross-core `ffts_*`.
 
 ## Common Patterns
 

@@ -49,20 +49,21 @@ PTO_INST RecordEvent TCMPS(TileDataDst& dst, TileDataSrc0& src0, T src1, CmpMode
 
 ## 约束
 
-- **实现检查 (A2A3)**:
-    - `TileData::DType` must be one of: `int32_t`, `float`, `half`, `uint16_t`, `int16_t`.
-    - Tile 布局 must be row-major (`TileData::isRowMajor`).
-- **实现检查 (A5)**:
-    - `TileData::DType` must be one of: `int32_t`, `float`, `half`, `uint16_t`, `int16_t`.
-    - Tile 布局 must be row-major (`TileData::isRowMajor`).
-- **Common constraints**:
-    - Tile location must be vector (`TileData::Loc == TileType::Vec`).
-    - Static valid bounds: `TileData::ValidRow <= TileData::Rows` and `TileData::ValidCol <= TileData::Cols`.
-    - Runtime: `src0` and `dst` must have the same valid row/col.
-- **有效区域**:
-    - The op uses `dst.GetValidRow()` / `dst.GetValidCol()` as the iteration domain.
-- **Comparison modes**:
-    - Supports `CmpMode::EQ`, `CmpMode::NE`, `CmpMode::LT`, `CmpMode::GT`, `CmpMode::LE`, `CmpMode::GE`.
+!!! warning "约束"
+    - **实现检查 (A2A3)**:
+        - `TileData::DType` must be one of: `int32_t`, `float`, `half`, `uint16_t`, `int16_t`.
+        - Tile 布局 must be row-major (`TileData::isRowMajor`).
+    - **实现检查 (A5)**:
+        - `TileData::DType` must be one of: `int32_t`, `float`, `half`, `uint16_t`, `int16_t`.
+        - Tile 布局 must be row-major (`TileData::isRowMajor`).
+    - **Common constraints**:
+        - Tile location must be vector (`TileData::Loc == TileType::Vec`).
+        - Static valid bounds: `TileData::ValidRow <= TileData::Rows` and `TileData::ValidCol <= TileData::Cols`.
+        - Runtime: `src0` and `dst` must have the same valid row/col.
+    - **有效区域**:
+        - The op uses `dst.GetValidRow()` / `dst.GetValidCol()` as the iteration domain.
+    - **Comparison modes**:
+        - Supports `CmpMode::EQ`, `CmpMode::NE`, `CmpMode::LT`, `CmpMode::GT`, `CmpMode::LE`, `CmpMode::GE`.
 
 ## 示例
 

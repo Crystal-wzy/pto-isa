@@ -148,10 +148,11 @@ PTO_INST RecordEvent TEXTRACT_FP(DstTileData &dst, SrcTileData &src, FpTileData 
 
 ## Constraints
 
-- **Runtime bounds**: `indexRow + DstTileData::Rows <= SrcTileData::Rows` and `indexCol + DstTileData::Cols <= SrcTileData::Cols`
-- **Type match**: `DstTileData::DType` must equal `SrcTileData::DType`
-- **Fp tile location**: `FpTileData::Loc` must be `TileType::Scaling` (A2/A3 and A5 both enforce this via `static_assert`)
-- **Fix-pipe path**: The backend offsets the FPC address by `indexCol` (counted in units of the fp tile's element width) before configuring the fix-pipe
+!!! warning "Constraints"
+    - **Runtime bounds**: `indexRow + DstTileData::Rows <= SrcTileData::Rows` and `indexCol + DstTileData::Cols <= SrcTileData::Cols`
+    - **Type match**: `DstTileData::DType` must equal `SrcTileData::DType`
+    - **Fp tile location**: `FpTileData::Loc` must be `TileType::Scaling` (A2/A3 and A5 both enforce this via `static_assert`)
+    - **Fix-pipe path**: The backend offsets the FPC address by `indexCol` (counted in units of the fp tile's element width) before configuring the fix-pipe
 
 ## Common Patterns
 

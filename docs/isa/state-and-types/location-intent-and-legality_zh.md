@@ -120,10 +120,11 @@ GlobalTensor 操作数遵循单独的合法性路径：
 
 ## 不允许的情形
 
-- 在 tile 指令上偷用 vector-buffer 假设而没有显式桥接
-- 把 location-sensitive 指令集写成“所有本地存储角色都等价”
-- 用模糊的 implementation-defined 掩盖其实是 profile 缩窄的限制
-- 把 CPU 模拟器的宽松行为当成 A5 合法性的证据
+!!! danger "不允许的情形"
+    - 在 tile 指令上偷用 vector-buffer 假设而没有显式桥接
+    - 把 location-sensitive 指令集写成“所有本地存储角色都等价”
+    - 用模糊的 implementation-defined 掩盖其实是 profile 缩窄的限制
+    - 把 CPU 模拟器的宽松行为当成 A5 合法性的证据
 
 ## 相关页面
 

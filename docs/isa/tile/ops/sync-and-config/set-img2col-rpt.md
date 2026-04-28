@@ -61,15 +61,17 @@ This form is defined primarily by its ordering or configuration effect. It does 
 
 ## Constraints
 
-- This instruction is backend-specific and available only for backends that expose IMG2COL configuration state.
-- `src` must be a valid IMG2COL configuration tile type accepted by the backend implementation.
-- On A2/A3 and A5, this instruction writes to the FMATRIX RPT field; the exact bit-width of the repeat field (e.g., 4-bit vs 8-bit encoding) is target-specific.
-- Use this instruction before dependent `pto.timg2col` operations in the same execution stream.
+!!! warning "Constraints"
+    - This instruction is backend-specific and available only for backends that expose IMG2COL configuration state.
+    - `src` must be a valid IMG2COL configuration tile type accepted by the backend implementation.
+    - On A2/A3 and A5, this instruction writes to the FMATRIX RPT field; the exact bit-width of the repeat field (e.g., 4-bit vs 8-bit encoding) is target-specific.
+    - Use this instruction before dependent `pto.timg2col` operations in the same execution stream.
 
 ## Cases That Are Not Allowed
 
-- Calling `pto.set_img2col_rpt` on backends that do not expose FMATRIX configuration state.
-- Using an invalid IMG2COL configuration tile type.
+!!! danger "Cases That Are Not Allowed"
+    - Calling `pto.set_img2col_rpt` on backends that do not expose FMATRIX configuration state.
+    - Using an invalid IMG2COL configuration tile type.
 
 ## Examples
 

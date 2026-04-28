@@ -58,17 +58,19 @@ PTO_INST RecordEvent TDEQUANT(TileDataDst &dst, TileDataSrc &src, TileDataPara &
 
 ## 约束
 
-- `dst` 与 `src` 的 valid row / valid col 必须一致。
-- `scale` 和 `offset` 的行数必须与 `dst.GetValidRow()` 一致。
-- 当前仓内实现中，`dst` 为 `float` / `float32_t`。
-- 当前仓内实现中，`src` 为 `int8_t` 或 `int16_t`。
-- 当前仓内实现中，`scale` / `offset` 使用与 `dst` 相同的浮点元素类型。
-- 当前具体实现要求 row-major tile。
+!!! warning "约束"
+    - `dst` 与 `src` 的 valid row / valid col 必须一致。
+    - `scale` 和 `offset` 的行数必须与 `dst.GetValidRow()` 一致。
+    - 当前仓内实现中，`dst` 为 `float` / `float32_t`。
+    - 当前仓内实现中，`src` 为 `int8_t` 或 `int16_t`。
+    - 当前仓内实现中，`scale` / `offset` 使用与 `dst` 相同的浮点元素类型。
+    - 当前具体实现要求 row-major tile。
 
 ## 不允许的情形
 
-- 使用不支持的类型组合、layout 或不匹配的 valid region。
-- 把 `scale` / `offset` 当作按列变化的参数，除非目标 profile 另行文档化。
+!!! danger "不允许的情形"
+    - 使用不支持的类型组合、layout 或不匹配的 valid region。
+    - 把 `scale` / `offset` 当作按列变化的参数，除非目标 profile 另行文档化。
 
 ## Target-Profile 限制
 

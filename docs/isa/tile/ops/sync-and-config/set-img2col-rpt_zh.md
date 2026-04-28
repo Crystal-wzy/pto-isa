@@ -54,9 +54,10 @@ PTO_INST RecordEvent SET_IMG2COL_RPT(ConvTileData &src, WaitEvents &... events);
 
 ## 约束
 
-- 该指令仅适用于暴露 IMG2COL 配置状态的后端。
-- `src` 必须是后端实现接受的有效 IMG2COL 配置 tile 类型。
-- 应在同一执行流中依赖它的 `pto.timg2col` 操作之前使用。
+!!! warning "约束"
+    - 该指令仅适用于暴露 IMG2COL 配置状态的后端。
+    - `src` 必须是后端实现接受的有效 IMG2COL 配置 tile 类型。
+    - 应在同一执行流中依赖它的 `pto.timg2col` 操作之前使用。
 
 ## 另请参阅
 

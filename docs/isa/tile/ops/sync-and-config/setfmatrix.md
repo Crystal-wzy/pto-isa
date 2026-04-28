@@ -60,14 +60,16 @@ This form is defined primarily by its ordering or configuration effect. It does 
 
 ## Constraints
 
-- The tile must be a valid matrix tile type (`TileType::Mat`, `TileType::Left`, `TileType::Right`, or `TileType::Acc`) as required by the target profile.
-- On A5, the tile's shape must be compatible with the FMATRIX slot dimensions.
-- This instruction should be ordered before dependent matrix multiply operations (`pto.tmatmul`, `pto.tgemv`, etc.).
+!!! warning "Constraints"
+    - The tile must be a valid matrix tile type (`TileType::Mat`, `TileType::Left`, `TileType::Right`, or `TileType::Acc`) as required by the target profile.
+    - On A5, the tile's shape must be compatible with the FMATRIX slot dimensions.
+    - This instruction should be ordered before dependent matrix multiply operations (`pto.tmatmul`, `pto.tgemv`, etc.).
 
 ## Cases That Are Not Allowed
 
-- Binding a non-matrix tile type to FMATRIX on backends that require specific tile types.
-- Calling `pto.setfmatrix` twice for the same FMATRIX slot without an intervening operation that releases the binding.
+!!! danger "Cases That Are Not Allowed"
+    - Binding a non-matrix tile type to FMATRIX on backends that require specific tile types.
+    - Calling `pto.setfmatrix` twice for the same FMATRIX slot without an intervening operation that releases the binding.
 
 ## Examples
 

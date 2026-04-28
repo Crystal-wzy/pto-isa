@@ -69,19 +69,21 @@ Fill the padding region (declared tile area outside the valid region) with a spe
 
 ## Constraints
 
-- `TRESHAPE` requires the total element count to remain unchanged: `src.Rv × src.Cv == dst.Rv × dst.Cv`.
-- `TTRANS` requires square shape (`Rv == Cv`) or produces a transposed declared shape.
-- `TEXTRACT` requires the sub-tile shape to divide evenly into the source tile declared shape.
-- `TINSERT` requires the inserted tile to fit within the destination's declared shape.
-- FP variants (`*_fp`) require a valid fill value (`fp`) compatible with the tile element type.
-- `TIMG2COL` requires specific kernel/padding/stride configuration; profile-dependent behavior.
+!!! warning "Constraints"
+    - `TRESHAPE` requires the total element count to remain unchanged: `src.Rv × src.Cv == dst.Rv × dst.Cv`.
+    - `TTRANS` requires square shape (`Rv == Cv`) or produces a transposed declared shape.
+    - `TEXTRACT` requires the sub-tile shape to divide evenly into the source tile declared shape.
+    - `TINSERT` requires the inserted tile to fit within the destination's declared shape.
+    - FP variants (`*_fp`) require a valid fill value (`fp`) compatible with the tile element type.
+    - `TIMG2COL` requires specific kernel/padding/stride configuration; profile-dependent behavior.
 
 ## Cases That Are Not Allowed
 
-- **MUST NOT** `TRESHAPE` to a shape with a different total element count.
-- **MUST NOT** `TEXTRACT` with offsets outside the source tile's declared shape.
-- **MUST NOT** `TINSERT` such that the inserted tile extends beyond the destination's declared shape.
-- **MUST NOT** use FP8 types with `TIMG2COL` on CPU simulator or A2/A3.
+!!! danger "Cases That Are Not Allowed"
+    - **MUST NOT** `TRESHAPE` to a shape with a different total element count.
+    - **MUST NOT** `TEXTRACT` with offsets outside the source tile's declared shape.
+    - **MUST NOT** `TINSERT` such that the inserted tile extends beyond the destination's declared shape.
+    - **MUST NOT** use FP8 types with `TIMG2COL` on CPU simulator or A2/A3.
 
 ## C++ Intrinsic
 
