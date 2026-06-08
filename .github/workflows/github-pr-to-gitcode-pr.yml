@@ -1,0 +1,37 @@
+name: Mirror GitHub PR to GitCode PR
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: github-pr-to-gitcode-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout trusted base repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Mirror PR branch and create GitCode PR
+        run: |
+          bash scripts/github_pr_to_gitcode_pr.sh
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          GITCODE_PUSH_URL: ${{ secrets.GITCODE_PUSH_URL }}
+          GITCODE_OWNER: cann
+          GITCODE_REPO: pto-isa
+          GITCODE_BASE_BRANCH: master
