@@ -7,7 +7,6 @@ THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, E
 INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 See LICENSE in the root of the software repository for the full text of the License.
 */
-
 #ifndef PTO_INSTR_IMPL_HPP
 #define PTO_INSTR_IMPL_HPP
 
@@ -184,6 +183,12 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #endif
 
 #ifdef PTO_NPU_ARCH_A5
+#ifdef __COSTMODEL
+#include "pto/npu/a5/TAssign.hpp"
+#include "pto/npu/a5/TSync.hpp"
+#include "pto/npu/a5/SyncAll.hpp"
+#include "pto/npu/a5/TAdd.hpp"
+#else
 #include "pto/npu/a5/TAssign.hpp"
 #include "pto/npu/a5/TSync.hpp"
 #include "pto/npu/a5/SyncAll.hpp"
@@ -305,6 +310,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "pto/npu/a5/TMulAddDst.hpp"
 #include "pto/npu/a5/TSubRelu.hpp"
 #include "pto/npu/a5/TFusedMulAddRelu.hpp"
+#endif // __COSTMODEL
 #endif
 
 #ifdef PTO_NPU_ARCH_KIRIN9030
