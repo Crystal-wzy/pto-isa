@@ -1,5 +1,5 @@
 /**
-Copyright (c) 2025 Huawei Technologies Co., Ltd.
+Copyright (c) 2026 Huawei Technologies Co., Ltd.
 This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 CANN Open Software License Agreement Version 2.0 (the "License").
 Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -7,7 +7,6 @@ THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, E
 INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 See LICENSE in the root of the software repository for the full text of the License.
 */
-
 #include <pto/pto-inst.hpp>
 #ifndef PTO_CPUSTUB_HPP
 #define PTO_CPUSTUB_HPP
@@ -78,6 +77,37 @@ static inline int aclrtMallocHost(void** p, size_t sz)
     return 0;
 }
 
+#define aclrtMalloc(a, b, c) aclrtMallocHost(a, b)
+
+#define aclrtMemcpy(dst, sz_dst, src, sz_src, type)                            \
+    {                                                                          \
+        for (size_t i = 0; i < sz_src && i < sz_dst; i++)                      \
+            reinterpret_cast<char*>(dst)[i] = reinterpret_cast<char*>(src)[i]; \
+    }
+
+#if defined(__CPU_SIM)
+inline int aclrtMemset(void* dst, size_t dstSize, int value, size_t count)
+{
+    constexpr int ACL_SUCCESS = 0;
+    constexpr int ACL_ERROR_GE_PARAM_INVALID = 145000;
+
+    if (count == 0) {
+        return ACL_SUCCESS;
+    }
+    if (dst == nullptr || count > dstSize) {
+        return ACL_ERROR_GE_PARAM_INVALID;
+    }
+    std::fill_n(reinterpret_cast<uint8_t*>(dst), count, static_cast<uint8_t>(value));
+    return ACL_SUCCESS;
+}
+#endif
+
+#define aclrtSynchronizeStream(x) (0)
+#define aclrtFree(x) free(x)
+#define aclrtFreeHost(x) free(x)
+#define aclrtDestroyStream(x)
+#define aclrtResetDevice(x)
+#define aclFinalize(x)
 #define set_flag(a, b, c)
 #define wait_flag(a, b, c)
 #define __cce_get_tile_ptr(x) x
@@ -582,6 +612,7 @@ struct is_event : std::false_type {};
 template <typename... Ts>
 inline constexpr bool all_events_v = (is_event<Ts>::value && ...);
 
+#if defined(__CPU_SIM)
 namespace pto {
 template <SyncCoreType CoreType = SyncCoreType::AIVOnly>
 inline void SYNCALL_IMPL()
@@ -615,5 +646,6 @@ inline void SYNCALL_SOFT_MIX_IMPL(int32_t* gmWorkspace, int32_t* ubWorkspace, in
     (void)usedCores;
 }
 } // namespace pto
+#endif // __CPU_SIM
 
 #endif
