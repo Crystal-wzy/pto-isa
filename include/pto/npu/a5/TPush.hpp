@@ -53,18 +53,24 @@ struct TPipe {
 
     PTO_INTERNAL static bool shouldWaitFree(uint32_t tileIndex)
     {
-        // Startup protection: Don't check flags when buffer is empty
-        if (tileIndex < SlotNum) {
-            return false;
+        if constexpr (SlotNum == 1) {
+            // First push uses the empty slot; later pushes wait for TPOP free.
+            return tileIndex > 0;
+        } else {
+            if (tileIndex < SlotNum) {
+                return false;
+            }
+            return (tileIndex % SyncPeriod) == 0;
         }
-        // Sparse sync: Only check flags periodically to reduce overhead
-        return (tileIndex % SyncPeriod) == 0;
     }
 
     PTO_INTERNAL static bool shouldNotifyFree(uint32_t tileIndex)
     {
-        // Notify consumer to free buffer when producer is one slot ahead of consumer
-        return ((tileIndex + 1) % SyncPeriod) == 0;
+        if constexpr (SlotNum == 1) {
+            return true;
+        } else {
+            return ((tileIndex + 1) % SyncPeriod) == 0;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -202,8 +208,11 @@ struct TPipe {
             constexpr uint32_t splitNum = 2;
             constexpr int ConsM = (Split == TileSplitAxis::TILE_UP_DOWN) ? (ProdM / splitNum) : ProdM;
             constexpr int ConsN = (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? (ProdN / splitNum) : ProdN;
-            using TileCons = Tile<TileType::Vec, T, ConsM, ConsN, BLayout::RowMajor, ConsM, ConsN>;
-            TileCons vecTile;
+            int vRows = (Split == TileSplitAxis::TILE_UP_DOWN) ? (tile.GetValidRow() / splitNum) : tile.GetValidRow();
+            int vCols =
+                (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? (tile.GetValidCol() / splitNum) : tile.GetValidCol();
+            using TileCons = Tile<TileType::Vec, T, ConsM, ConsN, BLayout::RowMajor, -1, -1>;
+            TileCons vecTile(vRows, vCols);
             uint64_t entryBase = (tileIndex % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE; // ConsM * ConsN * sizeof(T);
             TASSIGN(vecTile, (uint64_t)(fifo.C2V_CONSUMER_BUF + entryBase + entryOffset));
 
@@ -236,26 +245,28 @@ struct TPipe {
         PTO_INTERNAL void pushVec2MatFiFo(RingFiFo& fifo, TileProd& tile, int32_t subBlockId)
         {
             using T = typename TileProd::DType;
-            constexpr int ProdM = TileProd::Rows;
-            constexpr int ProdN = TileProd::Cols;
             constexpr uint32_t splitNum = 2;
-            constexpr int ConsM = (Split == TileSplitAxis::TILE_UP_DOWN) ? ProdM * splitNum : ProdM;
-            constexpr int ConsN = (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? ProdN * splitNum : ProdN;
-            Tile<TileType::Mat, T, ConsM, ConsN, BLayout::ColMajor, ConsM, ConsN> matTile;
+            constexpr int ConsM = (Split == TileSplitAxis::TILE_UP_DOWN) ? TileProd::Rows * splitNum : TileProd::Rows;
+            constexpr int ConsN =
+                (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? TileProd::Cols * splitNum : TileProd::Cols;
+            int vRows = (Split == TileSplitAxis::TILE_UP_DOWN) ? tile.GetValidRow() * splitNum : tile.GetValidRow();
+            int vCols = (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? tile.GetValidCol() * splitNum : tile.GetValidCol();
+            using MatTile = Tile<TileType::Mat, T, ConsM, ConsN, BLayout::ColMajor, -1, -1>;
+            MatTile matTile(vRows, vCols);
             uint64_t entryBase = (tileIndex % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE; // ConsM * ConsN * sizeof(T);
             TASSIGN_IMPL(matTile, (uint64_t)(fifo.V2C_CONSUMER_BUF + entryBase + entryOffset));
             if constexpr (Split == TileSplitAxis::TILE_NO_SPLIT) {
                 // single vector core
                 TINSERT_IMPL(matTile, tile, static_cast<uint16_t>(0), static_cast<uint16_t>(0));
             } else if constexpr (Split == TileSplitAxis::TILE_UP_DOWN) {
-                int rowIndex = ProdM * static_cast<size_t>(get_subblockid());
+                int rowIndex = tile.GetValidRow() * static_cast<size_t>(subBlockId);
                 TINSERT_IMPL(matTile, tile, static_cast<uint16_t>(rowIndex), static_cast<uint16_t>(0));
             } else if constexpr (Split == TileSplitAxis::TILE_LEFT_RIGHT) {
                 PTO_ASSERT(
                     tile.GetValidCol() * sizeof(T) % 32 == 0,
                     "Fix: For V2C(UB->L1), tile's valid column must be multiple of 32 bytes due to hardware "
                     "requirement.");
-                uint32_t colIndex = ProdN * static_cast<size_t>(subBlockId);
+                uint32_t colIndex = tile.GetValidCol() * static_cast<size_t>(subBlockId);
                 TINSERT_IMPL(matTile, tile, static_cast<uint16_t>(0), static_cast<uint16_t>(colIndex));
             }
         }
@@ -360,8 +371,8 @@ struct TPipe {
 
         template <typename TileProd, typename TConfig>
         using FixpipeGlobalData = GlobalTensor<
-            FixpipeConsType<TileProd, TConfig>, pto::Shape<1, 1, 1, TileProd::Rows, TileProd::Cols>,
-            pto::Stride<1, 1, 1, TileProd::Cols, 1>, TConfig::LayoutMode>;
+            FixpipeConsType<TileProd, TConfig>, pto::Shape<1, 1, 1, -1, -1>, pto::Stride<1, 1, 1, -1, 1>,
+            TConfig::LayoutMode>;
 
         template <typename TileProd, typename TConfig>
         PTO_INTERNAL void pushAcc2VecFiFo(RingFiFo& fifo, TileProd& tile)
@@ -382,8 +393,12 @@ struct TPipe {
         {
             using T = FixpipeConsType<TileProd, TConfig>;
             using GlobalData = FixpipeGlobalData<TileProd, TConfig>;
+            using GlobalShape = pto::Shape<1, 1, 1, -1, -1>;
+            using GlobalStride = pto::Stride<1, 1, 1, -1, 1>;
             size_t entryBase = (tileIndex % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE;
-            GlobalData globalTensor((__gm__ T*)((uint64_t)fifo.GM_SLOT_BUFFER + entryBase + entryOffset));
+            __gm__ T* addr = (__gm__ T*)((uint64_t)fifo.GM_SLOT_BUFFER + entryBase + entryOffset);
+            GlobalData globalTensor(
+                addr, GlobalShape(tile.GetValidRow(), tile.GetValidCol()), GlobalStride(tile.GetValidCol()));
 
             if constexpr (TConfig::AtomicT == AtomicType::AtomicAdd) {
                 SetAtomicAdd<typename GlobalData::DType>();
@@ -557,8 +572,6 @@ struct TPipe {
         PTO_INTERNAL void popTileFromVecFiFo(RingFiFo& fifo, TileCons& tile)
         {
             using T = typename TileCons::DType;
-            constexpr int ConsM = TileCons::Rows;
-            constexpr int ConsN = TileCons::Cols;
             uint32_t entryBase = (tileIndex % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE;
             uint64_t localTileBase = fifo.C2V_CONSUMER_BUF + entryBase + entryOffset;
             TASSIGN_IMPL(tile, localTileBase);
@@ -568,8 +581,6 @@ struct TPipe {
         PTO_INTERNAL void popTileFromMatFiFo(RingFiFo& fifo, TileCons& tile)
         {
             using T = typename TileCons::DType;
-            constexpr int ConsM = TileCons::Rows;
-            constexpr int ConsN = TileCons::Cols;
             uint32_t entryBase = (tileIndex % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE;
             uint64_t localTileBase = fifo.V2C_CONSUMER_BUF + entryBase + entryOffset;
             TASSIGN_IMPL(tile, localTileBase);
@@ -578,55 +589,62 @@ struct TPipe {
         template <typename TileCons, TileSplitAxis Split>
         PTO_INTERNAL void popVecTileFromGMFiFo(RingFiFo& fifo, TileCons& tile, int32_t subBlockId)
         {
-            constexpr int splitNum = 2;
             using T = typename TileCons::DType;
-            constexpr int ConsN = TileCons::Cols;
-            constexpr int ConsM = TileCons::Rows;
-            constexpr int ProdN = (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? ConsN * splitNum : ConsN;
-            constexpr int ProdM = (Split == TileSplitAxis::TILE_UP_DOWN) ? ConsM * splitNum : ConsM;
-
-            // global tensor
-            size_t entryBase = (static_cast<size_t>(tileIndex) % RingFiFo::SLOT_NUM) *
-                               RingFiFo::SLOT_SIZE; // ProdM * ProdN * sizeof(T);
-            constexpr int gmValidC = ConsN;
-            constexpr int gmValidR = ConsM;
-            constexpr int gmStrideR = ProdN;
-            size_t subAIVOffset = 0;
-            if constexpr (Split == TileSplitAxis::TILE_UP_DOWN) {
-                // TILE_UP_DOWN  : Vec1 starts at the second row-block → offset = VEC_M * ProdN * sizeof(T)
-                subAIVOffset = subBlockId * ConsM * ConsN * sizeof(T);
-            } else if constexpr (Split == TileSplitAxis::TILE_LEFT_RIGHT) { // TILE_LEFT_RIGHT
-                // TILE_LEFT_RIGHT: Vec1 starts at column ConsN within row 0 → offset = ConsN * sizeof(T)
-                subAIVOffset = subBlockId * ConsN * sizeof(T);
-            } else if constexpr (Split == TileSplitAxis::TILE_NO_SPLIT) {
-                subAIVOffset = 0; // TILE_NO_SPLIT : single reader, no offset needed
+            size_t gmStrideR = tile.GetValidCol();
+            constexpr int splitNum = 2;
+            if constexpr (Split == TileSplitAxis::TILE_LEFT_RIGHT) {
+                gmStrideR = splitNum * tile.GetValidCol();
+            } else if constexpr (Split == TileSplitAxis::TILE_LEFT_RIGHT_ODD) {
+                gmStrideR = splitNum * tile.GetValidCol() + 2 * subBlockId - 1;
+            } else {
+                gmStrideR = tile.GetValidCol();
             }
-            using GlobalData =
-                GlobalTensor<T, pto::Shape<1, 1, 1, gmValidR, gmValidC>, pto::Stride<1, 1, 1, gmStrideR, 1>>;
+            // global tensor
+            size_t subAIVOffset = 0;
+            if constexpr (Split == TileSplitAxis::TILE_NO_SPLIT) {
+                subAIVOffset = 0; // TILE_NO_SPLIT : single reader, no offset needed
+            } else if constexpr (Split == TileSplitAxis::TILE_UP_DOWN) {
+                subAIVOffset = subBlockId * tile.GetValidRow() * tile.GetValidCol() * sizeof(T);
+            } else if constexpr (Split == TileSplitAxis::TILE_LEFT_RIGHT) {
+                subAIVOffset = subBlockId * tile.GetValidCol() * sizeof(T);
+            } else if constexpr (Split == TileSplitAxis::TILE_UP_DOWN_ODD) {
+                subAIVOffset = subBlockId * (tile.GetValidRow() + subBlockId) * tile.GetValidCol() * sizeof(T);
+            } else if constexpr (Split == TileSplitAxis::TILE_LEFT_RIGHT_ODD) {
+                subAIVOffset = subBlockId * (tile.GetValidCol() + subBlockId) * sizeof(T);
+            }
+            size_t entryBase = (static_cast<size_t>(tileIndex) % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE;
             __gm__ T* addr = (__gm__ T*)((uint64_t)fifo.GM_SLOT_BUFFER + entryBase + subAIVOffset + entryOffset);
-            GlobalData globalTensor(addr);
 
+            using GlobalStride = pto::Stride<1, 1, 1, -1, 1>;
+            using GlobalShape = pto::Shape<1, 1, 1, -1, -1>;
+            using GlobalData = GlobalTensor<T, GlobalShape, GlobalStride>;
+            GlobalData globalData(addr, GlobalShape(tile.GetValidRow(), tile.GetValidCol()), GlobalStride(gmStrideR));
+
+            // local vector tile
             uint64_t localTileBase =
-                fifo.C2V_CONSUMER_BUF +
-                (static_cast<size_t>(tileIndex) % RingFiFo::LOCAL_SLOT_NUM) * ConsM * ConsN * sizeof(T);
+                fifo.C2V_CONSUMER_BUF + (static_cast<size_t>(tileIndex) % RingFiFo::LOCAL_SLOT_NUM) * TileCons::Rows *
+                                            TileCons::Cols * sizeof(T);
             TASSIGN_IMPL(tile, localTileBase);
-            TLOAD_IMPL(tile, globalTensor);
+            TLOAD_IMPL(tile, globalData);
         }
 
         template <typename TileCons, TileSplitAxis Split>
         PTO_INTERNAL void popMatTileFromGMFiFo(RingFiFo& fifo, TileCons& tile)
         {
             using T = typename TileCons::DType;
-            constexpr int ConsN = TileCons::Cols;
-            constexpr int ConsM = TileCons::Rows;
-            using GlobalData = GlobalTensor<T, pto::Shape<1, 1, 1, ConsM, ConsN>, pto::Stride<1, 1, 1, ConsN, 1>>;
-            uint32_t entryBase = (tileIndex % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE;
-            GlobalData globalTensor((__gm__ T*)((uint64_t)fifo.GM_SLOT_BUFFER + entryBase + entryOffset));
+            size_t entryBase = (static_cast<size_t>(tileIndex) % RingFiFo::SLOT_NUM) * RingFiFo::SLOT_SIZE;
+            __gm__ T* addr = (__gm__ T*)((uint64_t)fifo.GM_SLOT_BUFFER + entryBase + entryOffset);
+            using GlobalStride = pto::Stride<1, 1, 1, -1, 1>;
+            using GlobalShape = pto::Shape<1, 1, 1, -1, -1>;
+            using GlobalData = GlobalTensor<T, GlobalShape, GlobalStride>;
+            GlobalData globalT(
+                addr, GlobalShape(tile.GetValidRow(), tile.GetValidCol()), GlobalStride(tile.GetValidCol()));
 
             uint64_t localTileBase =
-                fifo.V2C_CONSUMER_BUF + (tileIndex % RingFiFo::LOCAL_SLOT_NUM) * ConsM * ConsN * sizeof(T);
+                fifo.V2C_CONSUMER_BUF + (static_cast<size_t>(tileIndex) % RingFiFo::LOCAL_SLOT_NUM) * TileCons::Rows *
+                                            TileCons::Cols * sizeof(T);
             TASSIGN_IMPL(tile, localTileBase);
-            TLOAD_IMPL(tile, globalTensor);
+            TLOAD_IMPL(tile, globalT);
         }
 
         PTO_INTERNAL void popCtrlFromCtrlFiFo(RingFiFo& fifo)
@@ -672,20 +690,27 @@ struct TPipe {
 
     PTO_INTERNAL explicit TPipe(__gm__ void* GM_SLOT_BUFFER, uint32_t C2V_CONSUMER_BUF, uint32_t V2C_CONSUMER_BUF)
         : fifo(GM_SLOT_BUFFER, C2V_CONSUMER_BUF, V2C_CONSUMER_BUF), prod(), cons()
-    {
-        for (uint32_t i = 0; i < SyncPeriod; ++i) {
-            if constexpr (IsNoSplit) {
-                cons.template free<TileSplitAxis::TILE_NO_SPLIT>();
-            } else {
-                cons.template free<TileSplitAxis::TILE_UP_DOWN>();
-            }
-        }
-    }
+    {}
 
     // Destructor for TPipe
     PTO_INTERNAL ~TPipe()
     {
-        for (uint32_t i = 0; i < SyncPeriod; ++i) {
+        const uint32_t numPopFree = prod.tileIndex / SyncPeriod;
+        uint32_t numPushWait = 0;
+        if constexpr (SlotNum == 1) {
+            numPushWait = (prod.tileIndex > 0) ? prod.tileIndex - 1 : 0;
+        } else {
+            if (prod.tileIndex > SlotNum) {
+                constexpr uint32_t firstAligned =
+                    (SlotNum % SyncPeriod == 0) ? SlotNum : ((SlotNum / SyncPeriod) + 1) * SyncPeriod;
+                const uint32_t lastAligned = ((prod.tileIndex - 1) / SyncPeriod) * SyncPeriod;
+                if (lastAligned >= firstAligned) {
+                    numPushWait = (lastAligned - firstAligned) / SyncPeriod + 1;
+                }
+            }
+        }
+        const uint32_t drainCount = (numPopFree > numPushWait) ? (numPopFree - numPushWait) : 0;
+        for (uint32_t i = 0; i < drainCount; ++i) {
             if constexpr (IsNoSplit) {
                 prod.template allocate<TileSplitAxis::TILE_NO_SPLIT>();
             } else {
@@ -982,14 +1007,15 @@ struct TMPipe {
             if constexpr (isSplitM) {
                 // split M between vectors
                 constexpr uint32_t VecM = ConsM / VEC_CORES;
-                int row_offset = VecM * static_cast<size_t>(get_subblockid());
+                int subblock_base_rows = VecM * static_cast<size_t>(get_subblockid());
+                int row_offset = subblock_base_rows + entryOffset;
                 uint64_t entryBase = (tile_id % DataFiFo::fifoDepth) * ConsM * ConsN * sizeof(T);
                 TileDataCons matTile;
                 TASSIGN_IMPL(matTile, fifo.fifoBase + entryBase);
                 TINSERT_IMPL(matTile, tile, static_cast<uint16_t>(row_offset), static_cast<uint16_t>(0));
             } else if constexpr (isSplitN) {
                 // split N between vectors
-                int col_index = ProdN * static_cast<size_t>(get_subblockid());
+                int col_index = ProdN;
                 uint64_t entryBase = (tile_id % DataFiFo::fifoDepth) * ConsM * ConsN * sizeof(T);
                 TileDataCons matTile;
                 TASSIGN_IMPL(matTile, fifo.fifoBase + entryBase);
