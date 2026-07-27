@@ -1,0 +1,217 @@
+name: Sync GitCode to GitHub
+
+# Daily mirror: GitCode cann/pto-isa:master -> this GitHub fork, via PR.
+#
+# The workflow runs in Crystal-wzy/pto-isa and creates or updates a sync branch
+# in the same GitHub repository. GitHub scheduled workflows only run from the
+# repository's default branch, so this file must be merged to main before the
+# daily cron will fire.
+#
+# Default cut point:
+# 29dc4a9565a39320c8011488748ee583842b4d0d
+# docs: add PTO-ISA external header and library description
+# 2026-07-22 14:41:20 +0800
+
+on:
+  schedule:
+    # Daily 09:30 Beijing / 01:30 UTC.
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "GitCode cann/pto-isa branch to sync from"
+        required: false
+        default: "master"
+      target_branch:
+        description: "GitHub branch to open the PR into"
+        required: false
+        default: "main"
+      sync_branch:
+        description: "GitHub branch that carries the synchronized changes"
+        required: false
+        default: "gitcode-sync"
+      cut_point:
+        description: "Carry only GitCode commits after this SHA"
+        required: false
+        default: "29dc4a9565a39320c8011488748ee583842b4d0d"
+      dry_run:
+        description: "Plan only; do not push or open a PR"
+        required: false
+        type: choice
+        default: "false"
+        options: ["true", "false"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-gitcode-to-github
+  cancel-in-progress: false
+
+env:
+  GITCODE_UPSTREAM_URL: https://gitcode.com/cann/pto-isa.git
+  GITCODE_OWNER: cann
+  GITCODE_REPO: pto-isa
+
+jobs:
+  sync:
+    name: Mirror GitCode cann/pto-isa commits into GitHub
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Resolve config
+        id: cfg
+        shell: bash
+        run: |
+          echo "source_ref=${{ github.event.inputs.source_ref || 'master' }}" >> "$GITHUB_OUTPUT"
+          echo "target_branch=${{ github.event.inputs.target_branch || 'main' }}" >> "$GITHUB_OUTPUT"
+          echo "sync_branch=${{ github.event.inputs.sync_branch || 'gitcode-sync' }}" >> "$GITHUB_OUTPUT"
+          echo "cut_point=${{ github.event.inputs.cut_point || '29dc4a9565a39320c8011488748ee583842b4d0d' }}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${{ github.event.inputs.dry_run || 'false' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out GitHub fork workspace
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure committer identity
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Build sync branch from GitHub target branch
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target_branch="${{ steps.cfg.outputs.target_branch }}"
+          source_ref="${{ steps.cfg.outputs.source_ref }}"
+          cut_point="${{ steps.cfg.outputs.cut_point }}"
+
+          git fetch --quiet --no-tags origin "${target_branch}"
+          github_base_sha="$(git rev-parse FETCH_HEAD)"
+
+          git remote add gitcode "${GITCODE_UPSTREAM_URL}" 2>/dev/null || true
+          git fetch --quiet --no-tags gitcode "${source_ref}"
+          gitcode_sha="$(git rev-parse FETCH_HEAD)"
+
+          echo "github_base_sha=${github_base_sha}" >> "$GITHUB_OUTPUT"
+          echo "gitcode_sha=${gitcode_sha}" >> "$GITHUB_OUTPUT"
+
+          if ! git cat-file -e "${cut_point}^{commit}" 2>/dev/null; then
+            echo "::error::Cut point ${cut_point} was not found after fetching GitCode ${source_ref}." >&2
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "${cut_point}" "${gitcode_sha}"; then
+            echo "::error::Cut point ${cut_point} is not an ancestor of GitCode ${source_ref} (${gitcode_sha})." >&2
+            exit 1
+          fi
+
+          new_count="$(git rev-list --count "${cut_point}..${gitcode_sha}")"
+          echo "new_count=${new_count}" >> "$GITHUB_OUTPUT"
+
+          if [ "${new_count}" -eq 0 ]; then
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing new after cut point ${cut_point:0:12}; GitCode ${source_ref} has not advanced."
+            exit 0
+          fi
+
+          git checkout --force -B sync_work "${github_base_sha}"
+
+          if ! git cherry-pick -X theirs "${cut_point}..${gitcode_sha}"; then
+            git status --short
+            git cherry-pick --abort 2>/dev/null || true
+            echo "::error::GitCode commits after ${cut_point:0:12} do not cherry-pick cleanly onto GitHub ${target_branch}, even when preferring GitCode hunks. Resolve the conflict manually so original GitCode commit messages remain preserved." >&2
+            exit 1
+          fi
+          echo "sync_mode=cherry-pick" >> "$GITHUB_OUTPUT"
+
+          if git diff --quiet "${github_base_sha}" HEAD; then
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+            echo "No net change versus GitHub ${target_branch}; no PR is needed."
+            exit 0
+          fi
+
+          echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+          echo "sync_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Show sync plan
+        shell: bash
+        run: |
+          echo "dry_run     : ${{ steps.cfg.outputs.dry_run }}"
+          echo "GitCode src : ${GITCODE_OWNER}/${GITCODE_REPO} ${{ steps.cfg.outputs.source_ref }} = ${{ steps.build.outputs.gitcode_sha }}"
+          echo "GitHub base : ${{ steps.cfg.outputs.target_branch }} = ${{ steps.build.outputs.github_base_sha }}"
+          echo "cut point   : ${{ steps.cfg.outputs.cut_point }}"
+          echo "new commits : ${{ steps.build.outputs.new_count }}"
+          echo "sync mode   : ${{ steps.build.outputs.sync_mode }}"
+          echo "sync head   : ${{ steps.build.outputs.sync_sha }}"
+          echo "sync branch : ${{ steps.cfg.outputs.sync_branch }}"
+          echo "needs_sync  : ${{ steps.build.outputs.needs_sync }}"
+
+      - name: Push sync branch to GitHub fork
+        if: ${{ steps.build.outputs.needs_sync == 'true' && steps.cfg.outputs.dry_run == 'false' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push --force --quiet origin "sync_work:refs/heads/${{ steps.cfg.outputs.sync_branch }}"
+          echo "Pushed ${{ steps.build.outputs.sync_sha }} to ${{ github.repository }}:${{ steps.cfg.outputs.sync_branch }}"
+
+      - name: Open or locate GitHub sync PR
+        if: ${{ steps.build.outputs.needs_sync == 'true' && steps.cfg.outputs.dry_run == 'false' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          target_branch="${{ steps.cfg.outputs.target_branch }}"
+          sync_branch="${{ steps.cfg.outputs.sync_branch }}"
+          source_ref="${{ steps.cfg.outputs.source_ref }}"
+          gitcode_sha="${{ steps.build.outputs.gitcode_sha }}"
+          short_sha="${gitcode_sha:0:12}"
+
+          existing="$(
+            gh pr list \
+              --repo "${{ github.repository }}" \
+              --head "${sync_branch}" \
+              --base "${target_branch}" \
+              --state open \
+              --json number,url \
+              --jq '.[0] | select(. != null) | "\(.number)\t\(.url)"'
+          )"
+
+          if [ -n "${existing}" ]; then
+            number="$(printf '%s' "${existing}" | cut -f1)"
+            url="$(printf '%s' "${existing}" | cut -f2)"
+            echo "Open sync PR already exists #${number}: ${url}"
+            echo "The PR diff has been refreshed by the forced branch push."
+            exit 0
+          fi
+
+          body="$(cat <<EOF
+          Automated daily sync from GitCode \`${GITCODE_OWNER}/${GITCODE_REPO}:${source_ref}\` into GitHub \`${target_branch}\`.
+
+          Carries only commits after cut point:
+          \`${{ steps.cfg.outputs.cut_point }}\`
+
+          Source SHA:
+          \`${gitcode_sha}\`
+
+          Sync mode:
+          \`${{ steps.build.outputs.sync_mode }}\`
+
+          Generated by the *Sync GitCode to GitHub* workflow.
+          EOF
+          )"
+
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --base "${target_branch}" \
+            --head "${sync_branch}" \
+            --title "sync: GitCode ${source_ref} @ ${short_sha}" \
+            --body "${body}"
