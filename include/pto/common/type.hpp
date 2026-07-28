@@ -173,6 +173,8 @@ enum class Layout {
     MX_B_ND,
     MX_B_DN,
     MX_B_NN,
+    HIF4_A_ZZ,
+    HIF4_B_NN,
     NC1HWC0,
     GNC1HWC0,
     NCHW,
@@ -278,7 +280,11 @@ constexpr uint16_t SYNC_AIC_AIV_FLAG = 13;
 constexpr uint16_t SYNC_AIV_ONLY_ALL = 14;
 constexpr uint16_t SYNC_FLAG_ID_MAX = 16;
 
-constexpr int32_t SYNCALL_SOFT_SLOT_INT32 = 8;
+// Soft SYNCALL uses only the first int32 of its GM workspace, as the counter every
+// participant atomically increments. That counter is published with dcci, which
+// writes back a whole 64-byte cache line, so the workspace has to reserve the full
+// line and share it with nothing else: 16 int32 = 64 bytes.
+constexpr int32_t SYNCALL_SOFT_WORKSPACE_INT32 = 16;
 constexpr int32_t SYNCALL_SOFT_BACKOFF_THRESHOLD = 16;
 constexpr int32_t SYNCALL_SOFT_MAX_POLL_ITERATIONS = 1000000;
 
