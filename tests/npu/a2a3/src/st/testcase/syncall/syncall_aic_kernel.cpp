@@ -16,7 +16,6 @@ using namespace pto;
 PTO_SYNCALL_AIC_KERNEL_META(RunSoftSyncAllAIC);
 PTO_SYNCALL_AIC_KERNEL_META(RunSoftSyncAllAICPartial);
 
-constexpr int32_t kBlockCount = 24;
 constexpr int32_t kInt32PerCacheLine = 8;
 constexpr uint64_t kFlagL1Addr = 0x0;
 constexpr uint64_t kOutL1Addr = 0x1000;
@@ -58,7 +57,7 @@ PTO_INTERNAL void SoftSyncAllAicBody(
     GlobalTensor<int32_t, pto::Shape<>, pto::Stride<>> gmWs(syncWorkspace);
     SYNCALL<SyncAllMode::Soft, SyncCoreType::AICOnly>(gmWs, totalBlocks);
 
-    InvalidateGmLines(flags, kBlockCount);
+    InvalidateGmLines(flags, totalBlocks);
     int32_t allVisible = 1;
     for (int32_t i = 0; i < totalBlocks; ++i) {
         __gm__ int32_t* flag = flags + i * kInt32PerCacheLine;
@@ -95,7 +94,7 @@ extern "C" __global__ AICORE void RunSoftSyncAllAICPartial(
 
 void LaunchSoftSyncAllAIC(int32_t* out, int32_t* flags, int32_t* syncWorkspace, int32_t totalBlocks, void* stream)
 {
-    RunSoftSyncAllAIC<<<24, nullptr, stream>>>(out, flags, syncWorkspace);
+    RunSoftSyncAllAIC<<<totalBlocks, nullptr, stream>>>(out, flags, syncWorkspace, totalBlocks);
 }
 
 void LaunchSoftSyncAllAICPartial(
