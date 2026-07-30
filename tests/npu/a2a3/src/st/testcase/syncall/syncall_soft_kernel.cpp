@@ -13,7 +13,6 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 using namespace pto;
 
-constexpr int32_t kBlockCount = 48;
 constexpr int32_t kInt32PerCacheLine = 8;
 constexpr uint64_t kFlagUbAddr = 0x0;
 constexpr uint64_t kReadUbAddr = 0x1000;
@@ -59,7 +58,7 @@ PTO_INTERNAL void SoftSyncAllBody(
     pipe_barrier(PIPE_ALL);
 
     int32_t allFirstVisible = 1;
-    for (int32_t i = 0; i < kBlockCount; ++i) {
+    for (int32_t i = 0; i < totalBlocks; ++i) {
         if (readUb[i * kInt32PerCacheLine] != i + 1) {
             allFirstVisible = 0;
         }
@@ -75,7 +74,7 @@ PTO_INTERNAL void SoftSyncAllBody(
     pipe_barrier(PIPE_ALL);
 
     int32_t allSecondVisible = 1;
-    for (int32_t i = 0; i < kBlockCount; ++i) {
+    for (int32_t i = 0; i < totalBlocks; ++i) {
         if (readUb[i * kInt32PerCacheLine] != (i + 1) * 2) {
             allSecondVisible = 0;
         }
@@ -108,7 +107,7 @@ extern "C" __global__ AICORE void RunSoftSyncAllPartial(
 
 void LaunchSoftSyncAll(int32_t* out, int32_t* flags, int32_t* syncWorkspace, int32_t totalBlocks, void* stream)
 {
-    RunSoftSyncAll<<<48, nullptr, stream>>>(out, flags, syncWorkspace);
+    RunSoftSyncAll<<<totalBlocks, nullptr, stream>>>(out, flags, syncWorkspace, totalBlocks);
 }
 
 void LaunchSoftSyncAllPartial(

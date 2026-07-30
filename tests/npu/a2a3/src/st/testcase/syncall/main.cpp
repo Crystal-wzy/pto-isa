@@ -11,6 +11,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "test_common.h"
 #include "acl/acl.h"
 #include "runtime/rt.h"
+#include "syncall_core_config.hpp"
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <cstdio>
@@ -67,8 +68,8 @@ template <bool withWorkspace, typename LaunchFn>
 void RunMixCase(size_t blockCount, LaunchFn launchFn, const char* label)
 {
     constexpr size_t int32PerCacheLine = 8;
-    constexpr size_t elementCount = blockCount * int32PerCacheLine;
-    constexpr size_t byteSize = elementCount * sizeof(int32_t);
+    const size_t elementCount = blockCount * int32PerCacheLine;
+    const size_t byteSize = elementCount * sizeof(int32_t);
 
     EXPECT_ACL_OK(aclInit(nullptr));
     EXPECT_ACL_OK(aclrtSetDevice(0));
@@ -216,11 +217,6 @@ void RunSoftPartialCase(size_t launchBlocks, size_t syncBlocks, LaunchFn launchF
 
 TEST_F(SYNCALLTest, case_aiv_only_all_blocks)
 {
-    constexpr size_t blockCount = 48;
-    constexpr size_t int32PerCacheLine = 8;
-    constexpr size_t elementCount = blockCount * int32PerCacheLine;
-    constexpr size_t byteSize = elementCount * sizeof(int32_t);
-
     EXPECT_ACL_OK(aclInit(nullptr));
     EXPECT_ACL_OK(aclrtSetDevice(0));
     aclrtStream stream;
@@ -289,11 +285,6 @@ TEST_F(SYNCALLTest, case_aiv_only_all_blocks)
 
 TEST_F(SYNCALLTest, case_soft_aiv_only_all_blocks)
 {
-    constexpr size_t blockCount = 48;
-    constexpr size_t int32PerCacheLine = 8;
-    constexpr size_t elementCount = blockCount * int32PerCacheLine;
-    constexpr size_t byteSize = elementCount * sizeof(int32_t);
-
     EXPECT_ACL_OK(aclInit(nullptr));
     EXPECT_ACL_OK(aclrtSetDevice(0));
     aclrtStream stream;
@@ -322,7 +313,7 @@ TEST_F(SYNCALLTest, case_soft_aiv_only_all_blocks)
     EXPECT_ACL_OK(aclrtMemcpy(flagsDevice, byteSize, flagsHost, byteSize, ACL_MEMCPY_HOST_TO_DEVICE));
     EXPECT_ACL_OK(aclrtMemcpy(syncWorkspaceDevice, byteSize, flagsHost, byteSize, ACL_MEMCPY_HOST_TO_DEVICE));
 
-    LaunchSoftSyncAll(outDevice, flagsDevice, syncWorkspaceDevice, stream);
+    LaunchSoftSyncAll(outDevice, flagsDevice, syncWorkspaceDevice, static_cast<int32_t>(blockCount), stream);
     EXPECT_ACL_OK(aclrtSynchronizeStream(stream));
     EXPECT_ACL_OK(aclrtMemcpy(outHost, byteSize, outDevice, byteSize, ACL_MEMCPY_DEVICE_TO_HOST));
     EXPECT_ACL_OK(aclrtMemcpy(flagsHost, byteSize, flagsDevice, byteSize, ACL_MEMCPY_DEVICE_TO_HOST));
@@ -423,11 +414,6 @@ TEST_F(SYNCALLTest, case_soft_mix_1_2_all_blocks)
 
 TEST_F(SYNCALLTest, case_hard_aic_only_all_blocks)
 {
-    constexpr size_t blockCount = 24;
-    constexpr size_t int32PerCacheLine = 8;
-    constexpr size_t elementCount = blockCount * int32PerCacheLine;
-    constexpr size_t byteSize = elementCount * sizeof(int32_t);
-
     EXPECT_ACL_OK(aclInit(nullptr));
     EXPECT_ACL_OK(aclrtSetDevice(0));
     aclrtStream stream;
@@ -511,11 +497,6 @@ TEST_F(SYNCALLTest, case_soft_aic_only_partial_blocks)
 
 TEST_F(SYNCALLTest, case_soft_aic_only_all_blocks)
 {
-    constexpr size_t blockCount = 24;
-    constexpr size_t int32PerCacheLine = 8;
-    constexpr size_t elementCount = blockCount * int32PerCacheLine;
-    constexpr size_t byteSize = elementCount * sizeof(int32_t);
-
     EXPECT_ACL_OK(aclInit(nullptr));
     EXPECT_ACL_OK(aclrtSetDevice(0));
     aclrtStream stream;
@@ -544,7 +525,7 @@ TEST_F(SYNCALLTest, case_soft_aic_only_all_blocks)
     EXPECT_ACL_OK(aclrtMemcpy(flagsDevice, byteSize, flagsHost, byteSize, ACL_MEMCPY_HOST_TO_DEVICE));
     EXPECT_ACL_OK(aclrtMemcpy(syncWorkspaceDevice, byteSize, flagsHost, byteSize, ACL_MEMCPY_HOST_TO_DEVICE));
 
-    LaunchSoftSyncAllAIC(outDevice, flagsDevice, syncWorkspaceDevice, stream);
+    LaunchSoftSyncAllAIC(outDevice, flagsDevice, syncWorkspaceDevice, static_cast<int32_t>(blockCount), stream);
     EXPECT_ACL_OK(aclrtSynchronizeStream(stream));
     EXPECT_ACL_OK(aclrtMemcpy(outHost, byteSize, outDevice, byteSize, ACL_MEMCPY_DEVICE_TO_HOST));
     EXPECT_ACL_OK(aclrtMemcpy(flagsHost, byteSize, flagsDevice, byteSize, ACL_MEMCPY_DEVICE_TO_HOST));

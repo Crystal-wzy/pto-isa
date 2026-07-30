@@ -475,6 +475,8 @@ void launchTFILLPAD(uint8_t* out, uint8_t* src, uint64_t* gLog, void* stream)
         launchTFILLPAD_20<<<1, nullptr, stream>>>(out, src, 1, 1, 1, 1, 15, gLog);
     } else if constexpr (testKey == 21) {
         launchTFILLPAD_21<<<1, nullptr, stream>>>(out, src, 1, 1, 1, 1, 15, gLog);
+    } else if constexpr (testKey == 22) {
+        launchTFILLPAD_22<<<1, nullptr, stream>>>(out, src, 1, 1, 1, 1, 40, gLog);
     }
 }
 
@@ -582,6 +584,8 @@ int get_input_golden(uint8_t* input, uint8_t* golden)
         return get_input_golden_case<uint8_t, 1, 1, 1, 1, 15, 1, 32, PadValue::Min>(input, golden);
     } else if constexpr (testKey == 21) {
         return get_input_golden_case<uint8_t, 1, 1, 1, 1, 15, 1, 32, PadValue::Max>(input, golden);
+    } else if constexpr (testKey == 22) {
+        return get_input_golden_case<int8_t, 1, 1, 1, 1, 40, 1, 64, PadValue::Max>(input, golden);
     }
 
     return 0;
