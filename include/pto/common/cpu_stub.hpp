@@ -17,8 +17,15 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include <cassert>
 #include <cstdio>
 #include <algorithm>
+#include <chrono>
+#include <exception>
+#include <filesystem>
+#include <fstream>
+#include <mutex>
+#include <sstream>
+#include <thread>
+#include <vector>
 #include <type_traits>
-#include <cstdio>
 #include <dlfcn.h>
 #include <string>
 #include "type.hpp"
@@ -52,13 +59,6 @@ const pipe_t PIPE_FIX = 7;
 inline void pipe_barrier(pipe_t pipe) { (void)pipe; }
 
 #define aclFloat16ToFloat(x) ((float)(x))
-
-enum {
-    ACL_MEM_MALLOC_HUGE_FIRST = 0,
-    ACL_MEMCPY_HOST_TO_DEVICE = 0,
-    ACL_MEMCPY_DEVICE_TO_HOST = 1,
-    ACL_MEMCPY_DEVICE_TO_DEVICE = 2,
-};
 
 #if !defined(__COSTMODEL)
 enum {
@@ -144,10 +144,6 @@ inline uint64_t sbitset0(uint64_t value, int bit) { return value & ~(1ULL << bit
 #define __cce_get_tile_ptr(x) x
 #define set_mask_norm(...)
 #define set_vector_mask(...)
-inline uint64_t get_ctrl() { return 0; }
-inline void set_ctrl(uint64_t) {}
-inline uint64_t sbitset1(uint64_t value, int) { return value; }
-inline uint64_t sbitset0(uint64_t value, int) { return value; }
 
 inline uint32_t get_block_idx();
 
@@ -533,57 +529,6 @@ inline int aclrtCreateStream(aclrtStream* stream)
         state->id = config.next_stream_id++;
     }
     *stream = reinterpret_cast<aclrtStream>(state);
-    return 0;
-}
-
-inline int aclrtMalloc(void** p, size_t sz, int) { return aclrtMallocHost(p, sz); }
-
-inline int aclrtMemcpy(void* dst, size_t sz_dst, const void* src, size_t sz_src, int)
-{
-    std::memcpy(dst, src, std::min(sz_dst, sz_src));
-    return 0;
-}
-
-inline int aclrtMemset(void* dst, size_t dstSize, int value, size_t count)
-{
-    constexpr int ACL_SUCCESS = 0;
-    constexpr int ACL_ERROR_GE_PARAM_INVALID = 145000;
-
-    if (count == 0) {
-        return ACL_SUCCESS;
-    }
-    if (dst == nullptr || count > dstSize) {
-        return ACL_ERROR_GE_PARAM_INVALID;
-    }
-    std::fill_n(reinterpret_cast<uint8_t*>(dst), count, static_cast<uint8_t>(value));
-    return ACL_SUCCESS;
-}
-
-inline int aclrtSynchronizeStream(aclrtStream) { return 0; }
-
-inline int aclrtFree(void* p)
-{
-    free(p);
-    return 0;
-}
-
-inline int aclrtFreeHost(void* p)
-{
-    free(p);
-    return 0;
-}
-
-inline int aclrtDestroyStream(aclrtStream stream)
-{
-    delete pto::cpu_sim::ToStreamState(stream);
-    return 0;
-}
-
-inline int aclrtResetDevice(int) { return 0; }
-
-inline int aclFinalize()
-{
-    pto::cpu_sim::ShutdownRuntime();
     return 0;
 }
 
