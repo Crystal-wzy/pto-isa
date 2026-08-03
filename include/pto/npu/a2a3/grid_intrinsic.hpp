@@ -463,11 +463,11 @@ inline AICORE void MockMtsprCounter(__gm__ uint32_t *remoteFlag, uint32_t newVal
         // Match the canonical TNotify Set pattern: pre-invalidate, store,
         // post-invalidate, dsb(DSB_DDR).  Compiler barriers prevent reordering.
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
         __asm__ __volatile__("" ::: "memory");
         *ptr = newValue;
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
         __asm__ __volatile__("" ::: "memory");
         dsb(DSB_DDR);
     }
@@ -517,7 +517,7 @@ inline AICORE bool MockTryWfeCounter(__gm__ uint32_t *localFlag, uint32_t thresh
     constexpr uint32_t kFenceInterval = 64;
     while (true) {
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(p)), SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(p)), cache_line_t::SINGLE_CACHE_LINE);
         __asm__ __volatile__("" ::: "memory");
         if (*p >= threshold) {
             return true;
@@ -560,7 +560,7 @@ inline AICORE void MockSetFault(__gm__ uint32_t *faultFlag, uint32_t faultCode)
         __asm__ __volatile__("" ::: "memory");
         *ptr = faultCode;
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
         dsb(DSB_DDR);
     }
 }
