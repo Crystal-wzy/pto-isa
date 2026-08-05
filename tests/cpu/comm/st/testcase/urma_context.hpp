@@ -29,8 +29,9 @@ public:
 struct UrmaTestContext {
     int deviceId{-1};
     void* devBuf{nullptr};
-    aclrtStream stream{nullptr};
+    void* stream{nullptr}; // dummy for tests backward compatibility with NPU
     UrmaWorkspaceManager urmaMgr;
+    void* stream{nullptr}; // Dummy placeholder for compatibility
 
     bool AllocHugePageBuffer(size_t commBytesNeeded) { return true; }
 
