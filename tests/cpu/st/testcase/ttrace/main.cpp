@@ -13,6 +13,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include <gtest/gtest.h>
 #include <pto/pto-inst.hpp>
 
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -21,9 +22,15 @@ See LICENSE in the root of the software repository for the full text of the Lice
 using CpuTileTestUtils::AssignTileStorage;
 using CpuTileTestUtils::FillLinear;
 
-void LaunchTraceKernel(float *out, float *src0, float *src1, void *stream);
+void LaunchTraceKernel(float* out, float* src0, float* src1, void* stream);
 
 namespace {
+
+template <typename TileData>
+std::uintptr_t TraceAddress(TileData& tile)
+{
+    return reinterpret_cast<std::uintptr_t>(tile.data());
+}
 
 class TTraceTest : public testing::Test {
 protected:
@@ -78,9 +85,9 @@ TEST_F(TTraceTest, CapturesZeroOperandAndBasicTileInstructions)
     EXPECT_EQ(trace[1].sequence_id, 1u);
     ASSERT_EQ(trace[1].input_tiles.size(), 2u);
     ASSERT_EQ(trace[1].output_tiles.size(), 1u);
-    EXPECT_EQ(trace[1].input_tiles[0].address, src0.GetAssignedAddress());
-    EXPECT_EQ(trace[1].input_tiles[1].address, src1.GetAssignedAddress());
-    EXPECT_EQ(trace[1].output_tiles[0].address, dst.GetAssignedAddress());
+    EXPECT_EQ(trace[1].input_tiles[0].address, TraceAddress(src0));
+    EXPECT_EQ(trace[1].input_tiles[1].address, TraceAddress(src1));
+    EXPECT_EQ(trace[1].output_tiles[0].address, TraceAddress(dst));
     EXPECT_EQ(trace[1].output_tiles[0].shape, (std::vector<int64_t>{2, 32}));
 
     EXPECT_EQ(trace[2].opcode, "TDIV");
@@ -121,10 +128,10 @@ TEST_F(TTraceTest, CapturesInterleavedAndMultiOutputOperands)
     EXPECT_EQ(trace[0].opcode, "TROWARGMAX");
     ASSERT_EQ(trace[0].output_tiles.size(), 2u);
     ASSERT_EQ(trace[0].input_tiles.size(), 2u);
-    EXPECT_EQ(trace[0].output_tiles[0].address, dstVal.GetAssignedAddress());
-    EXPECT_EQ(trace[0].output_tiles[1].address, dstIdx.GetAssignedAddress());
-    EXPECT_EQ(trace[0].input_tiles[0].address, src.GetAssignedAddress());
-    EXPECT_EQ(trace[0].input_tiles[1].address, tmp.GetAssignedAddress());
+    EXPECT_EQ(trace[0].output_tiles[0].address, TraceAddress(dstVal));
+    EXPECT_EQ(trace[0].output_tiles[1].address, TraceAddress(dstIdx));
+    EXPECT_EQ(trace[0].input_tiles[0].address, TraceAddress(src));
+    EXPECT_EQ(trace[0].input_tiles[1].address, TraceAddress(tmp));
 }
 
 TEST_F(TTraceTest, CapturesPointerOutputsForMxQuant)
@@ -163,16 +170,16 @@ TEST_F(TTraceTest, CapturesPointerOutputsForMxQuant)
     EXPECT_EQ(trace[0].opcode, "TQUANT");
     ASSERT_EQ(trace[0].input_tiles.size(), 1u);
     ASSERT_EQ(trace[0].output_tiles.size(), 4u);
-    EXPECT_EQ(trace[0].input_tiles[0].address, src.GetAssignedAddress());
-    EXPECT_EQ(trace[0].output_tiles[0].address, dst.GetAssignedAddress());
-    EXPECT_EQ(trace[0].output_tiles[1].address, exp.GetAssignedAddress());
-    EXPECT_EQ(trace[0].output_tiles[2].address, max.GetAssignedAddress());
-    EXPECT_EQ(trace[0].output_tiles[3].address, scaling.GetAssignedAddress());
+    EXPECT_EQ(trace[0].input_tiles[0].address, TraceAddress(src));
+    EXPECT_EQ(trace[0].output_tiles[0].address, TraceAddress(dst));
+    EXPECT_EQ(trace[0].output_tiles[1].address, TraceAddress(exp));
+    EXPECT_EQ(trace[0].output_tiles[2].address, TraceAddress(max));
+    EXPECT_EQ(trace[0].output_tiles[3].address, TraceAddress(scaling));
 
     EXPECT_EQ(trace[1].opcode, "TQUANT");
     ASSERT_EQ(trace[1].input_tiles.size(), 1u);
     ASSERT_EQ(trace[1].output_tiles.size(), 5u);
-    EXPECT_EQ(trace[1].output_tiles[4].address, expZz.GetAssignedAddress());
+    EXPECT_EQ(trace[1].output_tiles[4].address, TraceAddress(expZz));
 }
 
 TEST_F(TTraceTest, WritesKernelTraceFile)
