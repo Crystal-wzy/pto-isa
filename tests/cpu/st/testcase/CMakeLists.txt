@@ -158,19 +158,19 @@ tstore_acc2gm
 tstore_quant
 tstore_conv
 tsub
-tsubview
 tsubc
 tsubrelu
 tsubs
 tsubsc
+tsubview
 ttest
 ttrans
-ttrans_conv
 ttri
 ttrace
 twait
 txor
 txors
+ttrans_conv
 )
 
 foreach(TESTCASE ${ALL_TESTCASES})
