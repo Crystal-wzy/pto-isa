@@ -15,6 +15,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto {
 
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6)
 template <typename T>
 PTO_INTERNAL void Int64CompareRelationalRegs(
     MaskReg& dst, vector_s32& lhsLow, vector_s32& lhsHigh, vector_s32& rhsLow, vector_s32& rhsHigh, CmpMode mode,
@@ -231,34 +232,44 @@ template <Int64Op Op, typename T, unsigned DstCols, unsigned Src0Cols, unsigned 
 PTO_INTERNAL void Int64Binary(
     __ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, unsigned validRows, unsigned validCols)
 {
+    constexpr unsigned elementsPerRepeat = CCE_VL / sizeof(T);
+    uint16_t repeatTimes = CeilDivision(validCols, elementsPerRepeat);
     __VEC_SCOPE__
     {
         vector_s32 dstLow, dstHigh, src0Low, src0High, src1Low, src1High;
-        uint32_t maskCount = validCols;
-        MaskReg mask = plt_b32(maskCount, POST_UPDATE);
         uint16_t rowCount = validRows;
         for (uint16_t row = 0; row < rowCount; ++row) {
-            vlds(src0Low, src0High, (__ubuf__ int32_t*)src0, row * Src0Cols * 2, DINTLV_B32);
-            vlds(src1Low, src1High, (__ubuf__ int32_t*)src1, row * Src1Cols * 2, DINTLV_B32);
-            MaskReg carry;
-            MaskReg carryOut;
-            if constexpr (Op == Int64Op::Add) {
-                vaddc(carry, dstLow, src0Low, src1Low, mask);
-                vaddcs(carryOut, dstHigh, src0High, src1High, carry, mask);
+            uint32_t remainingCols = validCols;
+            for (uint16_t colRepeat = 0; colRepeat < repeatTimes; ++colRepeat) {
+                uint32_t cols = remainingCols > elementsPerRepeat ? elementsPerRepeat : remainingCols;
+                MaskReg mask = plt_b32(cols, POST_UPDATE);
+                uint32_t colOffset = colRepeat * elementsPerRepeat;
+                uint32_t src0Offset = (row * Src0Cols + colOffset) * 2;
+                uint32_t src1Offset = (row * Src1Cols + colOffset) * 2;
+                uint32_t dstOffset = (row * DstCols + colOffset) * 2;
+                vlds(src0Low, src0High, (__ubuf__ int32_t*)src0, src0Offset, DINTLV_B32);
+                vlds(src1Low, src1High, (__ubuf__ int32_t*)src1, src1Offset, DINTLV_B32);
+                MaskReg carry;
+                MaskReg carryOut;
+                if constexpr (Op == Int64Op::Add) {
+                    vaddc(carry, dstLow, src0Low, src1Low, mask);
+                    vaddcs(carryOut, dstHigh, src0High, src1High, carry, mask);
 
-            } else if constexpr (Op == Int64Op::Sub) {
-                vsubc(carry, dstLow, src0Low, src1Low, mask);
-                vsubcs(carryOut, dstHigh, src0High, src1High, carry, mask);
-            } else if constexpr (Op == Int64Op::Mul) {
-                vmull((vector_u32&)dstLow, (vector_u32&)dstHigh, (vector_u32&)src0Low, (vector_u32&)src1Low, mask);
-                vmula(dstHigh, src0Low, src1High, mask, MODE_ZEROING);
-                vmula(dstHigh, src0High, src1Low, mask, MODE_ZEROING);
-            } else if constexpr (Op == Int64Op::Shl || Op == Int64Op::Shr) {
-                Int64ShiftRegs<Op == Int64Op::Shr, T>(dstLow, dstHigh, src0Low, src0High, src1Low, mask);
-            } else {
-                Int64MinMax<Op, T>(dstLow, dstHigh, src0Low, src0High, src1Low, src1High, mask);
+                } else if constexpr (Op == Int64Op::Sub) {
+                    vsubc(carry, dstLow, src0Low, src1Low, mask);
+                    vsubcs(carryOut, dstHigh, src0High, src1High, carry, mask);
+                } else if constexpr (Op == Int64Op::Mul) {
+                    vmull((vector_u32&)dstLow, (vector_u32&)dstHigh, (vector_u32&)src0Low, (vector_u32&)src1Low, mask);
+                    vmula(dstHigh, src0Low, src1High, mask, MODE_ZEROING);
+                    vmula(dstHigh, src0High, src1Low, mask, MODE_ZEROING);
+                } else if constexpr (Op == Int64Op::Shl || Op == Int64Op::Shr) {
+                    Int64ShiftRegs<Op == Int64Op::Shr, T>(dstLow, dstHigh, src0Low, src0High, src1Low, mask);
+                } else {
+                    Int64MinMax<Op, T>(dstLow, dstHigh, src0Low, src0High, src1Low, src1High, mask);
+                }
+                vsts(dstLow, dstHigh, (__ubuf__ int32_t*)dst, dstOffset, INTLV_B32, mask);
+                remainingCols -= cols;
             }
-            vsts(dstLow, dstHigh, (__ubuf__ int32_t*)dst + row * DstCols * 2, 0, INTLV_B32, mask);
         }
     }
 }
@@ -351,6 +362,35 @@ PTO_INTERNAL void Int64SelectScalar(
         }
     }
 }
+#else
+// Declaration-only stubs for kirin9030/kirinX90 (no 64-bit intrinsics).
+// The A5 instruction headers call these templates from discarded if-constexpr
+// branches; they are never instantiated on architectures without 64-bit
+// vector support, so a declaration is sufficient for phase-1 name lookup.
+template <Int64Op Op, typename T, unsigned DstCols, unsigned Src0Cols, unsigned Src1Cols>
+PTO_INTERNAL void Int64Binary(
+    __ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, unsigned validRows, unsigned validCols);
+
+template <Int64Op Op, typename T, unsigned DstCols, unsigned SrcCols>
+PTO_INTERNAL void Int64Scalar(__ubuf__ T* dst, __ubuf__ T* src, T scalar, unsigned validRows, unsigned validCols);
+
+template <typename T, unsigned DstRowBytes, unsigned Src0Cols, unsigned Src1Cols>
+PTO_INTERNAL void Int64Compare(
+    __ubuf__ uint8_t* dst, __ubuf__ T* src0, __ubuf__ T* src1, CmpMode mode, unsigned validRows, unsigned validCols);
+
+template <typename T, unsigned DstRowBytes, unsigned SrcCols>
+PTO_INTERNAL void Int64CompareScalar(
+    __ubuf__ uint8_t* dst, __ubuf__ T* src, T scalar, CmpMode mode, unsigned validRows, unsigned validCols);
+
+template <typename T, unsigned DstCols, unsigned MaskRowBytes, unsigned Src0Cols, unsigned Src1Cols>
+PTO_INTERNAL void Int64Select(
+    __ubuf__ T* dst, __ubuf__ uint8_t* packedMask, __ubuf__ T* src0, __ubuf__ T* src1, unsigned validRows,
+    unsigned validCols);
+
+template <typename T, unsigned DstCols, unsigned MaskRowBytes, unsigned SrcCols>
+PTO_INTERNAL void Int64SelectScalar(
+    __ubuf__ T* dst, __ubuf__ uint8_t* packedMask, __ubuf__ T* src, T scalar, unsigned validRows, unsigned validCols);
+#endif
 
 } // namespace pto
 
