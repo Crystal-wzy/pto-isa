@@ -235,6 +235,7 @@ set(ALL_TESTCASES
     thistogram
     tinsert
     tinsert_acc2vec
+    tinsert_zn
     textract_nd_vec
     textract_vec
     tmov_zz
