@@ -43,12 +43,14 @@ enum class NPUArch { A2A3, A5 };
 class NPUMemoryModel {
 private:
     enum MemoryRegion {
-        REG, // Registers - simulates NPU registers
-        UB,  // Unified Buffer - for Vec tiles
-        L1,  // L1 Buffer - for Mat tiles
-        L0A, // L0A Buffer - for Left tiles
-        L0B, // L0B Buffer - for Right tiles
-        L0C, // L0C Buffer - for Acc tiles
+        REG,    // Registers - simulates NPU registers
+        UB,     // Unified Buffer - for Vec tiles
+        L1,     // L1 Buffer - for Mat tiles
+        L0A,    // L0A Buffer - for Left tiles
+        L0B,    // L0B Buffer - for Right tiles
+        L0C,    // L0C Buffer - for Acc tiles
+        L0A_MX, // L0A Scale Buffer - for Left MX scale tiles
+        L0B_MX, // L0B Scale Buffer - for Right MX scale tiles
         _MAX_REGIONS
     };
 
@@ -68,7 +70,9 @@ private:
         512 * 1024, // L1:  512 KB
         64 * 1024,  // L0A: 64 KB
         64 * 1024,  // L0B: 64 KB
-        128 * 1024  // L0C: 128 KB
+        128 * 1024, // L0C: 128 KB
+        4 * 1024,   // L0A_MX: 4 KB
+        4 * 1024,   // L0B: 4 KB
     };
 
     static inline constexpr ArchMemorySizes kA5MemorySizes = {
@@ -77,7 +81,9 @@ private:
         512 * 1024, // L1:  512 KB
         64 * 1024,  // L0A: 64 KB (placeholder - verify actual A5 spec)
         64 * 1024,  // L0B: 64 KB
-        256 * 1024  // L0C: 256 KB
+        256 * 1024, // L0C: 256 KB
+        4 * 1024,   // L0A_MX: 4 KB
+        4 * 1024,   // L0B: 4 KB
     };
 
     static std::size_t ReadSizeOverride(const char *name, std::size_t fallback)
@@ -151,28 +157,18 @@ public:
         }
     }
 
-    // Number of DType elements a tile addresses from its base.
-    //
-    // A windowed sub-view keeps the full static block shape (Rows x Cols, hence
-    // Numel) but marks only ValidRow x ValidCol valid and may sit at a non-zero
-    // byte offset. The tile addresses memory up to its last valid element, so the
-    // count is the valid-region footprint: equal to Numel for a fully-valid tile,
-    // smaller for a sub-window. Returns Numel when the valid shape is dynamic (not
-    // visible at this static call site) or the layout is unsupported below.
-    template <typename TileDef>
-    static std::size_t TileAccessElems()
+    template <typename T>
+    std::size_t GetNPUAddr(T* ptr)
     {
-        // GetTileOffset is defined for non-boxed tiles and the Nz/Zn/Zz boxed
-        // fractal layouts only.
-        constexpr bool layoutSupported = !TileDef::isBoxedLayout || is_Nz_layout<TileDef>::value ||
-                                         is_Zn_layout<TileDef>::value || is_Zz_layout<TileDef>::value;
-        if constexpr (layoutSupported && (TileDef::ValidRow > 0) && (TileDef::ValidCol > 0)) {
-            // Every supported layout maps the valid region's far corner to its
-            // largest element offset, so that offset + 1 is the element count.
-            return GetTileOffset<TileDef>(TileDef::ValidRow - 1, TileDef::ValidCol - 1) + 1;
-        } else {
-            return static_cast<std::size_t>(TileDef::Numel);
+        const auto addr = reinterpret_cast<std::uintptr_t>(ptr);
+        for (int region = 0; region < MemoryRegion::_MAX_REGIONS; ++region) {
+            const auto start = reinterpret_cast<std::uintptr_t>(buffers_[region].data());
+            const auto end = start + buffers_[region].size();
+            if (addr >= start && addr < end) {
+                return addr - start;
+            }
         }
+        throw std::invalid_argument("Cannot get proper NPU addr out of pointer");
     }
 
     // Get pointer to memory at offset within a region
@@ -194,6 +190,10 @@ public:
             return GetPointer<typename TileDef::DType, MemoryRegion::L0B>(byteOffset, numElem);
         } else if constexpr (TileDef::Loc == TileType::Acc) {
             return GetPointer<typename TileDef::DType, MemoryRegion::L0C>(byteOffset, numElem);
+        } else if constexpr (TileDef::Loc == TileType::ScaleLeft) {
+            return GetPointer<typename TileDef::DType, MemoryRegion::L0A_MX>(byteOffset, numElem);
+        } else if constexpr (TileDef::Loc == TileType::ScaleRight) {
+            return GetPointer<typename TileDef::DType, MemoryRegion::L0B_MX>(byteOffset, numElem);
         } else {
             return GetPointer<typename TileDef::DType, MemoryRegion::UB>(
                 byteOffset,
@@ -332,6 +332,14 @@ private:
     NPUArch arch_ = NPUArch::A2A3;
     bool initialized_ = false;
 };
+
+constexpr uint32_t SHIFT_MX_ADDR = 4;
+template <typename T>
+uint64_t GetScaleAddr(T* dst)
+{
+    uintptr_t addr = NPUMemoryModel::Instance().GetNPUAddr(dst);
+    return addr >> SHIFT_MX_ADDR;
+}
 
 } // namespace pto
 
