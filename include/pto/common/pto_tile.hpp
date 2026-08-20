@@ -1701,7 +1701,7 @@ public:
 #endif
 private:
     AICORE void assignData(TileDType data) { data_ = data; }
-    bool isKAligned_; // K alignment flag for A3.
+    bool isKAligned_ = false; // K alignment flag for A3.
 
 #if defined(__CPU_SIM) || defined(__COSTMODEL)
     mutable std::vector<DType> internalBuffer;
