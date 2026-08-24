@@ -24,12 +24,10 @@ enum class ElementOp {
     OP_ADD = 0,
     OP_POW,
     OP_SUB,
-    OP_SUBRELU,
     OP_MUL,
     OP_DIV,
     OP_MULADDDST,
     OP_FUSEDMULADD,
-    OP_FUSEDMULADDRELU,
     OP_REM,
     OP_SHL,
     OP_SHR,
@@ -56,8 +54,6 @@ enum class ElementOp {
 
     // ternary operation
     OP_SEL,
-    OP_ADDC,
-    OP_SUBC,
 
     // Tile-Scalar Operation
     // Input scala
@@ -82,8 +78,6 @@ enum class ElementOp {
     OP_SHRS,
     // Input tile0 tile1 and scala
     OP_SELS,
-    OP_ADDCS,
-    OP_SUBCS,
 };
 
 template <typename DType>
@@ -114,13 +108,6 @@ struct ElementOpCal<DType, ElementOp::OP_SUB> {
     static void apply(DType& dst, DType& src0, DType& src1, size_t) { dst = src0 - src1; }
 
     static void apply(DType& dst, const DType& src0, const DType& src1) { dst = src0 - src1; }
-};
-
-template <typename DType>
-struct ElementOpCal<DType, ElementOp::OP_SUBRELU> {
-    static void apply(DType& dst, DType& src0, DType& src1, size_t) { dst = ReLU(src0 - src1); }
-
-    static void apply(DType& dst, const DType& src0, const DType& src1) { dst = ReLU(src0 - src1); }
 };
 
 template <typename DType>
@@ -165,21 +152,6 @@ struct ElementOpCal<DType, ElementOp::OP_FUSEDMULADD> {
     static void apply(DType& dst, DType& src0, DType& src1, size_t) { dst = src0 * dst + src1; }
 
     static void apply(DType& dst, const DType& src0, const DType& src1) { dst = src0 * dst + src1; }
-};
-
-template <typename DType>
-struct ElementOpCal<DType, ElementOp::OP_FUSEDMULADDRELU> {
-    static void apply(DType& dst, DType& src0, DType& src1, size_t)
-    {
-        const DType product = CpuSimRoundElement<DType>(src0 * dst);
-        dst = ReLU(CpuSimRoundElement<DType>(product + src1));
-    }
-
-    static void apply(DType& dst, const DType& src0, const DType& src1)
-    {
-        const DType product = CpuSimRoundElement<DType>(src0 * dst);
-        dst = ReLU(CpuSimRoundElement<DType>(product + src1));
-    }
 };
 
 template <typename DType>
@@ -389,16 +361,6 @@ struct ElementOpCal<DType, ElementOp::OP_SEL> {
 };
 
 template <typename DType>
-struct ElementOpCal<DType, ElementOp::OP_ADDC> {
-    static void apply(DType& dst, DType& src0, DType& src1, DType& src2) { dst = src0 + src1 + src2; }
-};
-
-template <typename DType>
-struct ElementOpCal<DType, ElementOp::OP_SUBC> {
-    static void apply(DType& dst, DType& src0, DType& src1, DType& src2) { dst = src0 - src1 + src2; }
-};
-
-template <typename DType>
 struct ElementOpCal<DType, ElementOp::OP_EXPANDS> {
     static void apply(DType& dst, DType& scalar) { dst = scalar; }
 };
@@ -552,14 +514,5 @@ struct ElementOpCal<DType, ElementOp::OP_SELS> {
     }
 };
 
-template <typename DType>
-struct ElementOpCal<DType, ElementOp::OP_ADDCS> {
-    static void apply(DType& dst, DType& src0, DType& scalar, DType& src1) { dst = src0 + scalar + src1; }
-};
-
-template <typename DType>
-struct ElementOpCal<DType, ElementOp::OP_SUBCS> {
-    static void apply(DType& dst, DType& src0, DType& scalar, DType& src1) { dst = src0 - scalar + src1; }
-};
 } // namespace pto
 #endif
