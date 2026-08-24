@@ -18,9 +18,149 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include <pto/npu/a5/TBinOp.hpp>
 #include <pto/common/debug.h>
 #include "custom/TFmodRemHp.hpp"
-#include "Int64Div.hpp"
+#include "TDiv.hpp"
 
 namespace pto {
+
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6)
+template <typename T>
+PTO_INTERNAL void Int64RemRegs(
+    vector_s32& dstLow, vector_s32& dstHigh, vector_s32& lhsLow, vector_s32& lhsHigh, vector_s32& rhsLow,
+    vector_s32& rhsHigh, MaskReg& mask)
+{
+    vector_s32 qLow, qHigh, productLow, productHigh;
+    if constexpr (std::is_same_v<T, int64_t>)
+        Int64DivSignedRegs(qLow, qHigh, lhsLow, lhsHigh, rhsLow, rhsHigh, mask);
+    else
+        Int64DivUnsignedRegs(qLow, qHigh, lhsLow, lhsHigh, rhsLow, rhsHigh, mask);
+    Int64MulRegs(productLow, productHigh, qLow, qHigh, rhsLow, rhsHigh, mask);
+    Int64SubRegs(dstLow, dstHigh, lhsLow, lhsHigh, productLow, productHigh, mask);
+    vector_s32 zeroLow, zeroHigh;
+    Int64DuplicateRegs(zeroLow, zeroHigh, 0, 0);
+    MaskReg zeroMask;
+    Int64CompareEqRegs(zeroMask, rhsLow, rhsHigh, zeroLow, zeroHigh, mask);
+    Int64SelectRegs(dstLow, dstHigh, zeroLow, zeroHigh, dstLow, dstHigh, zeroMask);
+}
+
+template <typename T, unsigned DstCols, unsigned Src0Cols, unsigned Src1Cols>
+PTO_INTERNAL void Int64RemRepeat(
+    __ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, uint16_t row, uint32_t colOffset, MaskReg& mask)
+{
+    vector_s32 dstLow, dstHigh, lhsLow, lhsHigh, rhsLow, rhsHigh;
+    Int64LoadRegs<T, Src0Cols>(lhsLow, lhsHigh, src0, row, colOffset);
+    Int64LoadRegs<T, Src1Cols>(rhsLow, rhsHigh, src1, row, colOffset);
+    Int64RemRegs<T>(dstLow, dstHigh, lhsLow, lhsHigh, rhsLow, rhsHigh, mask);
+    Int64StoreRegs<T, DstCols>(dstLow, dstHigh, dst, row, colOffset, mask);
+}
+
+template <typename T, unsigned DstCols, unsigned Src0Cols, unsigned Src1Cols>
+PTO_INTERNAL void Int64Rem(__ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, unsigned validRows, unsigned validCols)
+{
+    constexpr unsigned elementsPerRepeat = CCE_VL / sizeof(T);
+    __VEC_SCOPE__
+    {
+        const uint16_t rowCount = validRows;
+        const uint16_t repeatCount = validCols / elementsPerRepeat;
+        const uint32_t remainderCols = validCols % elementsPerRepeat;
+        uint32_t maskCols = elementsPerRepeat;
+        MaskReg allMask = plt_b32(maskCols, POST_UPDATE);
+        MaskReg tailMask = Int64TailMask(remainderCols, allMask);
+        for (uint16_t row = 0; row < rowCount; ++row) {
+            for (uint16_t repeatIdx = 0; repeatIdx < repeatCount; ++repeatIdx) {
+                Int64RemRepeat<T, DstCols, Src0Cols, Src1Cols>(
+                    dst, src0, src1, row, repeatIdx * elementsPerRepeat, allMask);
+            }
+            if (remainderCols != 0) {
+                Int64RemRepeat<T, DstCols, Src0Cols, Src1Cols>(
+                    dst, src0, src1, row, repeatCount * elementsPerRepeat, tailMask);
+            }
+        }
+    }
+}
+
+template <typename T, unsigned DstCols>
+PTO_INTERNAL void Int64ZeroRepeat(__ubuf__ T* dst, uint16_t row, uint32_t colOffset, MaskReg& mask)
+{
+    vector_s32 zero;
+    vbr(zero, 0);
+    Int64StoreRegs<T, DstCols>(zero, zero, dst, row, colOffset, mask);
+}
+
+template <typename T, unsigned DstCols>
+PTO_INTERNAL void Int64Zero(__ubuf__ T* dst, unsigned validRows, unsigned validCols)
+{
+    constexpr unsigned elementsPerRepeat = CCE_VL / sizeof(T);
+    uint16_t repeatTimes = CeilDivision(validCols, elementsPerRepeat);
+    __VEC_SCOPE__
+    {
+        uint16_t rowLimit = validRows;
+        uint32_t maskCols = elementsPerRepeat;
+        MaskReg allMask = plt_b32(maskCols, POST_UPDATE);
+        for (uint16_t row = 0; row < rowLimit; ++row) {
+            uint32_t remainingCols = validCols;
+            for (uint16_t repeatIdx = 0; repeatIdx < repeatTimes; ++repeatIdx) {
+                uint32_t activeCols = remainingCols < elementsPerRepeat ? remainingCols : elementsPerRepeat;
+                MaskReg mask = activeCols == elementsPerRepeat ? allMask : Int64TailMask(activeCols, allMask);
+                Int64ZeroRepeat<T, DstCols>(dst, row, repeatIdx * elementsPerRepeat, mask);
+                remainingCols -= activeCols;
+            }
+        }
+    }
+}
+
+template <typename T, unsigned DstCols, unsigned SrcCols>
+PTO_INTERNAL void Int64RemScalarRepeat(
+    __ubuf__ T* dst, __ubuf__ T* src, vector_s32& scalarLow, vector_s32& scalarHigh, uint16_t row, uint32_t colOffset,
+    MaskReg& mask)
+{
+    vector_s32 dstLow, dstHigh, srcLow, srcHigh;
+    Int64LoadRegs<T, SrcCols>(srcLow, srcHigh, src, row, colOffset);
+    Int64RemRegs<T>(dstLow, dstHigh, srcLow, srcHigh, scalarLow, scalarHigh, mask);
+    Int64StoreRegs<T, DstCols>(dstLow, dstHigh, dst, row, colOffset, mask);
+}
+
+template <typename T, unsigned DstCols, unsigned SrcCols>
+PTO_INTERNAL void Int64RemScalar(__ubuf__ T* dst, __ubuf__ T* src, T scalar, unsigned validRows, unsigned validCols)
+{
+    if constexpr (std::is_same_v<T, uint64_t>) {
+        if (scalar == 0) {
+            Int64Zero<T, DstCols>(dst, validRows, validCols);
+            return;
+        }
+    }
+    constexpr unsigned elementsPerRepeat = CCE_VL / sizeof(T);
+    __VEC_SCOPE__
+    {
+        vector_s32 scalarLow, scalarHigh;
+        uint64_t bits = static_cast<uint64_t>(scalar);
+        Int64DuplicateRegs(scalarLow, scalarHigh, static_cast<uint32_t>(bits), static_cast<uint32_t>(bits >> 32));
+        const uint16_t rowCount = validRows;
+        const uint16_t repeatCount = validCols / elementsPerRepeat;
+        const uint32_t remainderCols = validCols % elementsPerRepeat;
+        uint32_t maskCols = elementsPerRepeat;
+        MaskReg allMask = plt_b32(maskCols, POST_UPDATE);
+        MaskReg tailMask = Int64TailMask(remainderCols, allMask);
+        for (uint16_t row = 0; row < rowCount; ++row) {
+            for (uint16_t repeatIdx = 0; repeatIdx < repeatCount; ++repeatIdx) {
+                Int64RemScalarRepeat<T, DstCols, SrcCols>(
+                    dst, src, scalarLow, scalarHigh, row, repeatIdx * elementsPerRepeat, allMask);
+            }
+            if (remainderCols != 0) {
+                Int64RemScalarRepeat<T, DstCols, SrcCols>(
+                    dst, src, scalarLow, scalarHigh, row, repeatCount * elementsPerRepeat, tailMask);
+            }
+        }
+    }
+}
+#else
+// Declaration-only stubs for kirin9030/kirinX90 (no 64-bit intrinsics).
+// See TBinOp.hpp for details.
+template <typename T, unsigned DstCols, unsigned Src0Cols, unsigned Src1Cols>
+PTO_INTERNAL void Int64Rem(__ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, unsigned validRows, unsigned validCols);
+
+template <typename T, unsigned DstCols, unsigned SrcCols>
+PTO_INTERNAL void Int64RemScalar(__ubuf__ T* dst, __ubuf__ T* src, T scalar, unsigned validRows, unsigned validCols);
+#endif
 
 template <RemAlgorithm PrecisionType, typename T>
 struct RemOp {
