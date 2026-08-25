@@ -31,7 +31,7 @@ svg { font-family: Arial, Helvetica, sans-serif; }
 .validBox { fill: none; stroke-width: 2; stroke-dasharray: 6 4; }
 </style>
 <rect x="0" y="0" width="1200" height="720" class="frame" />
-<rect x="24" y="24" width="1152" height="672" class="panel" />
+<rect x="24" y="24" width="1152" height="672" class="panel"/>
 <text x="40" y="46" class="title">TCI</text>
 <text x="40" y="72" class="subtitle">Generate a contiguous integer sequence into a destination tile.</text>
 <text x="40" y="92" class="meta">Template: complex</text>
@@ -80,8 +80,8 @@ svg { font-family: Arial, Helvetica, sans-serif; }
 <text x="593" y="374" class="axisText">c</text>
 <text x="553" y="408" class="axisText" text-anchor="end">r</text>
 <circle cx="600" cy="300" r="18" class="opCircle" stroke="#C53A79" />
-<rect x="587" y="287" width="26" height="26" rx="6" class="opRect" stroke="#C53A79" />
-<text x="600" y="303.0" class="opText" font-size="10px" text-anchor="middle">TCI</text>
+<rect x="587" y="287" width="26" height="26" rx="6" class="opRect" stroke="#C53A79"/>
+<text x="600" y="303.0" class="opText" text-anchor="middle" font-size="10px">TCI</text>
 <path d="M 500 252 L 500 300 L 582 300 L 582 300" class="arrow" stroke="#C53A79" marker-end="url(#arrow)" />
 <path d="M 700 252 L 700 300 L 618 300 L 618 300" class="arrow" stroke="#C53A79" marker-end="url(#arrow)" />
 <path d="M 600 318 L 600 333 L 600 333 L 600 348" class="arrow" stroke="#C53A79" marker-end="url(#arrow)" />
