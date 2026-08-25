@@ -88,6 +88,7 @@ tload
 tloadconv
 tlog
 tlrelu
+tmadd
 tmatmul
 tmatmul_layout
 tmatmul_mx
@@ -99,7 +100,7 @@ tmins
 tmov
 tmrgsort
 tmul
-tmuladddst
+tmula
 tmuls
 tneg
 tnot
