@@ -531,7 +531,7 @@ if [ "$ENABLE_A3" = "true" ]; then                 # A2A3
     python3 tests/script/run_st.py $ARGS -w -v a3 -t tmadd -g TMADDTest.case_float_32x128_32x192_32x256_32x127
     fi
     if [ -z "$ST_PART" ] || [ "$ST_PART" = "2" ]; then
-    python3 tests/script/run_st.py $ARGS -w -v a3 -t tmula -g TMULATest.case_float_32x128_32x192_32x256_32x127
+    python3 tests/script/run_st.py $ARGS -w -v a3 -t tmuladddst -g TMULADDDSTTest.case_float_32x128_32x192_32x256_32x127
     fi
     if [ -z "$ST_PART" ] || [ "$ST_PART" = "2" ]; then
     python3 tests/script/run_st.py $ARGS -w -v a3 -t textract_ndto2xnz -g TExtractNd2xNzTest.case_half
@@ -816,7 +816,6 @@ if [ "$ENABLE_A3" = "true" ]; then                 # A2A3
     python3 tests/script/run_st.py $ARGS -w -v a3 -t textract_ndto2xnz
     python3 tests/script/run_st.py $ARGS -w -v a3 -t tinsert_vec
     python3 tests/script/run_st.py $ARGS -w -v a3 -t tmadd
-    python3 tests/script/run_st.py $ARGS -w -v a3 -t tmula
     if [ "$IS_AUTO_MODE" = "false" ]; then
       python3 tests/script/run_st.py $ARGS -w -v a3 -t tcolgather
       python3 tests/script/run_st.py $ARGS -w -v a3 -t tcolscatter
@@ -985,7 +984,6 @@ if [ "$ENABLE_A5" = "true" ]; then
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmrgsort -g TMRGSORTTest.case_topk1
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmul -g TMULTest.case_float_64x64_64x64_64x64_64x64
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmadd -g TMADDTest.case_float_32x128_32x192_32x256_32x127
-    python3 tests/script/run_st.py $ARGS -w -v a5 -t tmula -g TMULATest.case_float_32x128_32x192_32x256_32x127
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmuls -g TMULSTest.case1
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tor -g TORTest.case2
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tpow -g TPOWTest.case1
@@ -1162,7 +1160,6 @@ if [ "$ENABLE_A5" = "true" ]; then
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmrgsort
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmul
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmadd
-    python3 tests/script/run_st.py $ARGS -w -v a5 -t tmula
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tmuls
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tor
     python3 tests/script/run_st.py $ARGS -w -v a5 -t tpow
@@ -1450,18 +1447,20 @@ if [ "$ENABLE_KIRINDEV0000" = "true" ]; then
   python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmatmul_new_full
 fi
 
-# if [ "$ENABLE_COMM" = "true" ]; then
-#   if [ "$ENABLE_A3" = "true" ]; then
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tput
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tget
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tnotify
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/twait
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/ttest
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tgather
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tscatter
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/treduce
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tbroadcast
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tput_async
-#     python3 tests/script/run_st.py $ARGS -v a3 -t comm/tget_async
-#   fi
-# fi
+if [ "$ENABLE_COMM" = "true" ]; then
+  if [ -z "$ST_PART" ] || [ "$ST_PART" = "3" ]; then
+    if [ "$ENABLE_A3" = "true" ]; then
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tput
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tget
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tnotify
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/twait
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/ttest
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tgather
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tscatter
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/treduce
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tbroadcast
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tput_async
+      python3 tests/script/run_st.py $ARGS -v a3 -t comm/tget_async
+    fi
+  fi
+fi

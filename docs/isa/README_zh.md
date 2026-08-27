@@ -33,7 +33,7 @@
 - 将 `TSYNC(events...)` 替换为普通 event 顺序表达：把 event 对象传给消费端 intrinsic，或在确需显式等待时调用 `WaitAllEvents(events...)`。
 - `TSUBVIEW` 不提供公开 ISA 替代接口。仓内实现可使用 `pto::detail::PtoSubTileView` 作为内部 helper；外部代码应通过受支持的 Tile 构造和公开数据搬运 API 表达数据视图。
 - 将三元/标量融合算术形式替换为对应基础算术序列，例如 `TADD`、`TSUB`、`TADDS`、`TSUBS`、`TMUL`、`TMADD` 和 `TRELU`。
-- 将历史融合乘加接口重命名：`TFUSEDMULADD` 改为 `TMADD`，`TMULADDDST` 改为 `TMULA`。
+- 将历史融合乘加接口重命名：`TFUSEDMULADD` 改为 `TMADD`。
 - 将融合 add/ReLU/convert 或 add/dequant/ReLU 形式拆分为显式算术、转换/反量化和 `TRELU` 步骤。
 - 将 `TPairReduceSum` 替换为与目标 layout 匹配的现有行/列归约原语。
 - 不再调用 `TGET_SCALE_ADDR`；AUTO 模式 MX 测试可在调用 MX matmul 原语前，在测试代码中根据数据 Tile 绑定 scale Tile 地址。
@@ -57,7 +57,6 @@
 - [TSUB](TSUB_zh.md) - 两个 Tile 的逐元素减法。
 - [TMUL](TMUL_zh.md) - 两个 Tile 的逐元素乘法。
 - [TMADD](TMADD_zh.md) - 三元逐元素运算：`src0 * dst + src1`。
-- [TMULA](TMULA_zh.md) - 三元逐元素运算：`src0 * src1 + dst`。
 - [TMIN](TMIN_zh.md) - 两个 Tile 的逐元素最小值。
 - [TMAX](TMAX_zh.md) - 两个 Tile 的逐元素最大值。
 - [TCMP](TCMP_zh.md) - 比较两个 Tile 并写入一个打包的谓词掩码。
@@ -79,6 +78,7 @@
 - [TNEG](TNEG_zh.md) - Tile 的逐元素取负。
 - [TREM](TREM_zh.md) - 两个 Tile 的逐元素余数，余数符号与除数相同。
 - [TFMOD](TFMOD_zh.md) - 两个 Tile 的逐元素余数，余数符号与被除数相同。
+- [TMULADDDST](TMULADDDST_zh.md) - 三元逐元素运算：`src0 * src1 + dst`。
 
 ## Tile-标量 / Tile-立即数
 - [TEXPANDS](TEXPANDS_zh.md) - 将标量广播到目标 Tile 中。
@@ -136,7 +136,7 @@
 - [TPREFETCH](TPREFETCH_zh.md) - 将数据从全局内存预取到 Tile 本地缓存/缓冲区（提示）。
 - [TPREFETCH_ASYNC](TPREFETCH_ASYNC_zh.md) - 通过 SDMA CMO 将 GlobalTensor 区域从 GM 异步预取到 L2 Cache。
 - [TSTORE](TSTORE_zh.md) - 将 Tile 中的数据存储到 GlobalTensor (GM)，可选使用原子写入或量化参数。
-- [TSTORE_FP](TSTORE_FP_zh.md) - 使用缩放 (`fp`) Tile 作为向量量化参数，将累加器 Tile 存储到全局内存。
+- [TSTORE_FP](TSTORE_FP_zh.md) - 历史 fp 量化存储形式的源码兼容 C++ 别名。
 - [MGATHER](MGATHER_zh.md) - 使用逐元素索引从全局内存收集加载元素到 Tile 中。
 - [MSCATTER](MSCATTER_zh.md) - 使用逐元素索引将 Tile 中的元素散播存储到全局内存。
 
@@ -153,15 +153,15 @@
 
 ## 数据搬运 / 布局
 - [TEXTRACT](TEXTRACT_zh.md) - 从源 Tile 中提取子 Tile。
-- [TEXTRACT_FP](TEXTRACT_FP_zh.md) - 带 fp/缩放 Tile 的提取（向量量化参数）。
+- [TEXTRACT_FP](TEXTRACT_FP_zh.md) - 历史 fp 量化提取形式的源码兼容 C++ 别名。
 - [TIMG2COL](TIMG2COL_zh.md) - 用于类卷积工作负载的图像到列变换。
 - [TINSERT](TINSERT_zh.md) - 在 (indexRow, indexCol) 偏移处将子 Tile 插入到目标 Tile 中。
-- [TINSERT_FP](TINSERT_FP_zh.md) - 带 fp/缩放 Tile 的插入（向量量化参数）。
+- [TINSERT_FP](TINSERT_FP_zh.md) - 历史 fp 量化插入形式的源码兼容 C++ 别名。
 - [TFILLPAD](TFILLPAD_zh.md) - 复制 Tile 并在有效区域外使用编译时填充值进行填充。
 - [TFILLPAD_INPLACE](TFILLPAD_INPLACE_zh.md) - 原地填充/填充变体。
 - [TFILLPAD_EXPAND](TFILLPAD_EXPAND_zh.md) - 填充/填充时允许目标大于源。
 - [TMOV](TMOV_zh.md) - 在 Tile 之间移动/复制，可选应用实现定义的转换模式。
-- [TMOV_FP](TMOV_FP_zh.md) - 使用缩放 (`fp`) Tile 作为向量量化参数，将累加器 Tile 移动/转换到目标 Tile。
+- [TMOV_FP](TMOV_FP_zh.md) - 历史 fp 量化移动形式的源码兼容 C++ 别名。
 - [TRESHAPE](TRESHAPE_zh.md) - 将 Tile 重新解释为另一种 Tile 类型/形状，同时保留底层字节。
 - [TTRANS](TTRANS_zh.md) - 使用实现定义的临时 Tile 进行转置。
 - [TCONCAT](TCONCAT_zh.md) - 将两个 Tile 沿列维度水平拼接。
