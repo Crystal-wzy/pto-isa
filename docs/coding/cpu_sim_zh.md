@@ -6,7 +6,7 @@ CPU_SIM 是一个面向纯 CPU 系统执行的后端实现。
 
 - 每个 CPU 工作线程内的 PTO 指令同步执行。对于已支持的同步和通信操作，CPU_SIM 会使用 CPU 同步原语进行模拟，其中包括 TileData `TPUSH`/`TPOP`/`TFREE` FIFO 流程。
 - 使用特定的内存模型来模拟 NPU 内存层次（见下文）。
-- 多线程支持尚不完整。`Tile` 对象的内存访问不具备线程间同步能力，因此除已支持的通信操作外，不建议跨线程共享 Tile。
+- 多线程支持尚不完整。`Tile` 对象的内存访问不具备线程间同步能力，因此除已支持的通信操作外，不建议跨线程共享 Tile。Tile 的惰性内存分配同样不具备线程间同步能力。
 
 ## 启用 CPU_SIM
 
@@ -58,6 +58,8 @@ CPU_SIM 默认提供至少 512 KiB 的 UB 临时空间。应在初始化内存�
 
 后备存储来自主机内存，不对应 Tile 声明的内存位置，也不会与模拟的 UB、L1、L0A、L0B 或 L0C 缓冲区重叠。如果需要模拟内存位置、偏移、别名或通信行为，应使用 `TASSIGN`。不提供惰性后备存储的其他 Tile 抽象仍需显式绑定内存。
 
+为避免 `__PTO_AUTO__` 模式下并发执行首次访问，CPU_SIM 的 `TMATMUL` 实现会在启动并行工作线程前，由调用线程完成输出、可选累加器和两个矩阵输入 Tile 的后备存储初始化。`TMATMUL_MX` 路径还会初始化两个缩放 Tile。
+
 ## 使用建议
 
 对于常规 `Tile`，可采用以下两种策略之一：
@@ -69,6 +71,9 @@ CPU_SIM 默认提供至少 512 KiB 的 UB 临时空间。应在初始化内存�
 
 ## 已支持行为和后端差异
 
+- 当各操作数的元素类型及运行时有效形状一致时，CPU_SIM `TADD` 和 `TABS` 支持操作数使用不同的 Tile 类型，包括混用静态和动态 `ValidRow`/`ValidCol` 模板参数。CPU_SIM 按每个操作数自身的 Tile 布局和物理形状计算索引；运行时有效形状不一致会触发断言。
+- CPU_SIM 同时实现 `TCI(dst, start)` 和 `TCI(dst, start, tmp)`。三参数形式接受 `tmp` 但不访问其存储，其升序或降序序列语义与两参数形式相同。编写跨后端 kernel 时，仍须保留目标 NPU 后端要求的临时空间分配。
+- CPU_SIM 实现了 `TCVT` 带或不带临时 Tile、显式或省略 `SaturationMode` 的全部四种重载。带临时 Tile 的形式接受但不访问 `tmp`，并与对应的不带临时 Tile 形式保持相同转换结果。CPU_SIM 默认使用 `SaturationMode::OFF`；跨后端 kernel 仍须保留 NPU 所需的临时空间。
 - TileData `TPUSH`/`TPOP`/`TFREE` 使用主机侧 `TPipe` FIFO 模型。该模型会等待空闲槽位和就绪数据，在 `Direction::DIR_BOTH` 下区分 C2V 和 V2C 流量，并通过模拟的 block/subblock 上下文协调 split lane。`TFREE` 会参与 CPU FIFO 的释放协议，不是 A2A3 TileData 路径中的空操作。CPU_SIM 当前不支持公共 GlobalData `TALLOC`/`TPUSH`/`TPOP`/`TFREE` 流程。
 - CPU_SIM 中，Tile-vs-Tile `TCMPS` 重载逐元素比较 `src0[i,j]` 与 `src1[i,j]`。该行为与 A5 一致，与 A2/A3 的标量广播行为不同；标量重载仍按通常的标量比较语义执行。
 - CPU arg-reduce 实现（`TCOLARGMIN`、`TCOLARGMAX`、`TROWARGMIN` 和 `TROWARGMAX`）支持 integral、`half`、`bfloat16_t` 和 `float` 源元素。索引输出必须为 `int32_t` 或 `uint32_t`，临时 Tile 参数在 CPU_SIM 中不使用。

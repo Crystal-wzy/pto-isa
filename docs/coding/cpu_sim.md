@@ -5,7 +5,8 @@ It has some limitations and differences comparing to NPU backends at this moment
   including the TileData `TPUSH`/`TPOP`/`TFREE` FIFO flow, are simulated with CPU synchronization primitives.
 - Specific memory model to mimic NPU memory (see below)
 - Multithreading support is not complete. Memory access in Tile objects is not synchronized across threads, so tiles
-  should not be shared across threads except through supported communication operations.
+  should not be shared across threads except through supported communication operations. Tile lazy allocation is also
+  not synchronized.
 
 ## Enabling CPU_SIM
 You may enable CPU backend (CPU_SIM) by setting `__CPU_SIM` compiler definition. In this case, programs can be built using standard CPU-targeted compiler (gcc or clang).
@@ -43,6 +44,10 @@ Fallback storage is allocated from host memory regardless of the tile location a
 L1, L0A, L0B, or L0C buffers. Use `TASSIGN` when the simulated memory location, offset, aliasing, or communication
 behavior matters. Tile abstractions that do not provide lazy fallback storage must still be explicitly bound.
 
+To avoid concurrent first access in `__PTO_AUTO__` mode, the CPU_SIM implementation of `TMATMUL` materializes the
+backing storage for the destination, optional accumulator, and both matrix input Tiles on the caller thread before
+launching parallel workers. The `TMATMUL_MX` path also materializes both scale Tiles.
+
 ### To summarize:
 For regular `Tile` objects, use one of these strategies:
 
@@ -55,6 +60,15 @@ correctness testing and does not model a specific on-chip address.
 
 ## Supported behavior and backend differences
 
+- CPU_SIM `TADD` and `TABS` accept independently typed operand Tiles when their element types and runtime
+  valid shapes match. This includes mixing static and dynamic `ValidRow`/`ValidCol` template arguments. Each operand
+  is indexed using its own Tile layout and physical shape; a runtime valid-shape mismatch triggers an assertion.
+- CPU_SIM implements both `TCI(dst, start)` and `TCI(dst, start, tmp)`. The three-argument form accepts but does not
+  access `tmp`, and otherwise has the same ascending or descending sequence semantics as the two-argument form.
+  Keep the target-specific scratch allocation required by the NPU backend when writing portable kernels.
+- CPU_SIM implements all four `TCVT` overloads, with or without an explicit scratch Tile and `SaturationMode`.
+  Scratch-Tile forms accept but do not access `tmp` and match the corresponding no-scratch conversion. The default
+  CPU_SIM saturation mode is `SaturationMode::OFF`; portable kernels must retain any NPU scratch allocation.
 - TileData `TPUSH`/`TPOP`/`TFREE` use a host-side `TPipe` FIFO model. The model waits for free slots and ready data,
   keeps C2V and V2C traffic separate for `Direction::DIR_BOTH`, and coordinates split lanes through the simulated
   block/subblock context. `TFREE` participates in the CPU FIFO release protocol; it is not the A2A3 TileData no-op.
