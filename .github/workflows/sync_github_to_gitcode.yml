@@ -1,0 +1,290 @@
+name: Sync GitHub to GitCode
+
+# Manual mirror: GitHub upstream hw-native-sys/pto-isa  ->  GitCode fork
+# zhhywang/pto-isa  ->  (open PR into)  cann/pto-isa:master.
+#
+# The workflow runs in the Crystal-wzy fork and mirrors the hw-native-sys/pto-isa
+# upstream, fetched explicitly.
+#
+# IMPORTANT — avoids the "conflicting whole-history" PR:
+# hw-native-sys main and cann:master are on DIVERGENT histories (the old common
+# ancestor is deep). So we do NOT push main verbatim. Instead we build the sync
+# branch ON TOP of cann:master and carry ONLY the commits after a cut point
+# (default 439faf48d…): `git cherry-pick <cut>..main`. If that conflicts, we
+# fall back to a file snapshot (set changed files to the upstream version), so
+# the PR never blocks. Same strategy as scripts/github_pr_to_gitcode_pr.sh.
+#
+# GitCode API auth uses the `PRIVATE-TOKEN` header; GitCode PR URLs are /pull/<n>.
+#
+# Secrets (repo): GITCODE_PUSH_URL = full authenticated GitCode clone URL of the
+#                                    zhhywang fork
+#                                    (https://oauth2:<token>@gitcode.com/zhhywang/pto-isa.git)
+#                  GITCODE_TOKEN    = GitCode PAT (PRIVATE-TOKEN header + oauth2 git auth)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Branch on hw-native-sys/pto-isa to mirror from (default main)"
+        required: false
+        default: "main"
+      target_branch:
+        description: "GitCode base branch to PR into (default master)"
+        required: false
+        default: "master"
+      sync_branch:
+        description: "GitCode fork feature branch that carries the synced commits"
+        required: false
+        default: "sync/github-main"
+      cut_point:
+        description: "Carry only commits AFTER this SHA (default 439faf48d…, the aligned point)"
+        required: false
+        default: "439faf48d7ab5c36a7bf72bc99d29c213a315550"
+      dry_run:
+        description: "Plan only; do not push or open a PR. Use for the first test."
+        required: false
+        type: choice
+        default: "false"
+        options: ["true", "false"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-github-to-gitcode
+  cancel-in-progress: false
+
+env:
+  GITHUB_UPSTREAM: hw-native-sys/pto-isa
+  GITCODE_OWNER: cann
+  GITCODE_REPO: pto-isa
+  GITCODE_API: https://api.gitcode.com/api/v5
+
+jobs:
+  sync:
+    name: Mirror hw-native-sys/pto-isa commits into GitCode cann/pto-isa
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Resolve config
+        id: cfg
+        shell: bash
+        run: |
+          echo "source_ref=${{ github.event.inputs.source_ref || 'main' }}" >> "$GITHUB_OUTPUT"
+          echo "target_branch=${{ github.event.inputs.target_branch || 'master' }}" >> "$GITHUB_OUTPUT"
+          echo "sync_branch=${{ github.event.inputs.sync_branch || 'sync/github-main' }}" >> "$GITHUB_OUTPUT"
+          echo "cut_point=${{ github.event.inputs.cut_point || '439faf48d7ab5c36a7bf72bc99d29c213a315550' }}" >> "$GITHUB_OUTPUT"
+          echo "dry_run=${{ github.event.inputs.dry_run || 'false' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out host fork (shallow; only used as a git workspace)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Guard GitCode secrets
+        env:
+          GITCODE_PUSH_URL: ${{ secrets.GITCODE_PUSH_URL }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          if [ -z "${GITCODE_PUSH_URL}" ]; then
+            echo "::error::Missing GITCODE_PUSH_URL secret (full authenticated GitCode clone URL of the zhhywang fork)." >&2
+            exit 1
+          fi
+          if [ -z "${GITCODE_TOKEN}" ]; then
+            echo "::error::Missing GITCODE_TOKEN secret (GitCode PAT for PRIVATE-TOKEN header)." >&2
+            exit 1
+          fi
+
+      - name: Configure committer identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Build sync branch on cann:master (commits after cut point only)
+        id: build
+        shell: bash
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          GITCODE_PUSH_URL: ${{ secrets.GITCODE_PUSH_URL }}
+        run: |
+          set -euo pipefail
+          # Source = GitHub UPSTREAM (hw-native-sys), not this fork's own main.
+          git remote add upstream "https://github.com/${GITHUB_UPSTREAM}.git" 2>/dev/null || true
+          git fetch --quiet --no-tags upstream "${{ steps.cfg.outputs.source_ref }}"
+          upstream_sha="$(git rev-parse FETCH_HEAD)"
+
+          # Base = canonical GitCode master (fetched directly via oauth2 token).
+          cann_url="https://oauth2:${GITCODE_TOKEN}@gitcode.com/${GITCODE_OWNER}/${GITCODE_REPO}.git"
+          git fetch --quiet --no-tags "${cann_url}" "${{ steps.cfg.outputs.target_branch }}"
+          base_sha="$(git rev-parse FETCH_HEAD)"
+
+          # Owner that GITCODE_PUSH_URL pushes to (the zhhywang fork, or cann).
+          path="${GITCODE_PUSH_URL#*gitcode.com[:/]}"
+          push_owner="${path%%/*}"
+
+          CUT="${{ steps.cfg.outputs.cut_point }}"
+          new_count="$(git rev-list --count "${CUT}..${upstream_sha}" || echo 0)"
+
+          echo "upstream_sha=${upstream_sha}" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${base_sha}" >> "$GITHUB_OUTPUT"
+          echo "push_owner=${push_owner}" >> "$GITHUB_OUTPUT"
+          echo "new_count=${new_count}" >> "$GITHUB_OUTPUT"
+
+          if [ "${new_count}" -eq 0 ]; then
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing new after cut point ${CUT:0:12}; main hasn't advanced — nothing to sync."
+            exit 0
+          fi
+
+          # Build the sync branch ON TOP of cann:master and carry only the new
+          # commits. Cherry-pick first; on conflict, fall back to a file snapshot.
+          git checkout --force -B sync_work "${base_sha}"
+          if git cherry-pick "${CUT}..${upstream_sha}"; then
+            echo "sync_mode=cherry-pick" >> "$GITHUB_OUTPUT"
+          else
+            git cherry-pick --abort 2>/dev/null || true
+            echo "cherry-pick conflicted; falling back to file snapshot (changed files set to upstream version)"
+            mapfile -t files < <(git diff --name-only "${CUT}" "${upstream_sha}")
+            for f in "${files[@]}"; do
+              if git cat-file -e "${upstream_sha}:$f" 2>/dev/null; then
+                git checkout "${upstream_sha}" -- "$f"
+              else
+                git rm -r --quiet -- "$f" 2>/dev/null || true
+              fi
+            done
+            git add -A
+            git commit --quiet -m "sync: ${GITHUB_UPSTREAM}@${{ steps.cfg.outputs.source_ref }} ${upstream_sha:0:12} (snapshot)"
+            echo "sync_mode=snapshot" >> "$GITHUB_OUTPUT"
+          fi
+
+          # If the net result matches cann:master, there is nothing to merge.
+          if git diff --quiet "${base_sha}" HEAD; then
+            echo "needs_sync=false" >> "$GITHUB_OUTPUT"
+            echo "No net change vs cann:master after applying new commits; nothing to sync."
+            exit 0
+          fi
+          echo "needs_sync=true" >> "$GITHUB_OUTPUT"
+          echo "sync_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Show sync plan
+        run: |
+          echo "dry_run     : ${{ steps.cfg.outputs.dry_run }}"
+          echo "GitHub src  : ${GITHUB_UPSTREAM} ${{ steps.cfg.outputs.source_ref }} = ${{ steps.build.outputs.upstream_sha }}"
+          echo "GitCode base: ${{ steps.cfg.outputs.target_branch }} = ${{ steps.build.outputs.base_sha }}"
+          echo "cut point   : ${{ steps.cfg.outputs.cut_point }}"
+          echo "new commits : ${{ steps.build.outputs.new_count }}"
+          echo "sync mode   : ${{ steps.build.outputs.sync_mode }}"
+          echo "sync head   : ${{ steps.build.outputs.sync_sha }}"
+          echo "mirror to   : ${{ steps.build.outputs.push_owner }}/${{ env.GITCODE_REPO }}:${{ steps.cfg.outputs.sync_branch }}"
+          echo "needs_sync  : ${{ steps.build.outputs.needs_sync }}"
+
+      - name: Push sync branch to GitCode fork
+        if: ${{ steps.build.outputs.needs_sync == 'true' && steps.cfg.outputs.dry_run == 'false' }}
+        env:
+          GITCODE_PUSH_URL: ${{ secrets.GITCODE_PUSH_URL }}
+        run: |
+          set -euo pipefail
+          # Force-push OUR feature branch (never the base branch) to the GitCode
+          # fork pointed at by GITCODE_PUSH_URL (zhhywang/pto-isa).
+          git push --force --quiet "${GITCODE_PUSH_URL}" "sync_work:refs/heads/${{ steps.cfg.outputs.sync_branch }}"
+          echo "Pushed ${{ steps.build.outputs.sync_sha }} -> ${{ steps.build.outputs.push_owner }}:${{ steps.cfg.outputs.sync_branch }}"
+
+      - name: Open or locate GitCode sync PR
+        id: pr
+        if: ${{ steps.build.outputs.needs_sync == 'true' && steps.cfg.outputs.dry_run == 'false' }}
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          set -euo pipefail
+          HEAD_REF="${{ steps.cfg.outputs.sync_branch }}"
+          BASE_REF="${{ steps.cfg.outputs.target_branch }}"
+          UPSTREAM_SHA="${{ steps.build.outputs.upstream_sha }}"
+          SHORT="${UPSTREAM_SHA:0:12}"
+          PUSH_OWNER="${{ steps.build.outputs.push_owner }}"
+          API="${GITCODE_API}/repos/${GITCODE_OWNER}/${GITCODE_REPO}/pulls"
+
+          # head format: same-repo -> branch; cross-repo (fork) -> owner:branch.
+          if [ "${PUSH_OWNER}" = "${GITCODE_OWNER}" ]; then
+            head_for_pr="${HEAD_REF}"
+          else
+            head_for_pr="${PUSH_OWNER}:${HEAD_REF}"
+          fi
+
+          # Look for an existing OPEN PR whose head branch and base match.
+          list_resp="$(mktemp)"
+          list_status="$(curl -sS --connect-timeout 30 --max-time 60 \
+            -o "${list_resp}" -w '%{http_code}' \
+            -H "PRIVATE-TOKEN: ${GITCODE_TOKEN}" \
+            "${API}?state=open&per_page=100")"
+          if [ "${list_status}" != "200" ]; then
+            echo "::error::GitCode list-PRs returned HTTP ${list_status}" >&2
+            cat "${list_resp}" >&2; rm -f "${list_resp}"; exit 1
+          fi
+          match="$(jq -r --arg h "${HEAD_REF}" --arg b "${BASE_REF}" '
+              [ .[] | select(
+                  ((.head | (if type=="object" then (.ref // .name // "") else . end)) == $h)
+                  and
+                  ((.base | (if type=="object" then (.ref // .name // "") else . end)) == $b)
+                ) ] as $m
+              | if ($m | length) > 0
+                then "\($m[0].number // $m[0].iid // $m[0].id // "")\t\($m[0].html_url // $m[0].web_url // "")"
+                else "" end' "${list_resp}")"
+          rm -f "${list_resp}"
+
+          if [ -n "${match}" ]; then
+            existing="$(printf '%s' "${match}" | cut -f1)"
+            existing_url="$(printf '%s' "${match}" | cut -f2 | grep -E 'gitcode\.com' | grep -v '/api/' | head -n1 || true)"
+            [ -n "${existing}" ] && echo "pr_number=${existing}" >> "$GITHUB_OUTPUT"
+            echo "Open sync PR already exists${existing:+ #${existing}}: ${existing_url:-https://gitcode.com/${GITCODE_OWNER}/${GITCODE_REPO}/pull/${existing}}"
+            echo "Its diff refreshes automatically from the pushed branch."
+            exit 0
+          fi
+
+          # Build the POST body with jq so nothing needs shell quoting.
+          body="$(jq -n \
+            --arg t "sync: ${GITHUB_UPSTREAM}/${{ steps.cfg.outputs.source_ref }} @ ${SHORT}" \
+            --arg h "${head_for_pr}" \
+            --arg b "${BASE_REF}" \
+            --arg sha "${UPSTREAM_SHA}" \
+            --arg src "${{ steps.cfg.outputs.source_ref }}" \
+            --arg ghup "${GITHUB_UPSTREAM}" \
+            --arg mode "${{ steps.build.outputs.sync_mode }}" \
+            '{title:$t, head:$h, base:$b,
+              body:("Automated weekly mirror of **" + $ghup + "** `" + $src + "` into GitCode `" + $b + "`.\n\n"
+                    + "Carries only commits after the cut point (" + $mode + ").\n"
+                    + "Source SHA: `" + $sha + "`\n\n"
+                    + "Generated by the *Sync GitHub to GitCode* GitHub Actions workflow.")}')"
+
+          create_resp="$(mktemp)"
+          create_status="$(curl -sS --connect-timeout 30 --max-time 180 \
+            -o "${create_resp}" -w '%{http_code}' \
+            -X POST "${API}" \
+            -H "Content-Type: application/json" \
+            -H "PRIVATE-TOKEN: ${GITCODE_TOKEN}" \
+            --data "${body}")"
+          number="$(jq -r '.number // .iid // .id // empty' "${create_resp}")"
+          case "${create_status}" in
+            200|201)
+              # Prefer the real web URL from the API response; fall back to /pull/<n>.
+              pr_url="$(jq -r '.html_url // .web_url // (.links.html.href // empty) // empty' "${create_resp}" \
+                | grep -E 'gitcode\.com' | grep -v '/api/' | head -n1 || true)"
+              if [ -z "${number}" ] && [ -z "${pr_url}" ]; then
+                echo "::error::PR created (HTTP ${create_status}) but no number/url in response:" >&2
+                cat "${create_resp}" >&2; rm -f "${create_resp}"; exit 1
+              fi
+              [ -n "${number}" ] && echo "pr_number=${number}" >> "$GITHUB_OUTPUT"
+              [ -z "${pr_url}" ] && pr_url="https://gitcode.com/${GITCODE_OWNER}/${GITCODE_REPO}/pull/${number}"
+              echo "Created GitCode PR${number:+ #${number}}: ${pr_url}"
+              ;;
+            422)
+              echo "GitCode returned 422 (likely no diff / nothing to merge); response:" >&2
+              cat "${create_resp}" >&2; rm -f "${create_resp}"
+              exit 0
+              ;;
+            *)
+              echo "::error::GitCode PR create returned HTTP ${create_status}:" >&2
+              cat "${create_resp}" >&2; rm -f "${create_resp}"
+              exit 1
+              ;;
+          esac
