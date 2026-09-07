@@ -204,7 +204,8 @@ set(ALL_TESTCASES
     tabs
     tlog
     trecip
-    # tstore_acc2gm
+    tstore_acc2gm
+    tstore_mat2gm
     tdivs
     tmuls
     tadds
