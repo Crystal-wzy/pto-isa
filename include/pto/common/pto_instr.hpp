@@ -473,8 +473,8 @@ PTO_INST RecordEvent TSTORE(GlobalData& dst, TileData& src, FpTileData& fp, Wait
     return {};
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINDEV0000) || \
-    defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_KIRIN9030) || \
+    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
 template <
     STPhase Phase, typename TileData, typename GlobalData, typename FpTileData,
     AtomicType atomicType = AtomicType::AtomicNone, ReluPreMode reluPreMode = ReluPreMode::NoRelu,
@@ -500,8 +500,8 @@ PTO_INST RecordEvent TSTORE_FP(GlobalData& dst, TileData& src, FpTileData& fp, W
     return {};
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINDEV0000) || \
-    defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_KIRIN9030) || \
+    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
 template <
     STPhase Phase, typename TileData, typename GlobalData, typename FpTileData,
     AtomicType atomicType = AtomicType::AtomicNone, ReluPreMode reluPreMode = ReluPreMode::NoRelu,
@@ -651,8 +651,7 @@ PTO_INST RecordEvent TSTORE(GlobalData& dst, TileData& src, FpTileData& fp, Wait
 {
     detail::PtoWaitEvents(events...);
 #if PTO_FORWARD_L2HINT_TO_IMPL
-    // A5/CPU_SIM Fp TSTORE_IMPL includes STPhase; a2a3 Fp IMPL is 6-param (no Phase).
-#if defined(PTO_NPU_ARCH_A5) || defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
     TSTORE_IMPL<TileData, GlobalData, FpTileData, atomicType, reluPreMode, STPhase::Unspecified, l2Control>(
         dst, src, fp);
 #else
@@ -665,8 +664,8 @@ PTO_INST RecordEvent TSTORE(GlobalData& dst, TileData& src, FpTileData& fp, Wait
     return {};
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINDEV0000) || \
-    defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_KIRIN9030) || \
+    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
 template <
     TStoreL2Hint l2Control, STPhase Phase, typename TileData, typename GlobalData, typename FpTileData,
     AtomicType atomicType = AtomicType::AtomicNone, ReluPreMode reluPreMode = ReluPreMode::NoRelu,
@@ -1174,6 +1173,19 @@ TEXTRACT(DstTileData& dst, SrcTileData& src, uint16_t indexRow, uint16_t indexCo
     return {};
 }
 
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, ReluPreMode reluMode = ReluPreMode::NoRelu,
+    typename... WaitEvents>
+PTO_INST RecordEvent
+TEXTRACT(DstTileData& dst, SrcTileData& src, uint16_t indexRow, uint16_t indexCol, WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TEXTRACT_IMPL<DstTileData, SrcTileData, reluMode, Phase>(dst, src, indexRow, indexCol);
+    return {};
+}
+#endif
+
 template <
     typename DstTileData, typename SrcTileData, AccToVecMode mode, ReluPreMode reluMode = ReluPreMode::NoRelu,
     typename... WaitEvents>
@@ -1195,6 +1207,20 @@ PTO_INST RecordEvent TEXTRACT(
     TEXTRACT_IMPL<DstTileData, SrcTileData, reluMode>(dst, src, preQuantScalar, indexRow, indexCol);
     return {};
 }
+
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, ReluPreMode reluMode = ReluPreMode::NoRelu,
+    typename... WaitEvents>
+PTO_INST RecordEvent TEXTRACT(
+    DstTileData& dst, SrcTileData& src, uint64_t preQuantScalar, uint16_t indexRow, uint16_t indexCol,
+    WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TEXTRACT_IMPL<DstTileData, SrcTileData, reluMode, Phase>(dst, src, preQuantScalar, indexRow, indexCol);
+    return {};
+}
+#endif
 
 template <
     typename DstTileData, typename SrcTileData, AccToVecMode mode, ReluPreMode reluMode = ReluPreMode::NoRelu,
@@ -1221,6 +1247,21 @@ PTO_INST RecordEvent TEXTRACT(
     return {};
 }
 
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, typename FpTileData,
+    ReluPreMode reluMode = ReluPreMode::NoRelu, typename... WaitEvents,
+    std::enable_if_t<
+        is_tile_data_v<FpTileData> && (FpTileData::Loc == TileType::Scaling) && all_events_v<WaitEvents...>, int> = 0>
+PTO_INST RecordEvent TEXTRACT(
+    DstTileData& dst, SrcTileData& src, FpTileData& fp, uint16_t indexRow, uint16_t indexCol, WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TEXTRACT_IMPL<DstTileData, SrcTileData, FpTileData, reluMode, Phase>(dst, src, fp, indexRow, indexCol);
+    return {};
+}
+#endif
+
 template <
     typename DstTileData, typename SrcTileData, typename FpTileData, ReluPreMode reluMode = ReluPreMode::NoRelu,
     typename... WaitEvents, std::enable_if_t<is_tile_data_v<FpTileData> && all_events_v<WaitEvents...>, int> = 0>
@@ -1231,6 +1272,20 @@ PTO_INST RecordEvent TEXTRACT_FP(
     TEXTRACT_IMPL<DstTileData, SrcTileData, FpTileData, reluMode>(dst, src, fp, indexRow, indexCol);
     return {};
 }
+
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, typename FpTileData,
+    ReluPreMode reluMode = ReluPreMode::NoRelu, typename... WaitEvents,
+    std::enable_if_t<is_tile_data_v<FpTileData> && all_events_v<WaitEvents...>, int> = 0>
+PTO_INST RecordEvent TEXTRACT_FP(
+    DstTileData& dst, SrcTileData& src, FpTileData& fp, uint16_t indexRow, uint16_t indexCol, WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TEXTRACT_IMPL<DstTileData, SrcTileData, FpTileData, reluMode, Phase>(dst, src, fp, indexRow, indexCol);
+    return {};
+}
+#endif
 
 #if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || defined(__CPU_SIM)
 template <
@@ -1339,6 +1394,19 @@ TINSERT(DstTileData& dst, SrcTileData& src, uint16_t indexRow, uint16_t indexCol
     return {};
 }
 
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, ReluPreMode reluMode = ReluPreMode::NoRelu,
+    typename... WaitEvents>
+PTO_INST RecordEvent
+TINSERT(DstTileData& dst, SrcTileData& src, uint16_t indexRow, uint16_t indexCol, WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TINSERT_IMPL<DstTileData, SrcTileData, reluMode, Phase>(dst, src, indexRow, indexCol);
+    return {};
+}
+#endif
+
 template <typename DstTileData, typename SrcTileData, typename... WaitEvents>
 PTO_INST RecordEvent
 TINSERT(DstTileData& dst, SrcTileData& src, uint16_t indexRow, uint16_t indexCol, WaitEvents&... events)
@@ -1369,6 +1437,21 @@ PTO_INST RecordEvent TINSERT(
     TINSERT_IMPL<DstTileData, SrcTileData, reluMode>(dst, src, preQuantScalar, indexRow, indexCol);
     return {};
 }
+
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, ReluPreMode reluMode = ReluPreMode::NoRelu,
+    typename... WaitEvents>
+PTO_INST RecordEvent TINSERT(
+    DstTileData& dst, SrcTileData& src, uint64_t preQuantScalar, uint16_t indexRow, uint16_t indexCol,
+    WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TINSERT_IMPL<DstTileData, SrcTileData, reluMode, Phase>(dst, src, preQuantScalar, indexRow, indexCol);
+    return {};
+}
+#endif
+
 template <
     typename DstTileData, typename SrcTileData, AccToVecMode mode, ReluPreMode reluMode = ReluPreMode::NoRelu,
     typename... WaitEvents>
@@ -1393,6 +1476,21 @@ TINSERT(DstTileData& dst, SrcTileData& src, FpTileData& fp, uint16_t indexRow, u
     return {};
 }
 
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, typename FpTileData,
+    ReluPreMode reluMode = ReluPreMode::NoRelu, typename... WaitEvents,
+    std::enable_if_t<
+        is_tile_data_v<FpTileData> && (FpTileData::Loc == TileType::Scaling) && all_events_v<WaitEvents...>, int> = 0>
+PTO_INST RecordEvent
+TINSERT(DstTileData& dst, SrcTileData& src, FpTileData& fp, uint16_t indexRow, uint16_t indexCol, WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TINSERT_IMPL<DstTileData, SrcTileData, FpTileData, reluMode, Phase>(dst, src, fp, indexRow, indexCol);
+    return {};
+}
+#endif
+
 template <
     typename DstTileData, typename SrcTileData, typename FpTileData, ReluPreMode reluMode = ReluPreMode::NoRelu,
     typename... WaitEvents, std::enable_if_t<is_tile_data_v<FpTileData> && all_events_v<WaitEvents...>, int> = 0>
@@ -1403,6 +1501,20 @@ PTO_INST RecordEvent TINSERT_FP(
     TINSERT_IMPL<DstTileData, SrcTileData, FpTileData, reluMode>(dst, src, fp, indexRow, indexCol);
     return {};
 }
+
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(__CPU_SIM)
+template <
+    STPhase Phase, typename DstTileData, typename SrcTileData, typename FpTileData,
+    ReluPreMode reluMode = ReluPreMode::NoRelu, typename... WaitEvents,
+    std::enable_if_t<is_tile_data_v<FpTileData> && all_events_v<WaitEvents...>, int> = 0>
+PTO_INST RecordEvent TINSERT_FP(
+    DstTileData& dst, SrcTileData& src, FpTileData& fp, uint16_t indexRow, uint16_t indexCol, WaitEvents&... events)
+{
+    detail::PtoWaitEvents(events...);
+    TINSERT_IMPL<DstTileData, SrcTileData, FpTileData, reluMode, Phase>(dst, src, fp, indexRow, indexCol);
+    return {};
+}
+#endif
 
 #if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || defined(__CPU_SIM)
 template <
@@ -1740,8 +1852,8 @@ PTO_INST RecordEvent TMOV(DstTileData& dst, SrcTileData& src, FpTileData& fp, Wa
     return {};
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || \
-    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_KIRIN9030) || \
+    defined(PTO_NPU_ARCH_KIRINX90) || defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
 template <
     STPhase Phase, typename DstTileData, typename SrcTileData, typename FpTileData,
     ReluPreMode reluMode = ReluPreMode::NoRelu, typename... WaitEvents,
@@ -1765,8 +1877,8 @@ PTO_INST RecordEvent TMOV_FP(DstTileData& dst, SrcTileData& src, FpTileData& fp,
     return {};
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || \
-    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_KIRIN9030) || \
+    defined(PTO_NPU_ARCH_KIRINX90) || defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
 template <
     STPhase Phase, typename DstTileData, typename SrcTileData, typename FpTileData,
     ReluPreMode reluMode = ReluPreMode::NoRelu, typename... WaitEvents,
