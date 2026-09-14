@@ -23,7 +23,7 @@ namespace comm {
 using NotifyOp = ::pto::comm::NotifyOp;
 
 template <typename GlobalSignalData>
-void TNotify_Impl(typename GlobalSignalData::DType *dstSignaData, int32_t value, NotifyOp op)
+void TNotify_Impl(typename GlobalSignalData::DType* dstSignaData, int32_t value, NotifyOp op)
 {
     switch (op) {
         case NotifyOp::AtomicAdd:
@@ -38,7 +38,7 @@ void TNotify_Impl(typename GlobalSignalData::DType *dstSignaData, int32_t value,
 }
 
 template <typename GlobalSignalData>
-PTO_INTERNAL void TNOTIFY_IMPL(GlobalSignalData &dstSignaData, int32_t value, NotifyOp op)
+PTO_INTERNAL void TNOTIFY_IMPL(GlobalSignalData& dstSignaData, int32_t value, NotifyOp op)
 {
     TNotify_Impl<GlobalSignalData>(dstSignaData.data(), value, op);
 }

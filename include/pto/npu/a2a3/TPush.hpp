@@ -62,10 +62,7 @@ struct TPipe {
         return (tileIndex % SyncPeriod) == 0;
     }
 
-    PTO_INTERNAL static bool shouldNotifyFree(uint32_t tileIndex)
-    {
-        return ((tileIndex + 1) % SyncPeriod) == 0;
-    }
+    PTO_INTERNAL static bool shouldNotifyFree(uint32_t tileIndex) { return ((tileIndex + 1) % SyncPeriod) == 0; }
 
     // Count TFREE notifications not consumed by steady-state TPUSH waits. Draining a fixed
     // SyncPeriod leaves stale flags or waits for notifications that will never arrive when

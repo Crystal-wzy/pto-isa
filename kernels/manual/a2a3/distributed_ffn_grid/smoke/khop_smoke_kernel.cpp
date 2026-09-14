@@ -53,8 +53,9 @@ constexpr int kUbSend = 0x0000;
 constexpr int kUbRecv = 0x4000;
 #endif
 
-__global__ AICORE void KHopSmokeKernel(__gm__ uint8_t *fftsAddr, __gm__ uint8_t *windows, __gm__ uint8_t *inBuf,
-                                       __gm__ uint8_t *outBuf, __gm__ uint8_t *hcclCtxRaw, int gridRows, int gridCols)
+__global__ AICORE void KHopSmokeKernel(
+    __gm__ uint8_t* fftsAddr, __gm__ uint8_t* windows, __gm__ uint8_t* inBuf, __gm__ uint8_t* outBuf,
+    __gm__ uint8_t* hcclCtxRaw, int gridRows, int gridCols)
 {
 #ifdef __CCE_AICORE__
     set_ffts_base_addr(reinterpret_cast<uint64_t>(fftsAddr));
@@ -78,12 +79,13 @@ __global__ AICORE void KHopSmokeKernel(__gm__ uint8_t *fftsAddr, __gm__ uint8_t 
         SmokePipe pipe;
         GridShape shape{gridRows, gridCols};
         GridCoord coord{blockIdx / gridCols, blockIdx - (blockIdx / gridCols) * gridCols};
-        __gm__ uint8_t *window = windows + blockIdx * KHOP_WINDOW_BYTES;
-        a2a3_grid::InitGridPipeFromWindow(pipe, shape, coord, window, reinterpret_cast<__gm__ void *>(hcclCtxRaw),
-                                          /*pipeId=*/0);
+        __gm__ uint8_t* window = windows + blockIdx * KHOP_WINDOW_BYTES;
+        a2a3_grid::InitGridPipeFromWindow(
+            pipe, shape, coord, window, reinterpret_cast<__gm__ void*>(hcclCtxRaw),
+            /*pipeId=*/0);
 
         // Each cell loads its own stamped input tile (MTE2 -> UB).
-        GSmoke inG(reinterpret_cast<__gm__ float *>(inBuf + blockIdx * KHOP_TILE_BYTES));
+        GSmoke inG(reinterpret_cast<__gm__ float*>(inBuf + blockIdx * KHOP_TILE_BYTES));
         TLOAD(sendTile, inG);
 #ifndef __PTO_AUTO__
         set_flag(PIPE_MTE2, PIPE_MTE3, EVENT_ID0);
@@ -110,7 +112,7 @@ __global__ AICORE void KHopSmokeKernel(__gm__ uint8_t *fftsAddr, __gm__ uint8_t 
             pipe_barrier(PIPE_ALL);
 #endif
             dsb(DSB_DDR);
-            GSmoke outG(reinterpret_cast<__gm__ float *>(outBuf + blockIdx * KHOP_TILE_BYTES));
+            GSmoke outG(reinterpret_cast<__gm__ float*>(outBuf + blockIdx * KHOP_TILE_BYTES));
             TSTORE(outG, recvTile);
 #ifndef __PTO_AUTO__
             pipe_barrier(PIPE_ALL);
@@ -129,8 +131,9 @@ __global__ AICORE void KHopSmokeKernel(__gm__ uint8_t *fftsAddr, __gm__ uint8_t 
 #endif
 }
 
-void launchKHopSmokeKernel(uint8_t *ffts, uint8_t *windows, uint8_t *inBuf, uint8_t *outBuf, uint8_t *hcclCtx,
-                           int gridRows, int gridCols, void *stream)
+void launchKHopSmokeKernel(
+    uint8_t* ffts, uint8_t* windows, uint8_t* inBuf, uint8_t* outBuf, uint8_t* hcclCtx, int gridRows, int gridCols,
+    void* stream)
 {
     int totalBlocks = gridRows * gridCols;
     if (totalBlocks <= 0) {

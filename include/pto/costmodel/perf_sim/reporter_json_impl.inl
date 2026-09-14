@@ -19,24 +19,21 @@ struct FlowSrc {
 
 using SignalMap = std::unordered_map<int64_t, std::vector<FlowSrc>>;
 
-static int64_t JsonFlowKey(int pid, event_t ev)
-{
-    return static_cast<int64_t>(pid) * 1000000LL + ev;
-}
+static int64_t JsonFlowKey(int pid, event_t ev) { return static_cast<int64_t>(pid) * 1000000LL + ev; }
 
 static LabelMap BuildLabelMaps(uint32_t num_cores)
 {
     LabelMap label_maps;
     for (uint32_t c = 0; c < num_cores; ++c) {
-        auto &labels = label_maps[static_cast<int>(c)];
-        for (auto &t : GetTracksForCore(c)) {
+        auto& labels = label_maps[static_cast<int>(c)];
+        for (auto& t : GetTracksForCore(c)) {
             labels[t.tid] = t.display_name;
         }
     }
     return label_maps;
 }
 
-static std::string DisplayTid(const LabelMap &label_maps, int pid, const std::string &label)
+static std::string DisplayTid(const LabelMap& label_maps, int pid, const std::string& label)
 {
     auto core_it = label_maps.find(pid);
     if (core_it == label_maps.end()) {
@@ -46,16 +43,16 @@ static std::string DisplayTid(const LabelMap &label_maps, int pid, const std::st
     return label_it == core_it->second.end() ? label : label_it->second;
 }
 
-static void CollectJsonSignals(const LabelMap &label_maps, SignalMap &signal_map, int pid,
-                               const std::vector<PipeEvent> &events)
+static void CollectJsonSignals(
+    const LabelMap& label_maps, SignalMap& signal_map, int pid, const std::vector<PipeEvent>& events)
 {
-    auto add_signal = [&](event_t signal, const PipeEvent &ev) {
+    auto add_signal = [&](event_t signal, const PipeEvent& ev) {
         if (signal >= 0) {
             signal_map[JsonFlowKey(pid, signal)].push_back(
                 {pid, DisplayTid(label_maps, pid, ev.pipe_label), ev.name, ev.end_cycle});
         }
     };
-    for (auto &ev : events) {
+    for (auto& ev : events) {
         add_signal(ev.signal_event, ev);
         for (int i = 0; i < ev.extra_signal_count; ++i) {
             add_signal(ev.extra_signals[i], ev);
@@ -63,7 +60,7 @@ static void CollectJsonSignals(const LabelMap &label_maps, SignalMap &signal_map
     }
 }
 
-static SignalMap BuildJsonSignalMap(const SimReport &report, const LabelMap &label_maps)
+static SignalMap BuildJsonSignalMap(const SimReport& report, const LabelMap& label_maps)
 {
     SignalMap signal_map;
     if (report.num_cores == 1) {
@@ -86,14 +83,14 @@ static std::unordered_map<std::string, int> BuildJsonSortMap(int pid)
     return sort_map;
 }
 
-static const FlowSrc *FindJsonFlowSource(const SignalMap &signal_map, int pid, event_t wait, uint64_t wait_start)
+static const FlowSrc* FindJsonFlowSource(const SignalMap& signal_map, int pid, event_t wait, uint64_t wait_start)
 {
     auto it = signal_map.find(JsonFlowKey(pid, wait));
     if (it == signal_map.end()) {
         return nullptr;
     }
-    const FlowSrc *best = nullptr;
-    for (const auto &src : it->second) {
+    const FlowSrc* best = nullptr;
+    for (const auto& src : it->second) {
         bool scalar_meta = src.name.find("TASSIGN(") == 0 || src.name.find("TRESHAPE(") == 0 ||
                            src.name.find("TALLOC(") == 0 || src.name.find("TFREE(") == 0;
         if (src.ts <= wait_start && !scalar_meta && (best == nullptr || src.ts > best->ts)) {
@@ -103,8 +100,8 @@ static const FlowSrc *FindJsonFlowSource(const SignalMap &signal_map, int pid, e
     return best;
 }
 
-static void WriteJsonFlow(std::ostream &out, const FlowSrc &src, int pid, const std::string &dst_tid,
-                          const PipeEvent &ev, int64_t flow_id)
+static void WriteJsonFlow(
+    std::ostream& out, const FlowSrc& src, int pid, const std::string& dst_tid, const PipeEvent& ev, int64_t flow_id)
 {
     out << ",\n";
     out << "  {\"name\": \"dep\", \"cat\": \"flow\", \"ph\": \"s\","
@@ -122,8 +119,9 @@ static void WriteJsonFlow(std::ostream &out, const FlowSrc &src, int pid, const 
         << "\"args\":{\"dst\":\"" << ev.name << "\"}}";
 }
 
-static void WriteJsonEvent(std::ostream &out, const LabelMap &label_maps, const SignalMap &signal_map, int pid,
-                           const PipeEvent &ev, bool &first, int64_t &flow_id)
+static void WriteJsonEvent(
+    std::ostream& out, const LabelMap& label_maps, const SignalMap& signal_map, int pid, const PipeEvent& ev,
+    bool& first, int64_t& flow_id)
 {
     if ((ev.end_cycle == ev.start_cycle && ev.is_sync) ||
         (ev.end_cycle == ev.start_cycle && ev.pipe_label == "Scalar")) {
@@ -147,15 +145,16 @@ static void WriteJsonEvent(std::ostream &out, const LabelMap &label_maps, const 
     }
     out << "\"}}";
     for (int i = 0; i < ev.wait_count; ++i) {
-        auto *src = FindJsonFlowSource(signal_map, pid, ev.wait_events[i], ev.start_cycle);
+        auto* src = FindJsonFlowSource(signal_map, pid, ev.wait_events[i], ev.start_cycle);
         if (src != nullptr && src->tid != dst_tid) {
             WriteJsonFlow(out, *src, pid, dst_tid, ev, flow_id++);
         }
     }
 }
 
-static void WriteSortedJsonEvents(std::ostream &out, const LabelMap &label_maps, const SignalMap &signal_map, int pid,
-                                  const std::vector<PipeEvent> &events, bool &first, int64_t &flow_id)
+static void WriteSortedJsonEvents(
+    std::ostream& out, const LabelMap& label_maps, const SignalMap& signal_map, int pid,
+    const std::vector<PipeEvent>& events, bool& first, int64_t& flow_id)
 {
     auto sort_map = BuildJsonSortMap(pid);
     std::vector<size_t> idx(events.size());
@@ -175,8 +174,8 @@ static void WriteSortedJsonEvents(std::ostream &out, const LabelMap &label_maps,
     }
 }
 
-static void WriteJsonEvents(std::ostream &out, const SimReport &report, const LabelMap &label_maps,
-                            const SignalMap &signal_map)
+static void WriteJsonEvents(
+    std::ostream& out, const SimReport& report, const LabelMap& label_maps, const SignalMap& signal_map)
 {
     bool first = false;
     int64_t flow_id = 1;
@@ -185,15 +184,15 @@ static void WriteJsonEvents(std::ostream &out, const SimReport &report, const La
         return;
     }
     for (uint32_t c = 0; c < report.num_cores; ++c) {
-        WriteSortedJsonEvents(out, label_maps, signal_map, static_cast<int>(c),
-                              report.multi_timeline.per_core[c].events, first, flow_id);
+        WriteSortedJsonEvents(
+            out, label_maps, signal_map, static_cast<int>(c), report.multi_timeline.per_core[c].events, first, flow_id);
     }
 }
 
-static void WriteJsonTrackMeta(std::ostream &out, int pid)
+static void WriteJsonTrackMeta(std::ostream& out, int pid)
 {
     int sort_idx = 0;
-    for (auto &t : GetTracksForCore(static_cast<uint32_t>(pid))) {
+    for (auto& t : GetTracksForCore(static_cast<uint32_t>(pid))) {
         out << ",\n";
         out << "  {\"ph\":\"M\",\"pid\":" << pid << ",\"tid\":\"" << t.display_name << "\",\"name\":\"thread_name\""
             << ",\"args\":{\"name\":\"" << t.display_name << "\"}}";
@@ -204,7 +203,7 @@ static void WriteJsonTrackMeta(std::ostream &out, int pid)
     }
 }
 
-static void WriteJsonProcessMeta(std::ostream &out, uint32_t core_id, bool emit_leading_comma)
+static void WriteJsonProcessMeta(std::ostream& out, uint32_t core_id, bool emit_leading_comma)
 {
     if (emit_leading_comma) {
         out << ",";
@@ -216,7 +215,7 @@ static void WriteJsonProcessMeta(std::ostream &out, uint32_t core_id, bool emit_
     WriteJsonTrackMeta(out, static_cast<int>(core_id));
 }
 
-static void WriteJsonMetadata(std::ostream &out, const SimReport &report)
+static void WriteJsonMetadata(std::ostream& out, const SimReport& report)
 {
     if (report.num_cores == 1) {
         out << "  {\"ph\":\"M\",\"pid\":0,\"tid\":0,"
@@ -231,7 +230,7 @@ static void WriteJsonMetadata(std::ostream &out, const SimReport &report)
     }
 }
 
-static void WriteSwimlaneJson(const std::string &path, const SimReport &report)
+static void WriteSwimlaneJson(const std::string& path, const SimReport& report)
 {
     if (!EnsureParentDir(path)) {
         return;

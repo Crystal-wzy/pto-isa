@@ -28,7 +28,7 @@ using namespace pto;
 namespace {
 
 template <typename TileData>
-void FillLinear(TileData &tile, typename TileData::DType start = typename TileData::DType(1))
+void FillLinear(TileData& tile, typename TileData::DType start = typename TileData::DType(1))
 {
     auto value = start;
     for (int r = 0; r < tile.GetValidRow(); ++r) {
@@ -39,13 +39,13 @@ void FillLinear(TileData &tile, typename TileData::DType start = typename TileDa
 }
 
 template <typename TileData>
-void FillAll(TileData &tile, typename TileData::DType value)
+void FillAll(TileData& tile, typename TileData::DType value)
 {
     std::fill(tile.data(), tile.data() + TileData::Numel, value);
 }
 
 template <typename TileData>
-void AssignTileStorage(TileData &tile, size_t &addr)
+void AssignTileStorage(TileData& tile, size_t& addr)
 {
     TASSIGN(tile, addr);
     addr += sizeof(typename TileData::DType) * static_cast<size_t>(TileData::Numel);
@@ -53,26 +53,26 @@ void AssignTileStorage(TileData &tile, size_t &addr)
 }
 
 template <typename... TileData>
-void AssignTileStorage(size_t &addr, TileData &...tiles)
+void AssignTileStorage(size_t& addr, TileData&... tiles)
 {
     (AssignTileStorage(tiles, addr), ...);
 }
 
 template <typename TileData>
-auto GetValue(const TileData &tile, int r, int c) -> typename TileData::DType
+auto GetValue(const TileData& tile, int r, int c) -> typename TileData::DType
 {
     return tile.data()[GetTileElementOffset<TileData>(r, c)];
 }
 
 template <typename TileData>
-void SetValue(TileData &tile, int r, int c, typename TileData::DType value)
+void SetValue(TileData& tile, int r, int c, typename TileData::DType value)
 {
     tile.data()[GetTileElementOffset<TileData>(r, c)] = value;
 }
 
 template <typename AccTile, typename LeftTile, typename RightTile>
-std::vector<typename AccTile::DType> ComputeMatmulExpected(const LeftTile &lhs, const RightTile &rhs,
-                                                           const AccTile *acc = nullptr, const float *bias = nullptr)
+std::vector<typename AccTile::DType> ComputeMatmulExpected(
+    const LeftTile& lhs, const RightTile& rhs, const AccTile* acc = nullptr, const float* bias = nullptr)
 {
     std::vector<typename AccTile::DType> expected(AccTile::Numel, typename AccTile::DType(0));
     for (int r = 0; r < lhs.GetValidRow(); ++r) {
@@ -92,7 +92,7 @@ std::vector<typename AccTile::DType> ComputeMatmulExpected(const LeftTile &lhs, 
 }
 
 template <typename TileData>
-void ExpectTileEqualsVector(const TileData &tile, const std::vector<typename TileData::DType> &expected)
+void ExpectTileEqualsVector(const TileData& tile, const std::vector<typename TileData::DType>& expected)
 {
     ASSERT_EQ(expected.size(), static_cast<size_t>(TileData::Numel));
     for (int i = 0; i < TileData::Numel; ++i) {
@@ -113,7 +113,7 @@ std::filesystem::path RepoRoot()
     return path;
 }
 
-std::vector<std::string> LoadIsaList(const std::filesystem::path &repoRoot)
+std::vector<std::string> LoadIsaList(const std::filesystem::path& repoRoot)
 {
     std::vector<std::string> ops;
     std::ifstream in(repoRoot / "include/pto/common/pto_instr.hpp");
@@ -131,24 +131,24 @@ std::vector<std::string> LoadIsaList(const std::filesystem::path &repoRoot)
     return ops;
 }
 
-std::map<std::string, std::set<std::string>> CollectCoverage(const std::filesystem::path &repoRoot,
-                                                             const std::vector<std::filesystem::path> &roots,
-                                                             const std::vector<std::string> &ops)
+std::map<std::string, std::set<std::string>> CollectCoverage(
+    const std::filesystem::path& repoRoot, const std::vector<std::filesystem::path>& roots,
+    const std::vector<std::string>& ops)
 {
     std::map<std::string, std::set<std::string>> usage;
     std::set<std::string> isaSet;
-    for (const auto &op : ops) {
+    for (const auto& op : ops) {
         usage.emplace(op, std::set<std::string>{});
         isaSet.insert(op);
     }
 
     const std::regex tokenPattern(R"(\b([A-Z][A-Z0-9_]+)\s*(?:<|\())");
 
-    for (const auto &root : roots) {
+    for (const auto& root : roots) {
         if (!std::filesystem::exists(root)) {
             continue;
         }
-        for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
             if (!entry.is_regular_file()) {
                 continue;
             }
@@ -172,11 +172,11 @@ std::map<std::string, std::set<std::string>> CollectCoverage(const std::filesyst
     return usage;
 }
 
-std::set<std::string> CollectCpuCaseDirs(const std::filesystem::path &repoRoot)
+std::set<std::string> CollectCpuCaseDirs(const std::filesystem::path& repoRoot)
 {
     std::set<std::string> dirs;
     const auto testcaseRoot = repoRoot / "tests/cpu/st/testcase";
-    for (const auto &entry : std::filesystem::directory_iterator(testcaseRoot)) {
+    for (const auto& entry : std::filesystem::directory_iterator(testcaseRoot)) {
         if (entry.is_directory()) {
             dirs.insert(entry.path().filename().string());
         }
@@ -184,7 +184,7 @@ std::set<std::string> CollectCpuCaseDirs(const std::filesystem::path &repoRoot)
     return dirs;
 }
 
-std::set<std::string> CollectCpuListedCases(const std::filesystem::path &repoRoot)
+std::set<std::string> CollectCpuListedCases(const std::filesystem::path& repoRoot)
 {
     std::set<std::string> listed;
     std::ifstream in(repoRoot / "tests/cpu/st/testcase/CMakeLists.txt");
@@ -221,7 +221,7 @@ TEST_F(IsaCoverageTest, RepoWideCoverageTouchesEveryIsaEntryPoint)
         CollectCoverage(repoRoot, {repoRoot / "tests/cpu", repoRoot / "tests/npu", repoRoot / "tests/costmodel"}, ops);
 
     std::vector<std::string> missing;
-    for (const auto &op : ops) {
+    for (const auto& op : ops) {
         if (usage.at(op).empty()) {
             missing.push_back(op);
         }
@@ -237,7 +237,7 @@ TEST_F(IsaCoverageTest, CpuCoverageTouchesEveryIsaEntryPoint)
     const auto usage = CollectCoverage(repoRoot, {repoRoot / "tests/cpu"}, ops);
 
     std::vector<std::string> missing;
-    for (const auto &op : ops) {
+    for (const auto& op : ops) {
         if (usage.at(op).empty()) {
             missing.push_back(op);
         }
@@ -254,7 +254,7 @@ TEST_F(IsaCoverageTest, CpuCaseDirectoriesAreListedInCpuStCMake)
     const auto listed = CollectCpuListedCases(repoRoot);
 
     std::vector<std::string> missingFromCMake;
-    for (const auto &dir : dirs) {
+    for (const auto& dir : dirs) {
         if (!listed.count(dir)) {
             missingFromCMake.push_back(dir);
         }
@@ -318,11 +318,13 @@ TEST_F(IsaCoverageTest, TfmodAndTfmodsUseFloatingPointRemainder)
 
 TEST_F(IsaCoverageTest, TfillpadInplaceAndExpandPadRemainingElements)
 {
-    using InplaceDst = Tile<TileType::Vec, int16_t, 4, 16, BLayout::RowMajor, 4, 16, SLayout::NoneBox,
-                            TileConfig::fractalABSize, PadValue::Max>;
+    using InplaceDst = Tile<
+        TileType::Vec, int16_t, 4, 16, BLayout::RowMajor, 4, 16, SLayout::NoneBox, TileConfig::fractalABSize,
+        PadValue::Max>;
     using SrcTile = Tile<TileType::Vec, int16_t, 4, 16, BLayout::RowMajor, 3, 8>;
-    using ExpandDst = Tile<TileType::Vec, int16_t, 5, 16, BLayout::RowMajor, 5, 16, SLayout::NoneBox,
-                           TileConfig::fractalABSize, PadValue::Max>;
+    using ExpandDst = Tile<
+        TileType::Vec, int16_t, 5, 16, BLayout::RowMajor, 5, 16, SLayout::NoneBox, TileConfig::fractalABSize,
+        PadValue::Max>;
 
     InplaceDst inplaceDst;
     ExpandDst expandDst;
@@ -533,7 +535,7 @@ TEST_F(IsaCoverageTest, TprintWritesReadableMatrix)
     FillLinear(src, 1);
 
     std::ostringstream captured;
-    auto *old = std::cout.rdbuf(captured.rdbuf());
+    auto* old = std::cout.rdbuf(captured.rdbuf());
 #ifdef _DEBUG
     TPRINT(src);
 #else

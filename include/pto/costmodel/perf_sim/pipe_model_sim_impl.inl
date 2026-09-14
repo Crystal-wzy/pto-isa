@@ -8,18 +8,18 @@ INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A
 See LICENSE in the root of the software repository for the full text of the License.
 */
 
-inline void SignalChannel(std::vector<EventChannel> &channels, event_t event, uint64_t now)
+inline void SignalChannel(std::vector<EventChannel>& channels, event_t event, uint64_t now)
 {
     if (event < 0 || static_cast<size_t>(event) >= channels.size())
         return;
-    auto &channel = channels[event];
+    auto& channel = channels[event];
     channel.count++;
     channel.signal_cycle = now;
 }
 
-inline bool AnyRunning(const std::vector<PipeQueue> &queues)
+inline bool AnyRunning(const std::vector<PipeQueue>& queues)
 {
-    for (auto &q : queues) {
+    for (auto& q : queues) {
         if (q.current && q.current->state == PipeEntry::RUNNING)
             return true;
     }
@@ -33,8 +33,8 @@ struct StepProgress {
 };
 
 template <typename SignalFn>
-inline void CompleteRunningEntryCommon(PipeQueue &queue, PipeTimeline &timeline, uint64_t now, StepProgress &progress,
-                                       SignalFn signal_fn)
+inline void CompleteRunningEntryCommon(
+    PipeQueue& queue, PipeTimeline& timeline, uint64_t now, StepProgress& progress, SignalFn signal_fn)
 {
     if (!queue.current || queue.current->state != PipeEntry::RUNNING)
         return;
@@ -52,22 +52,22 @@ inline void CompleteRunningEntryCommon(PipeQueue &queue, PipeTimeline &timeline,
     queue.next_free_cycle = now;
 }
 
-inline void CompleteRunningEntry(PipeQueue &queue, PipeTimeline &timeline, std::vector<EventChannel> &channels,
-                                 uint64_t now, StepProgress &progress)
+inline void CompleteRunningEntry(
+    PipeQueue& queue, PipeTimeline& timeline, std::vector<EventChannel>& channels, uint64_t now, StepProgress& progress)
 {
-    CompleteRunningEntryCommon(queue, timeline, now, progress,
-                               [&](event_t event) { SignalChannel(channels, event, now); });
+    CompleteRunningEntryCommon(
+        queue, timeline, now, progress, [&](event_t event) { SignalChannel(channels, event, now); });
 }
 
-inline void PopDoneEntries(std::vector<PipeQueue> &queues)
+inline void PopDoneEntries(std::vector<PipeQueue>& queues)
 {
-    for (auto &queue : queues) {
+    for (auto& queue : queues) {
         while (!queue.entries.empty() && queue.entries.front().state == PipeEntry::DONE)
             queue.entries.pop_front();
     }
 }
 
-inline bool SingleCoreWaitsReady(const PipeEntry &entry, const std::vector<EventChannel> &channels)
+inline bool SingleCoreWaitsReady(const PipeEntry& entry, const std::vector<EventChannel>& channels)
 {
     for (int i = 0; i < entry.wait_count; ++i) {
         event_t wait = entry.wait_events[i];
@@ -77,7 +77,7 @@ inline bool SingleCoreWaitsReady(const PipeEntry &entry, const std::vector<Event
     return true;
 }
 
-inline void ConsumeSingleCoreSyncWaits(const PipeEntry &entry, std::vector<EventChannel> &channels)
+inline void ConsumeSingleCoreSyncWaits(const PipeEntry& entry, std::vector<EventChannel>& channels)
 {
     int sync_base = SyncChannelBase();
     for (int i = 0; i < entry.wait_count; ++i) {
@@ -87,7 +87,7 @@ inline void ConsumeSingleCoreSyncWaits(const PipeEntry &entry, std::vector<Event
     }
 }
 
-inline void StartEntry(PipeQueue &queue, PipeEntry &entry, uint64_t now, L2CacheModel &cache, StepProgress &progress)
+inline void StartEntry(PipeQueue& queue, PipeEntry& entry, uint64_t now, L2CacheModel& cache, StepProgress& progress)
 {
     uint64_t duration = entry.duration;
     if (entry.is_mte && entry.size > 0) {
@@ -102,12 +102,12 @@ inline void StartEntry(PipeQueue &queue, PipeEntry &entry, uint64_t now, L2Cache
     progress.dispatched = true;
 }
 
-inline void TryDispatchSingleCore(PipeQueue &queue, std::vector<EventChannel> &channels, L2CacheModel &cache,
-                                  uint64_t now, StepProgress &progress)
+inline void TryDispatchSingleCore(
+    PipeQueue& queue, std::vector<EventChannel>& channels, L2CacheModel& cache, uint64_t now, StepProgress& progress)
 {
     if (!queue.CanAccept() || queue.entries.empty())
         return;
-    auto &entry = queue.entries.front();
+    auto& entry = queue.entries.front();
     if (entry.name == "BARRIER") {
         StartEntry(queue, entry, now, cache, progress);
         return;
@@ -124,10 +124,10 @@ inline void TryDispatchSingleCore(PipeQueue &queue, std::vector<EventChannel> &c
         StartEntry(queue, entry, now, cache, progress);
 }
 
-inline void CollectStuckEntries(const std::vector<PipeQueue> &queues, PipeTimeline &timeline)
+inline void CollectStuckEntries(const std::vector<PipeQueue>& queues, PipeTimeline& timeline)
 {
-    for (auto &queue : queues) {
-        for (auto &entry : queue.entries)
+    for (auto& queue : queues) {
+        for (auto& entry : queue.entries)
             timeline.events.push_back(BuildPipeEvent(entry, queue.label, true));
     }
 }
@@ -135,7 +135,7 @@ inline void CollectStuckEntries(const std::vector<PipeQueue> &queues, PipeTimeli
 constexpr int EVENTS_PER_CORE = 8192;        // max channels per core (auto-dep + sync)
 constexpr int CROSS_CHANNEL_OFFSET = 262144; // must be > max_cores * EVENTS_PER_CORE
 
-inline event_t EncodeMergedSyncEvent(const SyncRecord &sync, bool cross_core_enabled)
+inline event_t EncodeMergedSyncEvent(const SyncRecord& sync, bool cross_core_enabled)
 {
     if (cross_core_enabled && sync.cross_core) {
         return CROSS_CHANNEL_OFFSET + sync.event_id;
@@ -143,7 +143,7 @@ inline event_t EncodeMergedSyncEvent(const SyncRecord &sync, bool cross_core_ena
     return EncodeSyncKey(sync.dst_pipe, sync.event_id, sync.subblock_id);
 }
 
-inline void PushBarrierEntry(std::vector<PipeQueue> &queues)
+inline void PushBarrierEntry(std::vector<PipeQueue>& queues)
 {
     PipeEntry entry;
     entry.name = "BARRIER";
@@ -151,10 +151,11 @@ inline void PushBarrierEntry(std::vector<PipeQueue> &queues)
     queues[static_cast<int>(PipeStage::Scalar)].Push(std::move(entry));
 }
 
-inline void PushSignalEntry(std::vector<PipeQueue> &queues, const MergedEntry &entry, PipeStage last_mte2,
-                            bool include_seq, bool cross_core_enabled)
+inline void PushSignalEntry(
+    std::vector<PipeQueue>& queues, const MergedEntry& entry, PipeStage last_mte2, bool include_seq,
+    bool cross_core_enabled)
 {
-    const auto &sync = entry.sync;
+    const auto& sync = entry.sync;
     PipeEntry pipe_entry;
     pipe_entry.name = "SIGNAL(" + std::to_string(sync.event_id) + ")";
     if (include_seq) {
@@ -168,10 +169,11 @@ inline void PushSignalEntry(std::vector<PipeQueue> &queues, const MergedEntry &e
     queues[QueueIndex(SyncPipeToStage(sync.src_pipe, last_mte2), sync.subblock_id)].Push(std::move(pipe_entry));
 }
 
-inline void PushWaitEntry(std::vector<PipeQueue> &queues, const MergedEntry &entry, PipeStage last_mte2,
-                          bool include_seq, bool cross_core_enabled)
+inline void PushWaitEntry(
+    std::vector<PipeQueue>& queues, const MergedEntry& entry, PipeStage last_mte2, bool include_seq,
+    bool cross_core_enabled)
 {
-    const auto &sync = entry.sync;
+    const auto& sync = entry.sync;
     PipeEntry pipe_entry;
     pipe_entry.name = "WAIT(" + std::to_string(sync.event_id) + ")";
     if (include_seq) {
@@ -184,8 +186,9 @@ inline void PushWaitEntry(std::vector<PipeQueue> &queues, const MergedEntry &ent
     queues[QueueIndex(SyncPipeToStage(sync.dst_pipe, last_mte2), sync.subblock_id)].Push(std::move(pipe_entry));
 }
 
-inline void PushInstrEntry(std::vector<PipeQueue> &queues, const MergedEntry &entry, PipeStage &last_mte2,
-                           bool include_seq, CvDependencyState &cv_state)
+inline void PushInstrEntry(
+    std::vector<PipeQueue>& queues, const MergedEntry& entry, PipeStage& last_mte2, bool include_seq,
+    CvDependencyState& cv_state)
 {
     int idx = QueueIndex(entry.instr.stage, entry.instr.subblock_id);
     if (idx < 0 || idx >= static_cast<int>(queues.size())) {
@@ -198,8 +201,9 @@ inline void PushInstrEntry(std::vector<PipeQueue> &queues, const MergedEntry &en
     queues[idx].Push(BuildInstrEntry(entry.instr, entry.seq, include_seq, cv_state));
 }
 
-inline void PushMergedEntry(std::vector<PipeQueue> &queues, const MergedEntry &entry, PipeStage &last_mte2,
-                            bool include_seq, bool cross_core_enabled, CvDependencyState &cv_state)
+inline void PushMergedEntry(
+    std::vector<PipeQueue>& queues, const MergedEntry& entry, PipeStage& last_mte2, bool include_seq,
+    bool cross_core_enabled, CvDependencyState& cv_state)
 {
     if (!entry.is_sync) {
         PushInstrEntry(queues, entry, last_mte2, include_seq, cv_state);
@@ -218,12 +222,12 @@ inline void PushMergedEntry(std::vector<PipeQueue> &queues, const MergedEntry &e
     }
 }
 
-inline void FillQueuesFromMergedImpl(std::vector<PipeQueue> &queues, const std::vector<MergedEntry> &merged,
-                                     bool include_seq, bool cross_core_enabled)
+inline void FillQueuesFromMergedImpl(
+    std::vector<PipeQueue>& queues, const std::vector<MergedEntry>& merged, bool include_seq, bool cross_core_enabled)
 {
     PipeStage last_mte2 = PipeStage::MTE2_AIV;
     CvDependencyState cv_state;
-    for (auto &entry : merged) {
+    for (auto& entry : merged) {
         if (entry.sync_consumed) {
             continue;
         }
@@ -231,8 +235,8 @@ inline void FillQueuesFromMergedImpl(std::vector<PipeQueue> &queues, const std::
     }
 }
 
-inline void FillQueuesFromMerged(std::vector<PipeQueue> &queues, std::vector<EventChannel> &channels,
-                                 const std::vector<MergedEntry> &merged)
+inline void FillQueuesFromMerged(
+    std::vector<PipeQueue>& queues, std::vector<EventChannel>& channels, const std::vector<MergedEntry>& merged)
 {
     (void)channels;
     FillQueuesFromMergedImpl(queues, merged, true, false);
@@ -240,20 +244,21 @@ inline void FillQueuesFromMerged(std::vector<PipeQueue> &queues, std::vector<Eve
 
 // ── Event-driven Step simulation with cache ──
 
-inline PipeTimeline StepSimulate(std::vector<PipeQueue> &queues, std::vector<EventChannel> &channels,
-                                 L2CacheModel &cache, uint32_t max_steps = 500000)
+inline PipeTimeline StepSimulate(
+    std::vector<PipeQueue>& queues, std::vector<EventChannel>& channels, L2CacheModel& cache,
+    uint32_t max_steps = 500000)
 {
     PipeTimeline result;
     uint64_t now = 0;
 
     for (uint32_t step = 0; step < max_steps; ++step) {
         StepProgress progress;
-        for (auto &queue : queues)
+        for (auto& queue : queues)
             CompleteRunningEntry(queue, result, channels, now, progress);
 
         PopDoneEntries(queues);
 
-        for (auto &queue : queues)
+        for (auto& queue : queues)
             TryDispatchSingleCore(queue, channels, cache, now, progress);
 
         if (!progress.any_active)
@@ -268,7 +273,7 @@ inline PipeTimeline StepSimulate(std::vector<PipeQueue> &queues, std::vector<Eve
 
     CollectStuckEntries(queues, result);
 
-    for (auto &ev : result.events)
+    for (auto& ev : result.events)
         result.total_cycles = std::max(result.total_cycles, ev.end_cycle);
     return result;
 }
@@ -290,8 +295,8 @@ inline PipeTimeline RunPipeline()
 // ── Multi-core simulation data structures ──
 
 // Helper: lookup EventChannel for multi-core simulation
-inline EventChannel *LookupChannel(std::vector<EventChannel> &intra, std::vector<EventChannel> &cross, uint32_t core_id,
-                                   event_t event_id)
+inline EventChannel* LookupChannel(
+    std::vector<EventChannel>& intra, std::vector<EventChannel>& cross, uint32_t core_id, event_t event_id)
 {
     if (event_id < 0)
         return nullptr;
@@ -307,7 +312,7 @@ inline EventChannel *LookupChannel(std::vector<EventChannel> &intra, std::vector
     return nullptr;
 }
 
-inline void SignalChannel(EventChannel *channel, uint64_t now)
+inline void SignalChannel(EventChannel* channel, uint64_t now)
 {
     if (!channel)
         return;
@@ -325,56 +330,57 @@ struct MultiCoreTimeline {
     uint64_t total_cycles = 0;
 };
 
-inline bool AnyRunning(const std::vector<CorePipeline> &core_pipelines)
+inline bool AnyRunning(const std::vector<CorePipeline>& core_pipelines)
 {
-    for (auto &core : core_pipelines) {
+    for (auto& core : core_pipelines) {
         if (AnyRunning(core.queues))
             return true;
     }
     return false;
 }
 
-inline void CompleteRunningEntry(CorePipeline &core, PipeQueue &queue, PipeTimeline &timeline,
-                                 std::vector<EventChannel> &intra_channels, std::vector<EventChannel> &cross_channels,
-                                 uint64_t now, StepProgress &progress)
+inline void CompleteRunningEntry(
+    CorePipeline& core, PipeQueue& queue, PipeTimeline& timeline, std::vector<EventChannel>& intra_channels,
+    std::vector<EventChannel>& cross_channels, uint64_t now, StepProgress& progress)
 {
     CompleteRunningEntryCommon(queue, timeline, now, progress, [&](event_t event) {
         SignalChannel(LookupChannel(intra_channels, cross_channels, core.core_id, event), now);
     });
 }
 
-inline bool MultiCoreWaitsReady(const PipeEntry &entry, uint32_t core_id, std::vector<EventChannel> &intra_channels,
-                                std::vector<EventChannel> &cross_channels)
+inline bool MultiCoreWaitsReady(
+    const PipeEntry& entry, uint32_t core_id, std::vector<EventChannel>& intra_channels,
+    std::vector<EventChannel>& cross_channels)
 {
     for (int i = 0; i < entry.wait_count; ++i) {
-        auto *channel = LookupChannel(intra_channels, cross_channels, core_id, entry.wait_events[i]);
+        auto* channel = LookupChannel(intra_channels, cross_channels, core_id, entry.wait_events[i]);
         if (channel && !channel->signaled())
             return false;
     }
     return true;
 }
 
-inline void ConsumeMultiCoreSyncWaits(const PipeEntry &entry, uint32_t core_id,
-                                      std::vector<EventChannel> &intra_channels,
-                                      std::vector<EventChannel> &cross_channels)
+inline void ConsumeMultiCoreSyncWaits(
+    const PipeEntry& entry, uint32_t core_id, std::vector<EventChannel>& intra_channels,
+    std::vector<EventChannel>& cross_channels)
 {
     int sync_base = SyncChannelBase();
     for (int i = 0; i < entry.wait_count; ++i) {
         if (entry.wait_events[i] < sync_base)
             continue;
-        auto *channel = LookupChannel(intra_channels, cross_channels, core_id, entry.wait_events[i]);
+        auto* channel = LookupChannel(intra_channels, cross_channels, core_id, entry.wait_events[i]);
         if (channel)
             channel->count--;
     }
 }
 
-inline void TryDispatchMultiCore(CorePipeline &core, PipeQueue &queue, std::vector<EventChannel> &intra_channels,
-                                 std::vector<EventChannel> &cross_channels, L2CacheModel &cache, uint64_t now,
-                                 StepProgress &progress)
+inline void TryDispatchMultiCore(
+    CorePipeline& core, PipeQueue& queue, std::vector<EventChannel>& intra_channels,
+    std::vector<EventChannel>& cross_channels, L2CacheModel& cache, uint64_t now, StepProgress& progress)
 {
     if (!queue.CanAccept() || queue.entries.empty())
         return;
-    auto &entry = queue.entries.front();
+    auto& entry = queue.entries.front();
     if (entry.name == "BARRIER") {
         StartEntry(queue, entry, now, cache, progress);
         return;
@@ -391,11 +397,11 @@ inline void TryDispatchMultiCore(CorePipeline &core, PipeQueue &queue, std::vect
         StartEntry(queue, entry, now, cache, progress);
 }
 
-inline void CollectStuckEntries(const std::vector<CorePipeline> &core_pipelines, MultiCoreTimeline &timeline)
+inline void CollectStuckEntries(const std::vector<CorePipeline>& core_pipelines, MultiCoreTimeline& timeline)
 {
     for (size_t c = 0; c < core_pipelines.size(); ++c) {
-        for (auto &queue : core_pipelines[c].queues) {
-            for (auto &entry : queue.entries)
+        for (auto& queue : core_pipelines[c].queues) {
+            for (auto& entry : queue.entries)
                 timeline.per_core[c].events.push_back(BuildPipeEvent(entry, queue.label, true));
         }
     }
@@ -414,18 +420,18 @@ inline std::vector<std::vector<MergedEntry>> MergeRecordsPerCore(uint32_t num_ph
 
 // ── Multi-core FillQueuesFromMerged (handles cross_core offset) ──
 
-inline void FillQueuesFromMerged(std::vector<PipeQueue> &queues, std::vector<EventChannel> & /*intra_channels*/,
-                                 std::vector<EventChannel> & /*cross_channels*/, const std::vector<MergedEntry> &merged)
+inline void FillQueuesFromMerged(
+    std::vector<PipeQueue>& queues, std::vector<EventChannel>& /*intra_channels*/,
+    std::vector<EventChannel>& /*cross_channels*/, const std::vector<MergedEntry>& merged)
 {
     FillQueuesFromMergedImpl(queues, merged, false, true);
 }
 
 // ── Event-driven multi-core step simulation ──
 
-inline MultiCoreTimeline StepSimulateMultiCore(std::vector<CorePipeline> &core_pipelines,
-                                               std::vector<EventChannel> &intra_channels,
-                                               std::vector<EventChannel> &cross_channels, L2CacheModel &cache,
-                                               uint32_t max_steps = 500000)
+inline MultiCoreTimeline StepSimulateMultiCore(
+    std::vector<CorePipeline>& core_pipelines, std::vector<EventChannel>& intra_channels,
+    std::vector<EventChannel>& cross_channels, L2CacheModel& cache, uint32_t max_steps = 500000)
 {
     MultiCoreTimeline result;
     result.per_core.resize(core_pipelines.size());
@@ -433,17 +439,17 @@ inline MultiCoreTimeline StepSimulateMultiCore(std::vector<CorePipeline> &core_p
 
     for (uint32_t step = 0; step < max_steps; ++step) {
         StepProgress progress;
-        for (auto &cp : core_pipelines) {
-            for (auto &queue : cp.queues)
-                CompleteRunningEntry(cp, queue, result.per_core[cp.core_id], intra_channels, cross_channels, now,
-                                     progress);
+        for (auto& cp : core_pipelines) {
+            for (auto& queue : cp.queues)
+                CompleteRunningEntry(
+                    cp, queue, result.per_core[cp.core_id], intra_channels, cross_channels, now, progress);
         }
 
-        for (auto &cp : core_pipelines)
+        for (auto& cp : core_pipelines)
             PopDoneEntries(cp.queues);
 
-        for (auto &cp : core_pipelines) {
-            for (auto &queue : cp.queues)
+        for (auto& cp : core_pipelines) {
+            for (auto& queue : cp.queues)
                 TryDispatchMultiCore(cp, queue, intra_channels, cross_channels, cache, now, progress);
         }
 
@@ -459,8 +465,8 @@ inline MultiCoreTimeline StepSimulateMultiCore(std::vector<CorePipeline> &core_p
 
     CollectStuckEntries(core_pipelines, result);
 
-    for (auto &tl : result.per_core) {
-        for (auto &ev : tl.events)
+    for (auto& tl : result.per_core) {
+        for (auto& ev : tl.events)
             tl.total_cycles = std::max(tl.total_cycles, ev.end_cycle);
         result.total_cycles = std::max(result.total_cycles, tl.total_cycles);
     }

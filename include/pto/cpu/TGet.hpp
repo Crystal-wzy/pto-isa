@@ -19,8 +19,8 @@ namespace pto {
 namespace comm {
 
 template <typename GlobalDstData, typename GlobalSrcData>
-void TGet_Impl(typename GlobalDstData::DType *dst, typename GlobalSrcData::DType *src, long int shape[],
-               long int stride[])
+void TGet_Impl(
+    typename GlobalDstData::DType* dst, typename GlobalSrcData::DType* src, long int shape[], long int stride[])
 {
     for (size_t i = 0; i < shape[0]; i++) {
         for (size_t j = 0; j < shape[1]; j++) {
@@ -37,7 +37,7 @@ void TGet_Impl(typename GlobalDstData::DType *dst, typename GlobalSrcData::DType
 }
 
 template <typename GlobalDstData, typename GlobalSrcData>
-PTO_INTERNAL void Copy_Data(GlobalDstData &dst, GlobalSrcData &src)
+PTO_INTERNAL void Copy_Data(GlobalDstData& dst, GlobalSrcData& src)
 {
     long int shape[5] = {dst.GetShape(0), dst.GetShape(1), dst.GetShape(2), dst.GetShape(3), dst.GetShape(4)};
     long int stride[5] = {dst.GetStride(0), dst.GetStride(1), dst.GetStride(2), dst.GetStride(3), dst.GetStride(4)};
@@ -45,43 +45,43 @@ PTO_INTERNAL void Copy_Data(GlobalDstData &dst, GlobalSrcData &src)
 }
 
 template <typename GlobalDstData, typename GlobalSrcData, typename TileData>
-PTO_INTERNAL void TGET_IMPL(GlobalDstData &dst, GlobalSrcData &src, TileData &src1)
+PTO_INTERNAL void TGET_IMPL(GlobalDstData& dst, GlobalSrcData& src, TileData& src1)
 {
     Copy_Data(dst, src);
 }
 
 template <typename GlobalDstData, typename GlobalSrcData, typename TileData>
-PTO_INTERNAL void TGET_IMPL(GlobalDstData &dst, GlobalSrcData &src, TileData &ping, TileData &pong)
+PTO_INTERNAL void TGET_IMPL(GlobalDstData& dst, GlobalSrcData& src, TileData& ping, TileData& pong)
 {
     Copy_Data(dst, src);
 }
 
 template <typename GlobalDstData, typename GlobalSrcData, typename TileData>
-PTO_INTERNAL void TPUT_IMPL(GlobalDstData &dst, GlobalSrcData &src, TileData &src1)
+PTO_INTERNAL void TPUT_IMPL(GlobalDstData& dst, GlobalSrcData& src, TileData& src1)
 {
     Copy_Data(src, dst);
 }
 
 template <typename GlobalDstData, typename GlobalSrcData, typename TileData>
-PTO_INTERNAL void TPUT_IMPL(GlobalDstData &dst, GlobalSrcData &src, TileData &src1, AtomicType &atomicType)
+PTO_INTERNAL void TPUT_IMPL(GlobalDstData& dst, GlobalSrcData& src, TileData& src1, AtomicType& atomicType)
 {
     Copy_Data(src, dst);
 }
 
 template <typename GlobalDstData, typename GlobalSrcData, typename TileData>
-PTO_INTERNAL void TPUT_IMPL(GlobalDstData &dst, GlobalSrcData &src, TileData &ping, TileData &pong)
+PTO_INTERNAL void TPUT_IMPL(GlobalDstData& dst, GlobalSrcData& src, TileData& ping, TileData& pong)
 {
     Copy_Data(src, dst);
 }
 
 template <typename GlobalDstData, typename GlobalSrcData>
-PTO_INTERNAL void TGET_ASYNC_IMPL(GlobalDstData &dst, GlobalSrcData &src)
+PTO_INTERNAL void TGET_ASYNC_IMPL(GlobalDstData& dst, GlobalSrcData& src)
 {
     Copy_Data(dst, src);
 }
 
 template <typename GlobalDstData, typename GlobalSrcData>
-PTO_INTERNAL void TPUT_ASYNC_IMPL(GlobalDstData &dst, GlobalSrcData &src)
+PTO_INTERNAL void TPUT_ASYNC_IMPL(GlobalDstData& dst, GlobalSrcData& src)
 {
     Copy_Data(src, dst);
 }

@@ -19,7 +19,8 @@ See LICENSE in the root of the software repository for the full text of the Lice
 // its stamped input tile, pushes it KHOP_DIST hops EAST (if a target exists) and
 // pops/stores a tile from its KHOP_DIST-hop EAST upstream (if one exists).  The
 // hop distance is the compile-time KHOP_DIST constant baked into the kernel.
-void launchKHopSmokeKernel(uint8_t *ffts, uint8_t *windows, uint8_t *inBuf, uint8_t *outBuf, uint8_t *hcclCtx,
-                           int gridRows, int gridCols, void *stream);
+void launchKHopSmokeKernel(
+    uint8_t* ffts, uint8_t* windows, uint8_t* inBuf, uint8_t* outBuf, uint8_t* hcclCtx, int gridRows, int gridCols,
+    void* stream);
 
 #endif // KHOP_SMOKE_LAUNCH_HPP

@@ -41,10 +41,7 @@ TEST(TMin, case_int32_64x64_64x64_64x64_PAD_VALUE_NULL)
     runTMin<int32_t, 64, 64, 64, 64, PadValue::Null, 0.0f, 0.0f>();
 }
 
-TEST(TMin, case_half_64x64_64x64_64x64_PAD_VALUE_NULL)
-{
-    runTMin<half, 64, 64, 64, 64, PadValue::Null, 0.0f, 0.0f>();
-}
+TEST(TMin, case_half_64x64_64x64_64x64_PAD_VALUE_NULL) { runTMin<half, 64, 64, 64, 64, PadValue::Null, 0.0f, 0.0f>(); }
 
 TEST(TMin, case_int16_64x64_64x64_64x64_PAD_VALUE_NULL)
 {

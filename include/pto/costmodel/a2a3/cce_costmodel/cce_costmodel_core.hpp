@@ -67,7 +67,7 @@ inline const ::pto::mocker::evaluator::ArchConfig& CurrentArch()
 
 inline uint64_t EstimateBandwidthCycles(uint64_t bytes, ::pto::mocker::evaluator::PipeKey key)
 {
-    const auto &arch = CurrentArch();
+    const auto& arch = CurrentArch();
     const double bandwidth = arch.bandwidth[key];
     if (bandwidth <= 0.0) {
         return 0;

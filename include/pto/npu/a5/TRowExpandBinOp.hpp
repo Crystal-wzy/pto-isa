@@ -44,8 +44,8 @@ PTO_INTERNAL void TRowExpandBinOps_1D_NoPostUpdate(
         for (uint16_t i = 0; i < (uint16_t)repeatTimes; ++i) {
             uint16_t row = i / repeatTimesPerRow;
             sreg = (uint32_t)(kValidCols);
-            vldas(ureg_1, (__ubuf__ T *)(src1Ptr + row * stride));
-            vldus(vreg_uld, ureg_1, (__ubuf__ T *)(src1Ptr + row * stride));
+            vldas(ureg_1, (__ubuf__ T*)(src1Ptr + row * stride));
+            vldus(vreg_uld, ureg_1, (__ubuf__ T*)(src1Ptr + row * stride));
             vdup(vreg1, vreg_uld, preg_b8_all, POS_LOWEST, MODE_ZEROING);
 
             uint32_t offset = row * kValidCols + i % repeatTimesPerRow * elementsPerRepeat;

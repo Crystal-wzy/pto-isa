@@ -4,7 +4,7 @@ This program is free software, you can redistribute it and/or modify it under th
 CANN Open Software License Agreement Version 2.0 (the "License").
 Please refer to the License for details. You may not use this file except in compliance with the License.
 THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE.
+INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 See LICENSE in the root of the software repository for the full text of the License.
 */
 
@@ -40,7 +40,7 @@ T cellValue(int iter, int lane, int elem)
 }
 
 template <typename TileData>
-void fillHalfTile(TileData &tile, int iter, int lane)
+void fillHalfTile(TileData& tile, int iter, int lane)
 {
     using T = typename TileData::DType;
     for (int i = 0; i < tile.Numel; ++i) {
@@ -74,7 +74,7 @@ std::vector<T> makeExpected(int iter)
 
 // One AIV lane pushes its half tile into the shared slot.
 template <typename T, int rows, int cols, TileSplitAxis Split, typename Pipe>
-void pushLane(Pipe &pipe, int iter, int lane)
+void pushLane(Pipe& pipe, int iter, int lane)
 {
     constexpr int prodRows = (Split == TileSplitAxis::TILE_UP_DOWN) ? rows / 2 : rows;
     constexpr int prodCols = (Split == TileSplitAxis::TILE_LEFT_RIGHT) ? cols / 2 : cols;
@@ -87,7 +87,7 @@ void pushLane(Pipe &pipe, int iter, int lane)
 }
 
 template <typename T, int rows, int cols, TileSplitAxis Split, typename Pipe>
-void popTile(Pipe &pipe, std::vector<T> &out)
+void popTile(Pipe& pipe, std::vector<T>& out)
 {
     using MatTile = Tile<TileType::Mat, T, rows, cols>;
     cpu_sim::ScopedExecutionContext cubeCtx(0, 0, 1);
@@ -102,7 +102,7 @@ void popTile(Pipe &pipe, std::vector<T> &out)
 // (the cube pipelines: it pops tile k+1 before freeing tile k). Reading the
 // wrong slot here is exactly the V2C-split-reuse bug.
 template <typename T, int rows, int cols, TileSplitAxis Split, typename Pipe>
-void popOnly(Pipe &pipe, std::vector<T> &out)
+void popOnly(Pipe& pipe, std::vector<T>& out)
 {
     using MatTile = Tile<TileType::Mat, T, rows, cols>;
     cpu_sim::ScopedExecutionContext cubeCtx(0, 0, 1);
@@ -113,7 +113,7 @@ void popOnly(Pipe &pipe, std::vector<T> &out)
 }
 
 template <TileSplitAxis Split, typename Pipe>
-void freeOne(Pipe &pipe)
+void freeOne(Pipe& pipe)
 {
     cpu_sim::ScopedExecutionContext cubeCtx(0, 0, 1);
     TFREE<Pipe, Split>(pipe);
@@ -128,7 +128,7 @@ void runSplitSingleTile()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, 0x0, kMatConsumerBase);
+    Pipe pipe((__gm__ void*)nullptr, 0x0, kMatConsumerBase);
 
     pushLane<T, rows, cols, Split>(pipe, 0, 0);
     pushLane<T, rows, cols, Split>(pipe, 0, 1);
@@ -150,7 +150,7 @@ void runSplitWraparound()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, 0x0, kMatConsumerBase);
+    Pipe pipe((__gm__ void*)nullptr, 0x0, kMatConsumerBase);
 
     std::vector<std::vector<T>> actual(kIterations);
 
@@ -171,7 +171,7 @@ void runSplitWraparound()
         if (nextIter < kIterations) {
             popOnly<T, rows, cols, Split>(pipe, actual[nextIter]); // 2 in flight
         }
-        freeOne<Split>(pipe);                                      // retire tile `iter`
+        freeOne<Split>(pipe); // retire tile `iter`
         const int producerIter = iter + kFifoDepth;
         if (producerIter < kIterations) {
             pushBoth(producerIter);
@@ -202,7 +202,7 @@ void runSplitWraparoundBothDir()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, 0x0, kMatConsumerBase);
+    Pipe pipe((__gm__ void*)nullptr, 0x0, kMatConsumerBase);
 
     std::vector<std::vector<T>> actual(kIterations);
 
@@ -220,7 +220,7 @@ void runSplitWraparoundBothDir()
         if (nextIter < kIterations) {
             popOnly<T, rows, cols, Split>(pipe, actual[nextIter]); // 2 in flight
         }
-        freeOne<Split>(pipe);                                      // retire tile `iter`
+        freeOne<Split>(pipe); // retire tile `iter`
         const int producerIter = iter + kFifoDepth;
         if (producerIter < kIterations) {
             pushBoth(producerIter);
@@ -232,13 +232,13 @@ void runSplitWraparoundBothDir()
         EXPECT_TRUE(ResultCmp(expected, actual[iter], 0));
     }
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
 }
 
 template <typename TileData>
-void fillFullTile(TileData &tile, int base)
+void fillFullTile(TileData& tile, int base)
 {
     using T = typename TileData::DType;
     for (int r = 0; r < tile.GetValidRow(); ++r) {
@@ -249,7 +249,7 @@ void fillFullTile(TileData &tile, int base)
 }
 
 template <typename TileData>
-std::vector<typename TileData::DType> readFullTile(TileData &tile)
+std::vector<typename TileData::DType> readFullTile(TileData& tile)
 {
     std::vector<typename TileData::DType> out;
     out.reserve(static_cast<std::size_t>(tile.GetValidRow()) * tile.GetValidCol());
@@ -289,7 +289,7 @@ void runDirBothGmFifoKeepsC2VOrderAcrossV2CPrefetch()
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
     std::vector<uint8_t> gmStorage(static_cast<std::size_t>(Pipe::RingFiFo::SLOT_SIZE) * Pipe::RingFiFo::SLOT_NUM);
-    Pipe pipe(reinterpret_cast<__gm__ void *>(gmStorage.data()), 0x0, 0x0);
+    Pipe pipe(reinterpret_cast<__gm__ void*>(gmStorage.data()), 0x0, 0x0);
 
     auto pushC2V = [&](int base) {
         cpu_sim::ScopedExecutionContext cubeCtx(0, 0, 1);
@@ -346,7 +346,7 @@ void runDirBothGmFifoKeepsC2VOrderAcrossV2CPrefetch()
     popC2V(2000);
     popC2V(3000);
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
 }

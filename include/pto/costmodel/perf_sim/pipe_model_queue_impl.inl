@@ -20,8 +20,8 @@ struct MergedEntry {
 
 inline std::vector<MergedEntry> MergeRecords()
 {
-    auto &instrs = PtoRecorder::Get();
-    auto &syncs = SyncRecorder::Get();
+    auto& instrs = PtoRecorder::Get();
+    auto& syncs = SyncRecorder::Get();
 
     std::vector<MergedEntry> merged;
     merged.reserve(instrs.size() + syncs.size());
@@ -55,8 +55,8 @@ inline std::vector<MergedEntry> MergeRecordsForPhysicalCore(uint32_t phys_core)
 
     for (uint32_t sub = 0; sub < VEC_CORES_PER_AIC; ++sub) {
         uint32_t logical = phys_core * VEC_CORES_PER_AIC + sub;
-        auto &instrs = PtoRecorder::GetForCore(logical);
-        auto &syncs = SyncRecorder::GetForCore(logical);
+        auto& instrs = PtoRecorder::GetForCore(logical);
+        auto& syncs = SyncRecorder::GetForCore(logical);
         all_instrs.insert(all_instrs.end(), instrs.begin(), instrs.end());
         all_syncs.insert(all_syncs.end(), syncs.begin(), syncs.end());
     }
@@ -141,10 +141,7 @@ inline PipeStage SyncPipeToStage(int pipe, PipeStage last_mte2)
     }
 }
 
-inline bool IsMTE2(PipeStage s)
-{
-    return s == PipeStage::MTE2_AIV || s == PipeStage::MTE2_AIC;
-}
+inline bool IsMTE2(PipeStage s) { return s == PipeStage::MTE2_AIV || s == PipeStage::MTE2_AIC; }
 
 // ── Inline sync into merged entries (by global seq order) ──
 // Merges SIGNAL/WAIT sync entries into neighboring instruction entries at the
@@ -152,7 +149,7 @@ inline bool IsMTE2(PipeStage s)
 // src_pipe of a sync doesn't match the PipeStage of the preceding instruction
 // (e.g., TEXTRACT is PipeStage::Vector but sync uses PIPE_MTE1).
 
-inline void InlineSyncIntoMerged(std::vector<MergedEntry> &merged)
+inline void InlineSyncIntoMerged(std::vector<MergedEntry>& merged)
 {
     // Pass 1: attach SIGNALs to preceding instruction entries.
     // Track per (subblock_id, PipeStage) to separate VecCore0/VecCore1.
@@ -162,7 +159,7 @@ inline void InlineSyncIntoMerged(std::vector<MergedEntry> &merged)
     PipeStage last_mte2 = PipeStage::MTE2_AIV;
 
     for (size_t i = 0; i < merged.size(); ++i) {
-        auto &entry = merged[i];
+        auto& entry = merged[i];
         if (!entry.is_sync) {
             int sub = static_cast<int>(entry.instr.subblock_id);
             int pipe_idx = static_cast<int>(entry.instr.stage);
@@ -176,7 +173,7 @@ inline void InlineSyncIntoMerged(std::vector<MergedEntry> &merged)
             PipeStage src_stage = SyncPipeToStage(entry.sync.src_pipe, last_mte2);
             int idx = (sub < 2) ? last_instr[sub][static_cast<int>(src_stage)] : -1;
             if (idx >= 0) {
-                auto &instr = merged[idx].instr;
+                auto& instr = merged[idx].instr;
                 if (instr.extra_sync_signal_count < InstrRecord::MAX_SYNC_SIGNALS) {
                     instr.extra_sync_signals[instr.extra_sync_signal_count++] = ch;
                     entry.sync_consumed = true;
@@ -197,7 +194,7 @@ inline void InlineSyncIntoMerged(std::vector<MergedEntry> &merged)
 
 // ── Build PipeQueues from merged records
 
-inline bool AppendWait(PipeEntry &entry, event_t event)
+inline bool AppendWait(PipeEntry& entry, event_t event)
 {
     if (event < 0 || entry.wait_count >= PipeEntry::MAX_WAIT)
         return false;
@@ -205,7 +202,7 @@ inline bool AppendWait(PipeEntry &entry, event_t event)
     return true;
 }
 
-inline bool AppendUniqueWait(PipeEntry &entry, event_t event)
+inline bool AppendUniqueWait(PipeEntry& entry, event_t event)
 {
     if (event < 0)
         return false;
@@ -216,7 +213,7 @@ inline bool AppendUniqueWait(PipeEntry &entry, event_t event)
     return AppendWait(entry, event);
 }
 
-inline bool AppendExtraSignal(PipeEntry &entry, event_t event)
+inline bool AppendExtraSignal(PipeEntry& entry, event_t event)
 {
     if (event < 0 || entry.extra_signal_count >= PipeEntry::MAX_SIGNALS)
         return false;
@@ -229,7 +226,7 @@ inline bool UsesDirection(uint64_t cv_key, TPipeDir direction)
     return (CvKeyDirection(cv_key) & static_cast<uint8_t>(direction)) == static_cast<uint8_t>(direction);
 }
 
-inline std::string InstrName(const InstrRecord &instr, uint64_t seq, bool include_seq)
+inline std::string InstrName(const InstrRecord& instr, uint64_t seq, bool include_seq)
 {
     std::string name = instr.opcode + "(" + std::to_string(instr.rows) + "x" + std::to_string(instr.cols) +
                        (instr.dtype.empty() ? "" : ",") + instr.dtype + ")";
@@ -240,7 +237,7 @@ inline std::string InstrName(const InstrRecord &instr, uint64_t seq, bool includ
     return name;
 }
 
-inline bool IsTLoadOnStage(const InstrRecord &instr, PipeStage stage)
+inline bool IsTLoadOnStage(const InstrRecord& instr, PipeStage stage)
 {
     return instr.stage == stage && instr.opcode.find("TLOAD") != std::string::npos;
 }
@@ -262,7 +259,7 @@ struct CvDependencyState {
     std::unordered_map<event_t, event_t> pop_by_producer_signal;
     std::unordered_set<event_t> c2v_pop_signals;
 
-    void ObserveProducer(const InstrRecord &instr)
+    void ObserveProducer(const InstrRecord& instr)
     {
         if (instr.stage == PipeStage::Fixpipe && instr.signal_event >= 0) {
             latest_fixp_signal = instr.signal_event;
@@ -273,7 +270,7 @@ struct CvDependencyState {
         }
     }
 
-    CvInstrMeta AttachCvWaits(const InstrRecord &instr, PipeEntry &entry)
+    CvInstrMeta AttachCvWaits(const InstrRecord& instr, PipeEntry& entry)
     {
         CvInstrMeta meta;
         if (instr.cv_key != 0) {
@@ -286,7 +283,7 @@ struct CvDependencyState {
         return meta;
     }
 
-    void CommitCvSignal(const InstrRecord &instr, event_t signal_event, const CvInstrMeta &meta)
+    void CommitCvSignal(const InstrRecord& instr, event_t signal_event, const CvInstrMeta& meta)
     {
         if (instr.cv_key == 0 || signal_event < 0)
             return;
@@ -311,9 +308,9 @@ struct CvDependencyState {
     }
 
 private:
-    void AttachPopWaits(const InstrRecord &instr, PipeEntry &entry, CvInstrMeta &meta)
+    void AttachPopWaits(const InstrRecord& instr, PipeEntry& entry, CvInstrMeta& meta)
     {
-        auto &tokens = ready_tokens[instr.cv_key];
+        auto& tokens = ready_tokens[instr.cv_key];
         if (!tokens.empty() && AppendWait(entry, tokens.front())) {
             event_t token = tokens.front();
             tokens.pop_front();
@@ -328,7 +325,7 @@ private:
             AppendWait(entry, latest_mte3_signal);
     }
 
-    void AttachPushWaits(const InstrRecord &instr, PipeEntry &entry, CvInstrMeta &meta)
+    void AttachPushWaits(const InstrRecord& instr, PipeEntry& entry, CvInstrMeta& meta)
     {
         if (UsesDirection(instr.cv_key, TPipeDir::DIR_C2V) && AppendWait(entry, latest_fixp_signal)) {
             meta.push_producer_signals = pending_c2v_producer_signals;
@@ -340,7 +337,7 @@ private:
             meta.push_producer_signals.push_back(latest_mte3_signal);
     }
 
-    void AttachTLoadWaits(const InstrRecord &instr, PipeEntry &entry)
+    void AttachTLoadWaits(const InstrRecord& instr, PipeEntry& entry)
     {
         if (IsTLoadOnStage(instr, PipeStage::MTE2_AIV)) {
             uint64_t load_index = 0;
@@ -374,7 +371,7 @@ private:
         }
     }
 
-    event_t FindC2VPopWait(const PipeEntry &entry) const
+    event_t FindC2VPopWait(const PipeEntry& entry) const
     {
         for (int i = 0; i < entry.wait_count; ++i) {
             if (c2v_pop_signals.count(entry.wait_events[i]) != 0)
@@ -384,7 +381,7 @@ private:
     }
 };
 
-inline void AppendInstrExtraSignals(const InstrRecord &instr, PipeEntry &entry)
+inline void AppendInstrExtraSignals(const InstrRecord& instr, PipeEntry& entry)
 {
     for (int i = 0; i < instr.extra_sync_signal_count; ++i)
         AppendExtraSignal(entry, instr.extra_sync_signals[i]);
@@ -401,7 +398,7 @@ inline void AppendInstrExtraSignals(const InstrRecord &instr, PipeEntry &entry)
     }
 }
 
-inline PipeEntry BuildInstrEntry(const InstrRecord &instr, uint64_t seq, bool include_seq, CvDependencyState &cv_state)
+inline PipeEntry BuildInstrEntry(const InstrRecord& instr, uint64_t seq, bool include_seq, CvDependencyState& cv_state)
 {
     PipeEntry entry;
     entry.name = InstrName(instr, seq, include_seq);
@@ -418,12 +415,12 @@ inline PipeEntry BuildInstrEntry(const InstrRecord &instr, uint64_t seq, bool in
     return entry;
 }
 
-inline bool IsSyncEntryName(const std::string &name)
+inline bool IsSyncEntryName(const std::string& name)
 {
     return name.find("SIGNAL(") == 0 || name.find("WAIT(") == 0 || name == "BARRIER";
 }
 
-inline PipeEvent BuildPipeEvent(const PipeEntry &entry, const std::string &pipe_label, bool stuck = false)
+inline PipeEvent BuildPipeEvent(const PipeEntry& entry, const std::string& pipe_label, bool stuck = false)
 {
     PipeEvent event;
     event.name = entry.name;

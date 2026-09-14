@@ -16,8 +16,7 @@ namespace pto {
 
 #ifndef TINSERT_MODE_DEFINED
 #define TINSERT_MODE_DEFINED
-enum class TInsertMode : uint8_t
-{
+enum class TInsertMode : uint8_t {
     SPLIT2 = 2,
     SPLIT4 = 3,
 };

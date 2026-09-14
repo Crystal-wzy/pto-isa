@@ -28,8 +28,7 @@ enum class LayoutMode_t : uint8_t {
     NZ2DN = 2,
 };
 
-enum class DequantType
-{
+enum class DequantType {
     SCALAR = 0,
     TENSOR = 1,
 };

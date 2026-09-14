@@ -4,7 +4,7 @@ This program is free software, you can redistribute it and/or modify it under th
 CANN Open Software License Agreement Version 2.0 (the "License").
 Please refer to the License for details. You may not use this file except in compliance with the License.
 THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE.
+INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 See LICENSE in the root of the software repository for the full text of the License.
 */
 
@@ -23,7 +23,7 @@ constexpr uint32_t kMatConsumerBase = 0x20000;
 constexpr uint8_t kPipeFlagId = 12;
 
 template <typename T, int rows, int cols>
-void fillVectorTile(auto &tile, int iter)
+void fillVectorTile(auto& tile, int iter)
 {
     for (int i = 0; i < tile.Numel; ++i) {
         tile.data()[i] = static_cast<T>(iter * 1000 + i + 1);
@@ -51,7 +51,7 @@ void runVectorToCubeNoSplitSingleTile()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, 0x0, kMatConsumerBase);
+    Pipe pipe((__gm__ void*)nullptr, 0x0, kMatConsumerBase);
     VecTile vecTile;
     MatTile matTile;
     TASSIGN(vecTile, 0x0);
@@ -78,7 +78,7 @@ void runVectorToCubeNoSplitWraparound()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, 0x0, kMatConsumerBase);
+    Pipe pipe((__gm__ void*)nullptr, 0x0, kMatConsumerBase);
     std::vector<std::vector<T>> actual(kIterations);
 
     auto pushIter = [&](int iter) {
@@ -124,7 +124,7 @@ void runVectorToCubeNoSplitInactiveLaneNoOp()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, 0x0, kMatConsumerBase);
+    Pipe pipe((__gm__ void*)nullptr, 0x0, kMatConsumerBase);
 
     {
         cpu_sim::ScopedExecutionContext inactiveVecCtx(0, 1, 2);
@@ -135,7 +135,7 @@ void runVectorToCubeNoSplitInactiveLaneNoOp()
     }
 
     {
-        auto &sharedState = Pipe::GetSharedState();
+        auto& sharedState = Pipe::GetSharedState();
         std::lock_guard<std::mutex> lock(sharedState.mutex);
         EXPECT_EQ(sharedState.occupied, 0);
         EXPECT_EQ(sharedState.next_producer_slot, 0);
@@ -162,7 +162,7 @@ void runVectorToCubeNoSplitInactiveLaneNoOp()
     EXPECT_TRUE(ResultCmp(expected, matTile.data(), 0));
 
     {
-        auto &sharedState = Pipe::GetSharedState();
+        auto& sharedState = Pipe::GetSharedState();
         std::lock_guard<std::mutex> lock(sharedState.mutex);
         EXPECT_EQ(sharedState.occupied, 0);
     }

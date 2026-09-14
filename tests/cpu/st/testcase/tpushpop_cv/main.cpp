@@ -26,7 +26,7 @@ protected:
 };
 
 template <typename T, int rows, int cols>
-void fillCubeTile(auto &tile, int iter)
+void fillCubeTile(auto& tile, int iter)
 {
     for (int i = 0; i < tile.Numel; ++i) {
         tile.data()[i] = static_cast<T>(iter * 1000 + i + 1);
@@ -120,10 +120,7 @@ void runCubeToVectorMultiCoreStream()
     }
 }
 
-TEST_F(TPushPopCVTest, cube_to_vector_single_tile_float_64x128)
-{
-    runCubeToVectorSingleTile<float, 64, 128>();
-}
+TEST_F(TPushPopCVTest, cube_to_vector_single_tile_float_64x128) { runCubeToVectorSingleTile<float, 64, 128>(); }
 
 TEST_F(TPushPopCVTest, cube_to_vector_multicore_stream_float_64x128)
 {

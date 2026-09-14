@@ -102,13 +102,14 @@ __tf__ PTO_INTERNAL void TMovToVecImpl(
 }
 
 template <typename DstTileData, typename SrcTileData, unsigned blockSizeElem, unsigned srcStride, unsigned dstStride>
-__tf__ PTO_INTERNAL void TMovToVecImpl(typename DstTileData::TileDType __out__ dst,
-                                       typename SrcTileData::TileDType __in__ src, uint64_t validRow, uint64_t validCol)
+__tf__ PTO_INTERNAL void TMovToVecImpl(
+    typename DstTileData::TileDType __out__ dst, typename SrcTileData::TileDType __in__ src, uint64_t validRow,
+    uint64_t validCol)
 {
     using T = typename SrcTileData::DType;
     using U = typename DstTileData::DType;
-    __ubuf__ T *srcPtr = (__ubuf__ T *)__cce_get_tile_ptr(src);
-    __ubuf__ U *dstPtr = (__ubuf__ U *)__cce_get_tile_ptr(dst);
+    __ubuf__ T* srcPtr = (__ubuf__ T*)__cce_get_tile_ptr(src);
+    __ubuf__ U* dstPtr = (__ubuf__ U*)__cce_get_tile_ptr(dst);
 
     static_assert(sizeof(T) == sizeof(U), "TMOV: src and dst data type is different!");
     constexpr unsigned nRepeatElem = CCE_VL / sizeof(T);

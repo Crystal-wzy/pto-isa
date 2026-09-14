@@ -4,7 +4,7 @@ This program is free software, you can redistribute it and/or modify it under th
 CANN Open Software License Agreement Version 2.0 (the "License").
 Please refer to the License for details. You may not use this file except in compliance with the License.
 THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE.
+INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 See LICENSE in the root of the software repository for the full text of the License.
 */
 
@@ -26,7 +26,7 @@ constexpr uint32_t kVecConsumerBase = 0x10000;
 constexpr uint8_t kPipeFlagId = 10;
 
 template <typename T, int rows, int cols>
-void fillCubeTile(auto &tile, int iter)
+void fillCubeTile(auto& tile, int iter)
 {
     for (int i = 0; i < tile.Numel; ++i) {
         tile.data()[i] = static_cast<T>(iter * 1000 + i + 1);
@@ -54,7 +54,7 @@ void runCubeToVectorNoSplitSingleTile()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, kVecConsumerBase, 0x0);
+    Pipe pipe((__gm__ void*)nullptr, kVecConsumerBase, 0x0);
     CubeTile cubeTile;
     VecTile vecTile;
     TASSIGN(cubeTile, 0x0);
@@ -81,7 +81,7 @@ void runCubeToVectorNoSplitWraparound()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, kVecConsumerBase, 0x0);
+    Pipe pipe((__gm__ void*)nullptr, kVecConsumerBase, 0x0);
     std::vector<std::vector<T>> actual(kIterations);
 
     auto pushIter = [&](int iter) {
@@ -127,7 +127,7 @@ void runCubeToVectorNoSplitDelayedFree()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, kVecConsumerBase, 0x0);
+    Pipe pipe((__gm__ void*)nullptr, kVecConsumerBase, 0x0);
     std::vector<std::vector<T>> actual(kFifoDepth);
 
     cpu_sim::ScopedExecutionContext ctx(0, 0, 1);
@@ -153,7 +153,7 @@ void runCubeToVectorNoSplitDelayedFree()
         EXPECT_TRUE(ResultCmp(expected, actual[iter], 0));
     }
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
     EXPECT_EQ(sharedState.popped_not_freed, 0);
@@ -169,7 +169,7 @@ void runCubeToVectorNoSplitInactiveLaneSkipsProtocol()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, kVecConsumerBase, 0x0);
+    Pipe pipe((__gm__ void*)nullptr, kVecConsumerBase, 0x0);
 
     {
         cpu_sim::ScopedExecutionContext producerCtx(0, 0, 1);
@@ -188,7 +188,7 @@ void runCubeToVectorNoSplitInactiveLaneSkipsProtocol()
     }
 
     {
-        auto &sharedState = Pipe::GetSharedState();
+        auto& sharedState = Pipe::GetSharedState();
         std::lock_guard<std::mutex> lock(sharedState.mutex);
         EXPECT_EQ(sharedState.occupied, 1);
         EXPECT_EQ(sharedState.next_c2v_consumer_slot, 0);
@@ -206,7 +206,7 @@ void runCubeToVectorNoSplitInactiveLaneSkipsProtocol()
     EXPECT_TRUE(ResultCmp(expected, vecTile.data(), 0));
 
     {
-        auto &sharedState = Pipe::GetSharedState();
+        auto& sharedState = Pipe::GetSharedState();
         std::lock_guard<std::mutex> lock(sharedState.mutex);
         EXPECT_EQ(sharedState.occupied, 0);
     }
@@ -222,7 +222,7 @@ void runCubeToVectorNoSplitDualLaneDelayedFree()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, kVecConsumerBase, 0x0);
+    Pipe pipe((__gm__ void*)nullptr, kVecConsumerBase, 0x0);
     std::vector<std::vector<T>> lane0Actual(kFifoDepth);
     std::vector<std::vector<T>> lane1Actual(kFifoDepth);
 
@@ -250,7 +250,7 @@ void runCubeToVectorNoSplitDualLaneDelayedFree()
     }
 
     {
-        auto &sharedState = Pipe::GetSharedState();
+        auto& sharedState = Pipe::GetSharedState();
         std::lock_guard<std::mutex> lock(sharedState.mutex);
         EXPECT_EQ(sharedState.occupied, kFifoDepth);
     }
@@ -271,11 +271,11 @@ void runCubeToVectorNoSplitDualLaneDelayedFree()
     for (int iter = 0; iter < kFifoDepth; ++iter) {
         const auto expected = makeExpected<T, rows, cols>(iter);
         EXPECT_TRUE(ResultCmp(expected, lane0Actual[iter], 0));
-        EXPECT_TRUE(std::all_of(lane1Actual[iter].begin(), lane1Actual[iter].end(),
-                                [](T value) { return value == static_cast<T>(0); }));
+        EXPECT_TRUE(std::all_of(
+            lane1Actual[iter].begin(), lane1Actual[iter].end(), [](T value) { return value == static_cast<T>(0); }));
     }
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
     EXPECT_EQ(sharedState.popped_not_freed_by_lane[0], 0);
@@ -292,7 +292,7 @@ void runCubeToVectorNoSplitDualLaneFastLaneWrapWaits()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, kVecConsumerBase, 0x0);
+    Pipe pipe((__gm__ void*)nullptr, kVecConsumerBase, 0x0);
     std::vector<std::vector<T>> lane0Actual(kFifoDepth + 1);
     std::vector<std::vector<T>> lane1Actual(kFifoDepth);
 
@@ -360,11 +360,11 @@ void runCubeToVectorNoSplitDualLaneFastLaneWrapWaits()
         EXPECT_TRUE(ResultCmp(expected, lane0Actual[iter], 0));
     }
     for (int iter = 0; iter < kFifoDepth; ++iter) {
-        EXPECT_TRUE(std::all_of(lane1Actual[iter].begin(), lane1Actual[iter].end(),
-                                [](T value) { return value == static_cast<T>(0); }));
+        EXPECT_TRUE(std::all_of(
+            lane1Actual[iter].begin(), lane1Actual[iter].end(), [](T value) { return value == static_cast<T>(0); }));
     }
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 1);
     EXPECT_EQ(sharedState.popped_not_freed_by_lane[0], 0);
@@ -382,7 +382,7 @@ void runCubeToVectorNoSplitGmSlotUsesValidShape()
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
     std::vector<uint8_t> gmSlotStorage(Pipe::RingFiFo::SLOT_SIZE * Pipe::RingFiFo::SLOT_NUM);
-    auto *gmSlotBuffer = reinterpret_cast<__gm__ void *>(gmSlotStorage.data());
+    auto* gmSlotBuffer = reinterpret_cast<__gm__ void*>(gmSlotStorage.data());
     Pipe pipe(gmSlotBuffer, kVecConsumerBase, 0x0);
     std::vector<T> actual(VecTile::Numel);
 
@@ -423,7 +423,7 @@ void runCubeToVectorNoSplitGmSlotUsesValidShape()
     }
     EXPECT_TRUE(ResultCmp(expected, actual, 0));
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
 }
@@ -439,7 +439,7 @@ void runCubeToVectorNoSplitGmSlotUsesDynamicValidShape()
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
     std::vector<uint8_t> gmSlotStorage(Pipe::RingFiFo::SLOT_SIZE * Pipe::RingFiFo::SLOT_NUM);
-    auto *gmSlotBuffer = reinterpret_cast<__gm__ void *>(gmSlotStorage.data());
+    auto* gmSlotBuffer = reinterpret_cast<__gm__ void*>(gmSlotStorage.data());
     Pipe pipe(gmSlotBuffer, kVecConsumerBase, 0x0);
     std::vector<T> actual(VecTile::Numel);
 
@@ -480,7 +480,7 @@ void runCubeToVectorNoSplitGmSlotUsesDynamicValidShape()
     }
     EXPECT_TRUE(ResultCmp(expected, actual, 0));
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
 }
@@ -498,7 +498,7 @@ void runBothDirectionNoSplitC2VThenV2C()
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
     std::vector<uint8_t> gmSlotStorage(Pipe::RingFiFo::SLOT_SIZE * Pipe::RingFiFo::SLOT_NUM);
-    auto *gmSlotBuffer = reinterpret_cast<__gm__ void *>(gmSlotStorage.data());
+    auto* gmSlotBuffer = reinterpret_cast<__gm__ void*>(gmSlotStorage.data());
     Pipe pipe(gmSlotBuffer, kVecConsumerBase, kVecConsumerBase + 0x4000);
     std::vector<T> c2vActual(VecConsTile::Numel);
     std::vector<T> secondC2vActual(VecConsTile::Numel);
@@ -588,7 +588,7 @@ void runBothDirectionNoSplitC2VThenV2C()
     EXPECT_TRUE(ResultCmp(secondC2vExpected, secondC2vActual, 0));
     EXPECT_TRUE(ResultCmp(v2cExpected, v2cActual, 0));
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
 }
@@ -614,7 +614,7 @@ void runBothDirectionC2VProducerWaitsForOutOfOrderSlot()
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
     std::vector<uint8_t> gmSlotStorage(Pipe::RingFiFo::SLOT_SIZE * Pipe::RingFiFo::SLOT_NUM);
-    auto *gmSlotBuffer = reinterpret_cast<__gm__ void *>(gmSlotStorage.data());
+    auto* gmSlotBuffer = reinterpret_cast<__gm__ void*>(gmSlotStorage.data());
     Pipe pipe(gmSlotBuffer, kVecConsumerBase, kVecConsumerBase + 0x4000);
 
     // base: X=1, Y=1001, Z=2001 so each C2V tile is distinguishable per slot.
@@ -629,7 +629,7 @@ void runBothDirectionC2VProducerWaitsForOutOfOrderSlot()
         }
         TPUSH<Pipe, CubeProdTile, TileSplitAxis::TILE_NO_SPLIT>(pipe, cubeTile);
     };
-    auto popLaneFree = [&](uint32_t subblock, uint32_t gmOffset, std::vector<T> *capture) {
+    auto popLaneFree = [&](uint32_t subblock, uint32_t gmOffset, std::vector<T>* capture) {
         cpu_sim::ScopedExecutionContext laneCtx(0, subblock, 2);
         VecConsTile vecTile;
         TASSIGN(vecTile, gmOffset);
@@ -717,7 +717,7 @@ void runBothDirectionC2VProducerWaitsForOutOfOrderSlot()
     EXPECT_TRUE(ResultCmp(xExpected, xActual, 0)); // slot1, never corrupted by Z
     EXPECT_TRUE(ResultCmp(zExpected, zActual, 0));
 
-    auto &sharedState = Pipe::GetSharedState();
+    auto& sharedState = Pipe::GetSharedState();
     std::lock_guard<std::mutex> lock(sharedState.mutex);
     EXPECT_EQ(sharedState.occupied, 0);
 }
@@ -735,7 +735,7 @@ void runCubeToVectorNoSplitSingleSubblockOnDualLanePipe()
 
     NPU_MEMORY_CLEAR();
     Pipe::reset_for_cpu_sim();
-    Pipe pipe((__gm__ void *)nullptr, kVecConsumerBase, 0x0);
+    Pipe pipe((__gm__ void*)nullptr, kVecConsumerBase, 0x0);
     std::vector<std::vector<T>> actual(kFifoDepth);
 
     {
@@ -758,7 +758,7 @@ void runCubeToVectorNoSplitSingleSubblockOnDualLanePipe()
             TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
 
             // The single consumer's free releases its slot right away (no second lane pending).
-            auto &sharedState = Pipe::GetSharedState();
+            auto& sharedState = Pipe::GetSharedState();
             std::lock_guard<std::mutex> lock(sharedState.mutex);
             EXPECT_EQ(sharedState.occupied, kFifoDepth - 1 - iter);
         }

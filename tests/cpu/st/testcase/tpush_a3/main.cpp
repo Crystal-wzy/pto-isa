@@ -27,15 +27,13 @@ using T = float;
 
 class TPUSH_A3Test : public testing::Test {
 protected:
-    void SetUp() override
-    {}
-    void TearDown() override
-    {}
+    void SetUp() override {}
+    void TearDown() override {}
 };
 
 std::string GetGoldenDir()
 {
-    const testing::TestInfo *testInfo = testing::UnitTest::GetInstance()->current_test_info();
+    const testing::TestInfo* testInfo = testing::UnitTest::GetInstance()->current_test_info();
     const std::string caseName = testInfo->name();
     std::string suiteName = testInfo->test_suite_name();
     std::string fullPath = "../" + suiteName + "." + caseName;
@@ -45,8 +43,8 @@ std::string GetGoldenDir()
 // Pipe and Communication
 using MainPipe = TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>;
 
-static __aicore__ void main_incore_0_aic(__gm__ float *v1, __gm__ float *v2, __gm__ float *v3, __gm__ float *v4,
-                                         int32_t v5)
+static __aicore__ void main_incore_0_aic(
+    __gm__ float* v1, __gm__ float* v2, __gm__ float* v3, __gm__ float* v4, int32_t v5)
 {
     unsigned v6 = 0;
     const int32_t v7 = 8;
@@ -65,23 +63,27 @@ static __aicore__ void main_incore_0_aic(__gm__ float *v1, __gm__ float *v2, __g
     set_flag(PIPE_M, PIPE_MTE1, EVENT_ID0);
     set_flag(PIPE_FIX, PIPE_M, EVENT_ID0);
     for (size_t v16 = (size_t)v14; v16 < ((size_t)v7); v16 += (size_t)v9) {
-        Tile<TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-             CompactMode::Null>
-            v17 = Tile<TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-                       CompactMode::Null>(v8, v8);
+        Tile<
+            TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+            CompactMode::Null>
+            v17 = Tile<
+                TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+                CompactMode::Null>(v8, v8);
         TASSIGN(v17, v13);
-        Tile<TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-             CompactMode::Null>
-            v18 = Tile<TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-                       CompactMode::Null>(v8, v8);
-        __cbuf__ float *v19 = v17.data();
+        Tile<
+            TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+            CompactMode::Null>
+            v18 = Tile<
+                TileType::Mat, float, 64, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+                CompactMode::Null>(v8, v8);
+        __cbuf__ float* v19 = v17.data();
         uint64_t v20 = reinterpret_cast<uint64_t>(v19);
         TASSIGN(v18, v20);
         pto::Shape<1, 1, 1, 64, 64> v21 = pto::Shape<1, 1, 1, 64, 64>();
         pto::Stride<32768, 32768, 32768, 512, 1> v22 = pto::Stride<32768, 32768, 32768, 512, 1>();
         GlobalTensor<float, pto::Shape<1, 1, 1, 64, 64>, pto::Stride<32768, 32768, 32768, 512, 1>, pto::Layout::ND>
-            v23 = GlobalTensor<float, pto::Shape<1, 1, 1, 64, 64>, pto::Stride<32768, 32768, 32768, 512, 1>,
-                               pto::Layout::ND>(
+            v23 = GlobalTensor<
+                float, pto::Shape<1, 1, 1, 64, 64>, pto::Stride<32768, 32768, 32768, 512, 1>, pto::Layout::ND>(
                 v3 + (v6 + v6 * (unsigned)v10 +
                       (unsigned)((int32_t)(uint32_t)((int32_t)(uint32_t)((int32_t)(uint32_t)v5 * (uint32_t)v7) +
                                                      (uint32_t)((int32_t)v16)) *
@@ -90,56 +92,72 @@ static __aicore__ void main_incore_0_aic(__gm__ float *v1, __gm__ float *v2, __g
                 v21, v22);
         wait_flag(PIPE_MTE1, PIPE_MTE2, EVENT_ID0);
         TLOAD(v18, v23);
-        Tile<TileType::Mat, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-             CompactMode::Null>
-            v24 = Tile<TileType::Mat, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-                       CompactMode::Null>(v11, v8);
-        TPOP<TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
-             Tile<TileType::Mat, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-                  CompactMode::Null>,
-             TileSplitAxis::TILE_LEFT_RIGHT>(v15, v24);
+        Tile<
+            TileType::Mat, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+            CompactMode::Null>
+            v24 = Tile<
+                TileType::Mat, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+                CompactMode::Null>(v11, v8);
+        TPOP<
+            TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
+            Tile<
+                TileType::Mat, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+                CompactMode::Null>,
+            TileSplitAxis::TILE_LEFT_RIGHT>(v15, v24);
         set_flag(PIPE_MTE2, PIPE_MTE1, EVENT_ID0);
-        Tile<TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-             CompactMode::Null>
-            v25 = Tile<TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-                       CompactMode::Null>(v11, v8);
+        Tile<
+            TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+            CompactMode::Null>
+            v25 = Tile<
+                TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+                CompactMode::Null>(v11, v8);
         TASSIGN(v25, v12);
-        Tile<TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-             CompactMode::Null>
-            v26 = Tile<TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
-                       CompactMode::Null>(v11, v8);
-        __ca__ float *v27 = v25.data();
+        Tile<
+            TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+            CompactMode::Null>
+            v26 = Tile<
+                TileType::Left, float, 32, 64, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 512, PadValue::Null,
+                CompactMode::Null>(v11, v8);
+        __ca__ float* v27 = v25.data();
         uint64_t v28 = reinterpret_cast<uint64_t>(v27);
         TASSIGN(v26, v28);
         wait_flag(PIPE_MTE2, PIPE_MTE1, EVENT_ID0);
         wait_flag(PIPE_M, PIPE_MTE1, EVENT_ID0);
         TMOV(v26, v24);
         TFREE<TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>, TileSplitAxis::TILE_LEFT_RIGHT>(v15);
-        Tile<TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512, PadValue::Null,
-             CompactMode::Null>
-            v29 = Tile<TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512,
-                       PadValue::Null, CompactMode::Null>(v8, v8);
+        Tile<
+            TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512, PadValue::Null,
+            CompactMode::Null>
+            v29 = Tile<
+                TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512, PadValue::Null,
+                CompactMode::Null>(v8, v8);
         TASSIGN(v29, v12);
-        Tile<TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512, PadValue::Null,
-             CompactMode::Null>
-            v30 = Tile<TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512,
-                       PadValue::Null, CompactMode::Null>(v8, v8);
-        __cb__ float *v31 = v29.data();
+        Tile<
+            TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512, PadValue::Null,
+            CompactMode::Null>
+            v30 = Tile<
+                TileType::Right, float, 64, 64, BLayout::RowMajor, -1, -1, SLayout::ColMajor, 512, PadValue::Null,
+                CompactMode::Null>(v8, v8);
+        __cb__ float* v31 = v29.data();
         uint64_t v32 = reinterpret_cast<uint64_t>(v31);
         TASSIGN(v30, v32);
         TMOV(v30, v18);
         set_flag(PIPE_MTE1, PIPE_MTE2, EVENT_ID0);
         set_flag(PIPE_MTE1, PIPE_M, EVENT_ID0);
-        Tile<TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
-             CompactMode::Null>
-            v33 = Tile<TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
-                       CompactMode::Null>(v11, v8);
+        Tile<
+            TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
+            CompactMode::Null>
+            v33 = Tile<
+                TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
+                CompactMode::Null>(v11, v8);
         TASSIGN(v33, v12);
-        Tile<TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
-             CompactMode::Null>
-            v34 = Tile<TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
-                       CompactMode::Null>(v11, v8);
-        __cc__ float *v35 = v33.data();
+        Tile<
+            TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
+            CompactMode::Null>
+            v34 = Tile<
+                TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
+                CompactMode::Null>(v11, v8);
+        __cc__ float* v35 = v33.data();
         uint64_t v36 = reinterpret_cast<uint64_t>(v35);
         TASSIGN(v34, v36);
         wait_flag(PIPE_MTE1, PIPE_M, EVENT_ID0);
@@ -148,10 +166,12 @@ static __aicore__ void main_incore_0_aic(__gm__ float *v1, __gm__ float *v2, __g
         set_flag(PIPE_M, PIPE_MTE1, EVENT_ID0);
         set_flag(PIPE_M, PIPE_FIX, EVENT_ID0);
         wait_flag(PIPE_M, PIPE_FIX, EVENT_ID0);
-        TPUSH<TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
-              Tile<TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
-                   CompactMode::Null>,
-              TileSplitAxis::TILE_LEFT_RIGHT>(v15, v34);
+        TPUSH<
+            TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
+            Tile<
+                TileType::Acc, float, 32, 64, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 1024, PadValue::Null,
+                CompactMode::Null>,
+            TileSplitAxis::TILE_LEFT_RIGHT>(v15, v34);
         set_flag(PIPE_FIX, PIPE_M, EVENT_ID0);
     }
     wait_flag(PIPE_MTE1, PIPE_MTE2, EVENT_ID0);
@@ -162,8 +182,8 @@ static __aicore__ void main_incore_0_aic(__gm__ float *v1, __gm__ float *v2, __g
     return;
 }
 
-static __aicore__ void main_incore_0_aiv(__gm__ float *v1, __gm__ float *v2, __gm__ float *v3, __gm__ float *v4,
-                                         int32_t v5)
+static __aicore__ void main_incore_0_aiv(
+    __gm__ float* v1, __gm__ float* v2, __gm__ float* v3, __gm__ float* v4, int32_t v5)
 {
     unsigned v6 = 0;
     const float v7 = 1.0f;
@@ -183,16 +203,20 @@ static __aicore__ void main_incore_0_aiv(__gm__ float *v1, __gm__ float *v2, __g
     set_vector_mask(-1, -1);
     int64_t v18 = get_subblockid();
     auto v19 = TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>(v4, v17, v17);
-    Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-         CompactMode::Null>
-        v20 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                   CompactMode::Null>(v12, v12);
+    Tile<
+        TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+        CompactMode::Null>
+        v20 = Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>(v12, v12);
     TASSIGN(v20, v16);
-    Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-         CompactMode::Null>
-        v21 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                   CompactMode::Null>(v12, v12);
-    __ubuf__ float *v22 = v20.data();
+    Tile<
+        TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+        CompactMode::Null>
+        v21 = Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>(v12, v12);
+    __ubuf__ float* v22 = v20.data();
     uint64_t v23 = reinterpret_cast<uint64_t>(v22);
     TASSIGN(v21, v23);
     int32_t v24 = (int32_t)((uint32_t)((int32_t)(int64_t)v18) * (uint32_t)v12);
@@ -208,23 +232,27 @@ static __aicore__ void main_incore_0_aiv(__gm__ float *v1, __gm__ float *v2, __g
     set_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
     wait_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
     for (size_t v28 = (size_t)v17; v28 < ((size_t)v8); v28 += (size_t)v10) {
-        Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-             CompactMode::Null>
-            v29 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                       CompactMode::Null>(v12, v12);
+        Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>
+            v29 = Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>(v12, v12);
         TASSIGN(v29, v15);
-        Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-             CompactMode::Null>
-            v30 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                       CompactMode::Null>(v12, v12);
-        __ubuf__ float *v31 = v29.data();
+        Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>
+            v30 = Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>(v12, v12);
+        __ubuf__ float* v31 = v29.data();
         uint64_t v32 = reinterpret_cast<uint64_t>(v31);
         TASSIGN(v30, v32);
         pto::Shape<1, 1, 1, 32, 32> v33 = pto::Shape<1, 1, 1, 32, 32>();
         pto::Stride<16384, 16384, 16384, 512, 1> v34 = pto::Stride<16384, 16384, 16384, 512, 1>();
         GlobalTensor<float, pto::Shape<1, 1, 1, 32, 32>, pto::Stride<16384, 16384, 16384, 512, 1>, pto::Layout::ND>
-            v35 = GlobalTensor<float, pto::Shape<1, 1, 1, 32, 32>, pto::Stride<16384, 16384, 16384, 512, 1>,
-                               pto::Layout::ND>(
+            v35 = GlobalTensor<
+                float, pto::Shape<1, 1, 1, 32, 32>, pto::Stride<16384, 16384, 16384, 512, 1>, pto::Layout::ND>(
                 v1 + (v6 + v6 * (unsigned)v11 +
                       (unsigned)((int32_t)(uint32_t)((int32_t)(uint32_t)((int32_t)(uint32_t)((int32_t)(uint32_t)v5 *
                                                                                              (uint32_t)v8) +
@@ -235,46 +263,60 @@ static __aicore__ void main_incore_0_aiv(__gm__ float *v1, __gm__ float *v2, __g
                 v33, v34);
         wait_flag(PIPE_MTE3, PIPE_MTE2, EVENT_ID0);
         TLOAD(v30, v35);
-        Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-             CompactMode::Null>
-            v36 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                       CompactMode::Null>(v12, v12);
+        Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>
+            v36 = Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>(v12, v12);
         TASSIGN(v36, v14);
-        Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-             CompactMode::Null>
-            v37 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                       CompactMode::Null>(v12, v12);
-        __ubuf__ float *v38 = v36.data();
+        Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>
+            v37 = Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>(v12, v12);
+        __ubuf__ float* v38 = v36.data();
         uint64_t v39 = reinterpret_cast<uint64_t>(v38);
         TASSIGN(v37, v39);
         wait_flag(PIPE_MTE3, PIPE_V, EVENT_ID0);
         TADDS(v37, v21, v7);
         set_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
         wait_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
-        TPUSH<TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
-              Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                   CompactMode::Null>,
-              TileSplitAxis::TILE_LEFT_RIGHT>(v19, v37);
+        TPUSH<
+            TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
+            Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>,
+            TileSplitAxis::TILE_LEFT_RIGHT>(v19, v37);
         set_flag(PIPE_MTE3, PIPE_V, EVENT_ID0);
-        Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-             CompactMode::Null>
-            v40 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                       CompactMode::Null>(v12, v12);
-        TPOP<TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
-             Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                  CompactMode::Null>,
-             TileSplitAxis::TILE_LEFT_RIGHT>(v19, v40);
+        Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>
+            v40 = Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>(v12, v12);
+        TPOP<
+            TPipe<0, Direction::DIR_BOTH, 8192, 4, 4, false>,
+            Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>,
+            TileSplitAxis::TILE_LEFT_RIGHT>(v19, v40);
         set_flag(PIPE_MTE2, PIPE_V, EVENT_ID1);
-        Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-             CompactMode::Null>
-            v41 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                       CompactMode::Null>(v12, v12);
+        Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>
+            v41 = Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>(v12, v12);
         TASSIGN(v41, v13);
-        Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-             CompactMode::Null>
-            v42 = Tile<TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
-                       CompactMode::Null>(v12, v12);
-        __ubuf__ float *v43 = v41.data();
+        Tile<
+            TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+            CompactMode::Null>
+            v42 = Tile<
+                TileType::Vec, float, 32, 32, BLayout::RowMajor, -1, -1, SLayout::NoneBox, 512, PadValue::Null,
+                CompactMode::Null>(v12, v12);
+        __ubuf__ float* v43 = v41.data();
         uint64_t v44 = reinterpret_cast<uint64_t>(v43);
         TASSIGN(v42, v44);
         wait_flag(PIPE_MTE2, PIPE_V, EVENT_ID1);
@@ -292,30 +334,30 @@ static __aicore__ void main_incore_0_aiv(__gm__ float *v1, __gm__ float *v2, __g
     return;
 }
 
-void *g_shared_storage_ptr = nullptr;
+void* g_shared_storage_ptr = nullptr;
 // A simple function matching GetPipeSharedStateInjectedHookFn signature
-extern "C" void *GlobalPipeHook(uint64_t key, size_t size)
+extern "C" void* GlobalPipeHook(uint64_t key, size_t size)
 {
     // We'll use a global pointer to store the allocated memory
     return g_shared_storage_ptr;
 }
 
-inline void LaunchTPush(T *out, T *A, T *B, T *C)
+inline void LaunchTPush(T* out, T* A, T* B, T* C)
 {
     size_t v5 = 0;
     std::cout << "Start" << std::endl;
     // 1. Allocate and zero the shared synchronization state
     size_t required_size = sizeof(MainPipe::SharedState);
-    void *raw_mem = malloc(required_size);
+    void* raw_mem = malloc(required_size);
     // g_shared_storage_ptr = calloc(1, required_size);
     g_shared_storage_ptr = new (raw_mem) MainPipe::SharedState();
 
-    T *pipe_mem;
-    aclrtMalloc((void **)&pipe_mem, 2 * 65536, ACL_MEM_MALLOC_HUGE_FIRST);
+    T* pipe_mem;
+    aclrtMalloc((void**)&pipe_mem, 2 * 65536, ACL_MEM_MALLOC_HUGE_FIRST);
 
     std::barrier sync_point(3);
 
-    pto::cpu_sim::register_hooks(nullptr, (void *)GlobalPipeHook);
+    pto::cpu_sim::register_hooks(nullptr, (void*)GlobalPipeHook);
 
     auto aiv_func = [&](int32_t id) {
         pto::cpu_sim::ScopedExecutionContext ctx(0, id, 2);
@@ -356,15 +398,15 @@ void test_tpush()
     T *dstHost, *srcAHost, *srcBHost, *srcCHost;
     T *dstDevice, *srcADevice, *srcBDevice, *srcCDevice;
 
-    aclrtMallocHost((void **)(&dstHost), CSize);
-    aclrtMallocHost((void **)(&srcAHost), ASize);
-    aclrtMallocHost((void **)(&srcBHost), BSize);
-    aclrtMallocHost((void **)(&srcCHost), CSize);
+    aclrtMallocHost((void**)(&dstHost), CSize);
+    aclrtMallocHost((void**)(&srcAHost), ASize);
+    aclrtMallocHost((void**)(&srcBHost), BSize);
+    aclrtMallocHost((void**)(&srcCHost), CSize);
 
-    aclrtMalloc((void **)&dstDevice, CSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMalloc((void **)&srcADevice, ASize, ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMalloc((void **)&srcBDevice, BSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    aclrtMalloc((void **)&srcCDevice, CSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&dstDevice, CSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&srcADevice, ASize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&srcBDevice, BSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&srcCDevice, CSize, ACL_MEM_MALLOC_HUGE_FIRST);
 
     CHECK_RESULT_GTEST(ReadFile(GetGoldenDir() + "/a.bin", ASize, srcAHost, ASize));
     CHECK_RESULT_GTEST(ReadFile(GetGoldenDir() + "/b.bin", BSize, srcBHost, BSize));
@@ -405,9 +447,6 @@ void test_tpush()
     EXPECT_TRUE(ret);
 }
 
-TEST_F(TPUSH_A3Test, case_1)
-{
-    test_tpush();
-}
+TEST_F(TPUSH_A3Test, case_1) { test_tpush(); }
 
 } // namespace
