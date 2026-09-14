@@ -22,7 +22,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 namespace pto {
 
 template <pto::GridDirection Dir, int Dist, typename Pipe, typename TileCons>
-AICORE bool GRID_TRY_TPOP_IMPL(Pipe &pipe, TileCons &tile, uint32_t maxSpins = grid_mock::kDefaultWfeMaxSpins)
+AICORE bool GRID_TRY_TPOP_IMPL(Pipe& pipe, TileCons& tile, uint32_t maxSpins = grid_mock::kDefaultWfeMaxSpins)
 {
     static_assert(Dist >= 1, "GridPipe TPOP distance must be >= 1 (routed K-hop unicast)");
 
@@ -45,15 +45,15 @@ AICORE bool GRID_TRY_TPOP_IMPL(Pipe &pipe, TileCons &tile, uint32_t maxSpins = g
     NeighborCounterOperand readyCounter{pipe.readyFlags[dirIdx]};
 #endif
     if (!wfe_neighbor_counter(NeighborCounterKind::Ready, dirIdx, expectedReady, readyCounter, maxSpins)) {
-        grid_mock::MockSetFault(pipe.readyFlags[dirIdx] + grid_mock::kFaultFlagWordOffset,
-                                grid_mock::kFaultWaitReadyTimeout);
+        grid_mock::MockSetFault(
+            pipe.readyFlags[dirIdx] + grid_mock::kFaultFlagWordOffset, grid_mock::kFaultWaitReadyTimeout);
         return false;
     }
 
     // Step 2: compute local SRAM slot address; producer wrote it here.
     const uint32_t idx = pipe.consIndex[dirIdx];
     const uint32_t slotOff = (idx % Pipe::SlotCount) * Pipe::SlotBytes;
-    __gm__ uint8_t *localSlot = pipe.slotBase[dirIdx] + slotOff;
+    __gm__ uint8_t* localSlot = pipe.slotBase[dirIdx] + slotOff;
     neighbor_sram_addr localSramSlot = a2a3_grid_payload::LocalSramAddr(localSlot);
 
     // Step 2.5: NoC read-locality guard.  A TPOP may only drain *this* core's
@@ -85,7 +85,7 @@ AICORE bool GRID_TRY_TPOP_IMPL(Pipe &pipe, TileCons &tile, uint32_t maxSpins = g
         NeighborCounterOperand freeCounter{};
 #else
         const int peerRank = RankForPopK(Dir, pipe.coord, pipe.shape, Dist);
-        __gm__ uint32_t *peerFree =
+        __gm__ uint32_t* peerFree =
             a2a3_grid_payload::RemoteCounterPtr(pipe.runtimeCtx, pipe.freeFlags[dirIdx], peerRank);
         NeighborCounterOperand freeCounter{peerFree};
 #endif
@@ -98,7 +98,7 @@ AICORE bool GRID_TRY_TPOP_IMPL(Pipe &pipe, TileCons &tile, uint32_t maxSpins = g
 }
 
 template <pto::GridDirection Dir, int Dist, typename Pipe, typename TileCons>
-AICORE void GRID_TPOP_IMPL(Pipe &pipe, TileCons &tile)
+AICORE void GRID_TPOP_IMPL(Pipe& pipe, TileCons& tile)
 {
     (void)GRID_TRY_TPOP_IMPL<Dir, Dist, Pipe, TileCons>(pipe, tile, 0);
 }

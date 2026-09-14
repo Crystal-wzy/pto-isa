@@ -68,7 +68,7 @@ static inline void PerformFusedComputation(TileT& tile_result, const TileT& tile
 }
 
 template <typename TileT>
-static inline void AssignTileStorage(TileT &tile, std::size_t &addr)
+static inline void AssignTileStorage(TileT& tile, std::size_t& addr)
 {
     TASSIGN(tile, addr);
     addr += sizeof(typename TileT::DType) * static_cast<std::size_t>(TileT::Numel);
@@ -136,7 +136,7 @@ static inline void FusedAddReLUMulKernelImpl(
     AssignTileStorage(tile_result, tile_addr);
 
     for (int i = ctx.start; i < ctx.end; i += TILE_SIZE) {
-        GlobalData src_global(const_cast<float *>(x + i));
+        GlobalData src_global(const_cast<float*>(x + i));
         GlobalData dst_global(out + i);
 
         TLOAD(tile_x, src_global);
@@ -167,7 +167,7 @@ static inline void FusedAddReLUMulOptimizedKernelImpl(
     AssignTileStorage(tile_result[1], tile_addr);
 
     if (ctx.start < ctx.end) {
-        GlobalData src_global(const_cast<float *>(x + ctx.start));
+        GlobalData src_global(const_cast<float*>(x + ctx.start));
         load_event[0] = TLOAD(tile_x[0], src_global);
     }
 
@@ -180,7 +180,7 @@ static inline void FusedAddReLUMulOptimizedKernelImpl(
 
         if (tile_idx + 1 < num_tiles) {
             int next_i = ctx.start + (tile_idx + 1) * TILE_SIZE;
-            GlobalData next_src_global(const_cast<float *>(x + next_i));
+            GlobalData next_src_global(const_cast<float*>(x + next_i));
             load_event[next] = TLOAD(tile_x[next], next_src_global);
         }
 
@@ -252,41 +252,41 @@ __global__ __aicore__ void FusedAddReLUMulLargeTileKernel(
 
 #ifdef __CPU_SIM
 template <typename T>
-void LaunchFusedAddReLUMul(uint8_t *out, uint8_t *x, float bias, float scale, uint32_t totalLength, void *stream)
+void LaunchFusedAddReLUMul(uint8_t* out, uint8_t* x, float bias, float scale, uint32_t totalLength, void* stream)
 {
-    auto *out_ptr = reinterpret_cast<T *>(out);
-    const auto *x_ptr = reinterpret_cast<const T *>(x);
+    auto* out_ptr = reinterpret_cast<T*>(out);
+    const auto* x_ptr = reinterpret_cast<const T*>(x);
     pto::cpu_sim::LaunchKernelMultiCore(
         {.kernel_name = "basic", .total_work_items = totalLength, .work_quantum = StandardTileConfig::TILE_SIZE},
         stream, [&]() { FusedAddReLUMulKernel(out_ptr, x_ptr, bias, scale, totalLength); });
 }
 
 template <typename T>
-void LaunchFusedAddReLUMulOptimized(uint8_t *out, uint8_t *x, float bias, float scale, uint32_t totalLength,
-                                    void *stream)
+void LaunchFusedAddReLUMulOptimized(
+    uint8_t* out, uint8_t* x, float bias, float scale, uint32_t totalLength, void* stream)
 {
-    auto *out_ptr = reinterpret_cast<T *>(out);
-    const auto *x_ptr = reinterpret_cast<const T *>(x);
+    auto* out_ptr = reinterpret_cast<T*>(out);
+    const auto* x_ptr = reinterpret_cast<const T*>(x);
     pto::cpu_sim::LaunchKernelMultiCore(
         {.kernel_name = "optimized", .total_work_items = totalLength, .work_quantum = StandardTileConfig::TILE_SIZE},
         stream, [&]() { FusedAddReLUMulOptimizedKernel(out_ptr, x_ptr, bias, scale, totalLength); });
 }
 
 template <typename T>
-void LaunchFusedAddReLUMulLargeTile(uint8_t *out, uint8_t *x, float bias, float scale, uint32_t totalLength,
-                                    void *stream)
+void LaunchFusedAddReLUMulLargeTile(
+    uint8_t* out, uint8_t* x, float bias, float scale, uint32_t totalLength, void* stream)
 {
-    auto *out_ptr = reinterpret_cast<T *>(out);
-    const auto *x_ptr = reinterpret_cast<const T *>(x);
+    auto* out_ptr = reinterpret_cast<T*>(out);
+    const auto* x_ptr = reinterpret_cast<const T*>(x);
     pto::cpu_sim::LaunchKernelMultiCore(
         {.kernel_name = "large_tile", .total_work_items = totalLength, .work_quantum = LargeTileConfig::TILE_SIZE},
         stream, [&]() { FusedAddReLUMulLargeTileKernel(out_ptr, x_ptr, bias, scale, totalLength); });
 }
 
-template void LaunchFusedAddReLUMul<float>(uint8_t *out, uint8_t *x, float bias, float scale, uint32_t totalLength,
-                                           void *stream);
-template void LaunchFusedAddReLUMulOptimized<float>(uint8_t *out, uint8_t *x, float bias, float scale,
-                                                    uint32_t totalLength, void *stream);
-template void LaunchFusedAddReLUMulLargeTile<float>(uint8_t *out, uint8_t *x, float bias, float scale,
-                                                    uint32_t totalLength, void *stream);
+template void LaunchFusedAddReLUMul<float>(
+    uint8_t* out, uint8_t* x, float bias, float scale, uint32_t totalLength, void* stream);
+template void LaunchFusedAddReLUMulOptimized<float>(
+    uint8_t* out, uint8_t* x, float bias, float scale, uint32_t totalLength, void* stream);
+template void LaunchFusedAddReLUMulLargeTile<float>(
+    uint8_t* out, uint8_t* x, float bias, float scale, uint32_t totalLength, void* stream);
 #endif

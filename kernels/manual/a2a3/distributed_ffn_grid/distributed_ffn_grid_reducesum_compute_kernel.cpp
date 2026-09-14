@@ -54,8 +54,9 @@ using DownF32Tile = Tile<TileType::Vec, float, FFN_TOKEN_TILE, FFN_MODEL_TILE, B
 using FfnGridPipe = GridPipe<DownF32Tile, FFN_SLOT_BYTES, FFN_SLOT_COUNT>;
 
 using ShapeTH = Shape<1, 1, 1, FFN_TOKEN_TILE, FFN_MODEL_TILE>;
-using StrideTH = Stride<FFN_TOKEN_TILE * FFN_MODEL_TILE, FFN_TOKEN_TILE * FFN_MODEL_TILE,
-                        FFN_TOKEN_TILE * FFN_MODEL_TILE, FFN_MODEL_TILE, 1>;
+using StrideTH = Stride<
+    FFN_TOKEN_TILE * FFN_MODEL_TILE, FFN_TOKEN_TILE * FFN_MODEL_TILE, FFN_TOKEN_TILE * FFN_MODEL_TILE, FFN_MODEL_TILE,
+    1>;
 using GTHF32 = GlobalTensor<float, ShapeTH, StrideTH, Layout::ND>;
 
 constexpr int kUbGateF32 = 0x0000;
@@ -73,12 +74,11 @@ constexpr int kL1WDown = 0x28000;
 
 #endif
 
-__global__ AICORE void DistributedFfnGridMixedKernel(__gm__ uint8_t *fftsAddr, __gm__ uint8_t *reducePipeWindow,
-                                                     __gm__ uint8_t *x, __gm__ uint8_t *wGate, __gm__ uint8_t *wUp,
-                                                     __gm__ uint8_t *wDown, __gm__ uint8_t *gatePartial,
-                                                     __gm__ uint8_t *upPartial, __gm__ uint8_t *hiddenIn,
-                                                     __gm__ uint8_t *downPartial, __gm__ uint8_t *yOutput,
-                                                     __gm__ uint8_t *hcclCtxRaw, int gridRows, int gridCols)
+__global__ AICORE void DistributedFfnGridMixedKernel(
+    __gm__ uint8_t* fftsAddr, __gm__ uint8_t* reducePipeWindow, __gm__ uint8_t* x, __gm__ uint8_t* wGate,
+    __gm__ uint8_t* wUp, __gm__ uint8_t* wDown, __gm__ uint8_t* gatePartial, __gm__ uint8_t* upPartial,
+    __gm__ uint8_t* hiddenIn, __gm__ uint8_t* downPartial, __gm__ uint8_t* yOutput, __gm__ uint8_t* hcclCtxRaw,
+    int gridRows, int gridCols)
 {
 #ifdef __CCE_AICORE__
     set_ffts_base_addr(reinterpret_cast<uint64_t>(fftsAddr));
@@ -97,10 +97,10 @@ __global__ AICORE void DistributedFfnGridMixedKernel(__gm__ uint8_t *fftsAddr, _
     constexpr int K = ((validK + blockAlign - 1) / blockAlign) * blockAlign;
     constexpr int N = ((validN + blockAlign - 1) / blockAlign) * blockAlign;
 
-    using GX = GlobalTensor<half, Shape<1, 1, 1, validM, validK>,
-                            Stride<validM * validK, validM * validK, validM * validK, validK, 1>>;
-    using GW = GlobalTensor<half, Shape<1, 1, 1, validK, validN>,
-                            Stride<validK * validN, validK * validN, validK * validN, validN, 1>>;
+    using GX = GlobalTensor<
+        half, Shape<1, 1, 1, validM, validK>, Stride<validM * validK, validM * validK, validM * validK, validK, 1>>;
+    using GW = GlobalTensor<
+        half, Shape<1, 1, 1, validK, validN>, Stride<validK * validN, validK * validN, validK * validN, validN, 1>>;
     using TileA = Tile<TileType::Mat, half, M, K, BLayout::ColMajor, validM, validK, SLayout::RowMajor, 512>;
     using TileB = Tile<TileType::Mat, half, K, N, BLayout::ColMajor, validK, validN, SLayout::RowMajor, 512>;
     using TL = TileLeft<half, M, K, validM, validK>;
@@ -137,26 +137,26 @@ __global__ AICORE void DistributedFfnGridMixedKernel(__gm__ uint8_t *fftsAddr, _
     constexpr int partialTileBytes = FFN_GATE_PARTIAL_BYTES;
     constexpr int hiddenTileBytes = FFN_HIDDEN_BYTES;
     constexpr int downTileBytes = FFN_DOWN_PARTIAL_BYTES;
-    __gm__ uint8_t *xBlock = x + blockIdx * xTileBytes;
-    __gm__ uint8_t *wGateBlock = wGate + blockIdx * wGateTileBytes;
-    __gm__ uint8_t *wUpBlock = wUp + blockIdx * wUpTileBytes;
-    __gm__ uint8_t *wDownBlock = wDown + blockIdx * wDownTileBytes;
-    __gm__ uint8_t *gateBlock = gatePartial + blockIdx * partialTileBytes;
-    __gm__ uint8_t *upBlock = upPartial + blockIdx * partialTileBytes;
-    __gm__ uint8_t *hiddenBlock = hiddenIn + blockIdx * hiddenTileBytes;
-    __gm__ uint8_t *downBlock = downPartial + blockIdx * downTileBytes;
-    __gm__ uint8_t *yBlock = yOutput + (blockIdx / gridCols) * FFN_Y_OUTPUT_BYTES;
+    __gm__ uint8_t* xBlock = x + blockIdx * xTileBytes;
+    __gm__ uint8_t* wGateBlock = wGate + blockIdx * wGateTileBytes;
+    __gm__ uint8_t* wUpBlock = wUp + blockIdx * wUpTileBytes;
+    __gm__ uint8_t* wDownBlock = wDown + blockIdx * wDownTileBytes;
+    __gm__ uint8_t* gateBlock = gatePartial + blockIdx * partialTileBytes;
+    __gm__ uint8_t* upBlock = upPartial + blockIdx * partialTileBytes;
+    __gm__ uint8_t* hiddenBlock = hiddenIn + blockIdx * hiddenTileBytes;
+    __gm__ uint8_t* downBlock = downPartial + blockIdx * downTileBytes;
+    __gm__ uint8_t* yBlock = yOutput + (blockIdx / gridCols) * FFN_Y_OUTPUT_BYTES;
 
-    GatePipe gatePipe(reinterpret_cast<__gm__ void *>(gateBlock), kUbGateF32, 0);
-    UpPipe upPipe(reinterpret_cast<__gm__ void *>(upBlock), kUbUpF32, 0);
-    HiddenPipe hiddenPipe(reinterpret_cast<__gm__ void *>(hiddenBlock), 0, kL1Hidden);
-    DownPipe downPipe(reinterpret_cast<__gm__ void *>(downBlock), kUbDownF32, 0);
+    GatePipe gatePipe(reinterpret_cast<__gm__ void*>(gateBlock), kUbGateF32, 0);
+    UpPipe upPipe(reinterpret_cast<__gm__ void*>(upBlock), kUbUpF32, 0);
+    HiddenPipe hiddenPipe(reinterpret_cast<__gm__ void*>(hiddenBlock), 0, kL1Hidden);
+    DownPipe downPipe(reinterpret_cast<__gm__ void*>(downBlock), kUbDownF32, 0);
 
     if constexpr (DAV_CUBE) {
-        GX xG(reinterpret_cast<__gm__ half *>(xBlock));
-        GW wGateG(reinterpret_cast<__gm__ half *>(wGateBlock));
-        GW wUpG(reinterpret_cast<__gm__ half *>(wUpBlock));
-        GW wDownG(reinterpret_cast<__gm__ half *>(wDownBlock));
+        GX xG(reinterpret_cast<__gm__ half*>(xBlock));
+        GW wGateG(reinterpret_cast<__gm__ half*>(wGateBlock));
+        GW wUpG(reinterpret_cast<__gm__ half*>(wUpBlock));
+        GW wDownG(reinterpret_cast<__gm__ half*>(wDownBlock));
 
         TLOAD(xMat, xG);
         TLOAD(wGateMat, wGateG);
@@ -289,7 +289,7 @@ __global__ AICORE void DistributedFfnGridMixedKernel(__gm__ uint8_t *fftsAddr, _
 
         TMOV(hiddenPipe, hiddenF16); // V2C push -> hiddenPipe
 
-        TMOV(downF32, downPipe);     // C2V pop <- downPipe
+        TMOV(downF32, downPipe); // C2V pop <- downPipe
 
 #ifndef __PTO_AUTO__
         set_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
@@ -299,9 +299,10 @@ __global__ AICORE void DistributedFfnGridMixedKernel(__gm__ uint8_t *fftsAddr, _
         FfnGridPipe reducePipe;
         GridShape shape{gridRows, gridCols};
         GridCoord coord{blockIdx / gridCols, blockIdx - (blockIdx / gridCols) * gridCols};
-        __gm__ uint8_t *window = reducePipeWindow + blockIdx * FFN_GRID_WINDOW_BYTES;
-        a2a3_grid::InitGridPipeFromWindow(reducePipe, shape, coord, window, reinterpret_cast<__gm__ void *>(hcclCtxRaw),
-                                          /*pipeId=*/0);
+        __gm__ uint8_t* window = reducePipeWindow + blockIdx * FFN_GRID_WINDOW_BYTES;
+        a2a3_grid::InitGridPipeFromWindow(
+            reducePipe, shape, coord, window, reinterpret_cast<__gm__ void*>(hcclCtxRaw),
+            /*pipeId=*/0);
 
         using pto::GridDirection;
         int col = coord.col;
@@ -337,7 +338,7 @@ __global__ AICORE void DistributedFfnGridMixedKernel(__gm__ uint8_t *fftsAddr, _
             set_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
             wait_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
 #endif
-            GTHF32 yG(reinterpret_cast<__gm__ float *>(yBlock));
+            GTHF32 yG(reinterpret_cast<__gm__ float*>(yBlock));
             TSTORE(yG, downF32);
         }
 
@@ -364,16 +365,16 @@ __global__ AICORE void DistributedFfnGridMixedKernel(__gm__ uint8_t *fftsAddr, _
 #endif
 }
 
-void launchDistributedFfnGridMixedKernel(uint8_t *ffts, uint8_t *reducePipeWindow, uint8_t *x, uint8_t *wGate,
-                                         uint8_t *wUp, uint8_t *wDown, uint8_t *gatePartial, uint8_t *upPartial,
-                                         uint8_t *hiddenIn, uint8_t *downPartial, uint8_t *yOutput, uint8_t *hcclCtx,
-                                         int gridRows, int gridCols, void *stream)
+void launchDistributedFfnGridMixedKernel(
+    uint8_t* ffts, uint8_t* reducePipeWindow, uint8_t* x, uint8_t* wGate, uint8_t* wUp, uint8_t* wDown,
+    uint8_t* gatePartial, uint8_t* upPartial, uint8_t* hiddenIn, uint8_t* downPartial, uint8_t* yOutput,
+    uint8_t* hcclCtx, int gridRows, int gridCols, void* stream)
 {
     int totalBlocks = gridRows * gridCols;
     if (totalBlocks <= 0) {
         return;
     }
-    DistributedFfnGridMixedKernel<<<totalBlocks, nullptr, stream>>>(ffts, reducePipeWindow, x, wGate, wUp, wDown,
-                                                                    gatePartial, upPartial, hiddenIn, downPartial,
-                                                                    yOutput, hcclCtx, gridRows, gridCols);
+    DistributedFfnGridMixedKernel<<<totalBlocks, nullptr, stream>>>(
+        ffts, reducePipeWindow, x, wGate, wUp, wDown, gatePartial, upPartial, hiddenIn, downPartial, yOutput, hcclCtx,
+        gridRows, gridCols);
 }

@@ -41,10 +41,7 @@ TEST(TMax, case_int32_64x64_64x64_64x64_PAD_VALUE_NULL)
     runTMax<int32_t, 64, 64, 64, 64, PadValue::Null, 0.0f, 0.0f>();
 }
 
-TEST(TMax, case_half_64x64_64x64_64x64_PAD_VALUE_NULL)
-{
-    runTMax<half, 64, 64, 64, 64, PadValue::Null, 0.0f, 0.0f>();
-}
+TEST(TMax, case_half_64x64_64x64_64x64_PAD_VALUE_NULL) { runTMax<half, 64, 64, 64, 64, PadValue::Null, 0.0f, 0.0f>(); }
 
 TEST(TMax, case_int16_64x64_64x64_64x64_PAD_VALUE_NULL)
 {

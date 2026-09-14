@@ -1,3 +1,13 @@
+/**
+Copyright (c) 2026 Huawei Technologies Co., Ltd.
+This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+CANN Open Software License Agreement Version 2.0 (the "License").
+Please refer to the License for details. You may not use this file except in compliance with the License.
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+See LICENSE in the root of the software repository for the full text of the License.
+*/
+
 #include <pto/pto-inst.hpp>
 #include "cpu_tile_test_utils.h"
 
@@ -54,8 +64,8 @@ TEST(TPartMulTest, UsesSrc1WhenSrc0IsOutOfRange)
     for (int r = 0; r < dst.GetValidRow(); ++r) {
         for (int c = 0; c < dst.GetValidCol(); ++c) {
             if (r < src0.GetValidRow() && c < src0.GetValidCol()) {
-                ExpectValueEquals(GetValue(dst, r, c),
-                                  static_cast<int32_t>(GetValue(src0, r, c) * GetValue(src1, r, c)));
+                ExpectValueEquals(
+                    GetValue(dst, r, c), static_cast<int32_t>(GetValue(src0, r, c) * GetValue(src1, r, c)));
             } else {
                 ExpectValueEquals(GetValue(dst, r, c), GetValue(src1, r, c));
             }

@@ -14,9 +14,9 @@ class PerfSimReporter {
 public:
     // Fixed track layout for Chrome Trace (1AIC + 2AIV per core)
     struct TrackInfo {
-        const char *tid;          // queue label (must match PipeQueue label)
+        const char* tid;          // queue label (must match PipeQueue label)
         std::string display_name; // [AIC-{core_id}] PIPE or [AIV-{sub}] PIPE
-        const char *group;        // AIC / AIV-0 / AIV-1
+        const char* group;        // AIC / AIV-0 / AIV-1
     };
 
     static std::vector<TrackInfo> GetTracksForCore(uint32_t core_id)
@@ -52,12 +52,12 @@ public:
         uint64_t mte3_cycles = 0;
     };
 
-    static uint64_t EventBusyCycles(const PipeEvent &event)
+    static uint64_t EventBusyCycles(const PipeEvent& event)
     {
         return event.stuck ? event.duration : (event.end_cycle - event.start_cycle);
     }
 
-    static bool EnsureParentDir(const std::string &path)
+    static bool EnsureParentDir(const std::string& path)
     {
         std::filesystem::path output_path(path);
         auto parent = output_path.parent_path();
@@ -74,13 +74,13 @@ public:
         return true;
     }
 
-    static PipelineSummaryRow BuildPipelineSummaryRow(const PipeTimeline &timeline, uint32_t core_id,
-                                                      const std::string &unit, const std::vector<std::string> &pipes)
+    static PipelineSummaryRow BuildPipelineSummaryRow(
+        const PipeTimeline& timeline, uint32_t core_id, const std::string& unit, const std::vector<std::string>& pipes)
     {
         std::unordered_map<std::string, uint64_t> busy_cycles;
         uint64_t active_start = std::numeric_limits<uint64_t>::max();
         uint64_t active_end = 0;
-        for (auto &ev : timeline.events) {
+        for (auto& ev : timeline.events) {
             if (std::find(pipes.begin(), pipes.end(), ev.pipe_label) == pipes.end())
                 continue;
             uint64_t busy = EventBusyCycles(ev);
@@ -91,7 +91,7 @@ public:
             }
         }
 
-        auto get = [&](const char *pipe) -> uint64_t {
+        auto get = [&](const char* pipe) -> uint64_t {
             auto it = busy_cycles.find(pipe);
             return it == busy_cycles.end() ? 0 : it->second;
         };
@@ -116,11 +116,11 @@ public:
         return row;
     }
 
-    static std::vector<PipelineSummaryRow> BuildPipelineSummary(const SimReport &report)
+    static std::vector<PipelineSummaryRow> BuildPipelineSummary(const SimReport& report)
     {
         std::vector<PipelineSummaryRow> rows;
         rows.reserve(report.num_cores * 3);
-        auto append_core = [&](const PipeTimeline &timeline, uint32_t core_id) {
+        auto append_core = [&](const PipeTimeline& timeline, uint32_t core_id) {
             rows.push_back(
                 BuildPipelineSummaryRow(timeline, core_id, "AIC", {"Scalar", "MTE2_AIC", "MTE1", "CUBE", "FIXP"}));
             rows.push_back(BuildPipelineSummaryRow(timeline, core_id, "AIV0", {"MTE2_AIV", "VEC", "MTE3"}));
@@ -134,7 +134,7 @@ public:
         return rows;
     }
 
-    static void AccumulateLogicalCoreStats(SimReport &report, uint32_t logical_cores)
+    static void AccumulateLogicalCoreStats(SimReport& report, uint32_t logical_cores)
     {
         for (uint32_t lc = 0; lc < logical_cores; ++lc) {
             report.instr_count += PtoRecorder::GetForCore(lc).size();
@@ -142,21 +142,22 @@ public:
         }
     }
 
-    static void DropCrossCoreSync(std::vector<MergedEntry> &merged)
+    static void DropCrossCoreSync(std::vector<MergedEntry>& merged)
     {
-        merged.erase(std::remove_if(merged.begin(), merged.end(),
-                                    [](const MergedEntry &e) { return e.is_sync && e.sync.cross_core; }),
-                     merged.end());
+        merged.erase(
+            std::remove_if(
+                merged.begin(), merged.end(), [](const MergedEntry& e) { return e.is_sync && e.sync.cross_core; }),
+            merged.end());
     }
 
-    static void SetCacheStats(SimReport &report, const L2CacheModel &cache)
+    static void SetCacheStats(SimReport& report, const L2CacheModel& cache)
     {
         report.cache_hits = cache.GetStats().hits;
         report.cache_misses = cache.GetStats().misses;
         report.cache_hit_rate = cache.GetStats().HitRate();
     }
 
-    static void RunSingleCoreSimulation(SimReport &report)
+    static void RunSingleCoreSimulation(SimReport& report)
     {
         report.num_cores = 1;
         AccumulateLogicalCoreStats(report, VEC_CORES_PER_AIC);
@@ -184,10 +185,9 @@ public:
         return core_pipelines;
     }
 
-    static void PrepareCoreMergedQueues(std::vector<CorePipeline> &core_pipelines,
-                                        std::vector<std::vector<MergedEntry>> &per_core_merged,
-                                        std::vector<EventChannel> &intra_channels,
-                                        std::vector<EventChannel> &cross_channels)
+    static void PrepareCoreMergedQueues(
+        std::vector<CorePipeline>& core_pipelines, std::vector<std::vector<MergedEntry>>& per_core_merged,
+        std::vector<EventChannel>& intra_channels, std::vector<EventChannel>& cross_channels)
     {
         for (uint32_t c = 0; c < core_pipelines.size(); ++c) {
             DropCrossCoreSync(per_core_merged[c]);
@@ -196,7 +196,7 @@ public:
         }
     }
 
-    static void RunMultiCoreSimulation(SimReport &report, uint32_t num_cores, uint32_t cross_core_channel_count)
+    static void RunMultiCoreSimulation(SimReport& report, uint32_t num_cores, uint32_t cross_core_channel_count)
     {
         report.num_cores = num_cores;
         AccumulateLogicalCoreStats(report, num_cores * VEC_CORES_PER_AIC);
@@ -213,11 +213,11 @@ public:
         SetCacheStats(report, cache);
     }
 
-    SimReport Run(const std::string &op_name)
+    SimReport Run(const std::string& op_name)
     {
         SimReport report;
         report.op_name = op_name;
-        auto &cfg = GetConfig();
+        auto& cfg = GetConfig();
         if (cfg.block_dim <= 1) {
             RunSingleCoreSimulation(report);
         } else {
@@ -227,10 +227,10 @@ public:
     }
 
     // ── Pipeline table: rows=core, cols=pipe, cell=busy cycles ──
-    static void PrintPipelineTable(const SimReport &report, std::ostream &os)
+    static void PrintPipelineTable(const SimReport& report, std::ostream& os)
     {
         // Fixed column order for all pipelines across all cores
-        const char *const pipe_names[] = {"Scalar", "MTE2(AIC)", "MTE1", "CUBE", "FIXP", "MTE2(AIV)", "VEC", "MTE3"};
+        const char* const pipe_names[] = {"Scalar", "MTE2(AIC)", "MTE1", "CUBE", "FIXP", "MTE2(AIV)", "VEC", "MTE3"};
         constexpr int kPipes = 8;
 
         auto rows = BuildPipelineSummary(report);
@@ -249,9 +249,9 @@ public:
         for (int p = 0; p < kPipes; ++p) {
             os << std::setw(12) << pipe_names[p] << " |";
             for (uint32_t c = 0; c < report.num_cores; ++c) {
-                const auto &aic = rows[c * 3];
-                const auto &aiv0 = rows[c * 3 + 1];
-                const auto &aiv1 = rows[c * 3 + 2];
+                const auto& aic = rows[c * 3];
+                const auto& aiv0 = rows[c * 3 + 1];
+                const auto& aiv1 = rows[c * 3 + 2];
                 const uint64_t values[kPipes] = {
                     aic.scalar_cycles,
                     aic.mte2_aic_cycles,
@@ -275,7 +275,7 @@ public:
         os << "Note: AIV pipeline rows sum AIV0 and AIV1. Use pipeline_summary.csv for per-AIV active/busy cycles.\n\n";
     }
 
-    static void PrintText(const SimReport &report, std::ostream &os = std::cout)
+    static void PrintText(const SimReport& report, std::ostream& os = std::cout)
     {
         os << "===== Perf-Sim Report: " << report.op_name << " =====\n";
         os << "Cores        : " << report.num_cores << "\n";

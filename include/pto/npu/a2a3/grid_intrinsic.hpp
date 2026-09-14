@@ -67,8 +67,7 @@ struct GridCoord {
 // Direction enum (design doc section 3.1).  Strongly-typed to avoid clashing
 // with the cluster-local pto::Direction enum used by TPipe.
 // ---------------------------------------------------------------------------
-enum class GridDirection : uint8_t
-{
+enum class GridDirection : uint8_t {
     SOURCE = 0, // GM/Host/Runtime injection.  Only valid for TPOP.
     NORTH = 1,  // row -> row-1
     EAST = 2,   // col -> col+1
@@ -78,10 +77,7 @@ enum class GridDirection : uint8_t
 
 inline constexpr int kGridDirectionCount = 5;
 
-AICORE constexpr int GridDirectionIndex(GridDirection d)
-{
-    return static_cast<int>(d);
-}
+AICORE constexpr int GridDirectionIndex(GridDirection d) { return static_cast<int>(d); }
 
 // ---------------------------------------------------------------------------
 // Broadcast span (single-source row/column multicast).  A ROW broadcast fans a
@@ -93,8 +89,7 @@ AICORE constexpr int GridDirectionIndex(GridDirection d)
 // drains it with the ordinary TPOP<EAST, dist>, a receiver west with
 // TPOP<WEST, dist>.  Used by the GridPipe TPUSH<GridSpan> broadcast overload.
 // ---------------------------------------------------------------------------
-enum class GridSpan : uint8_t
-{
+enum class GridSpan : uint8_t {
     ROW = 0, // fan along the source's row:    EAST arm + WEST arm
     COL = 1, // fan along the source's column: NORTH arm + SOUTH arm
 };
@@ -134,15 +129,15 @@ struct GridPipe {
     GridCoord coord{};
 
     // Per-direction state.  Index by GridDirectionIndex(dir).
-    __gm__ uint8_t *slotBase[kGridDirectionCount] = {nullptr};
-    __gm__ uint32_t *readyFlags[kGridDirectionCount] = {nullptr};
-    __gm__ uint32_t *freeFlags[kGridDirectionCount] = {nullptr};
+    __gm__ uint8_t* slotBase[kGridDirectionCount] = {nullptr};
+    __gm__ uint32_t* readyFlags[kGridDirectionCount] = {nullptr};
+    __gm__ uint32_t* freeFlags[kGridDirectionCount] = {nullptr};
     uint32_t prodIndex[kGridDirectionCount] = {0};
     uint32_t consIndex[kGridDirectionCount] = {0};
 
     // Opaque runtime pointer used by the A2/A3 backend to resolve cross-rank
     // addresses (HCCL device context).  Other targets may reinterpret.
-    __gm__ void *runtimeCtx = nullptr;
+    __gm__ void* runtimeCtx = nullptr;
 
     // Stable logical id used for runtime telemetry / mock SPR_PIPE_ID_<DIR>.
     uint32_t pipeId = 0;
@@ -172,10 +167,7 @@ AICORE inline GridCoord GetGridCoord(GridShape shape)
     return GridCoord{blockIdx / shape.gridCols, blockIdx % shape.gridCols};
 }
 
-AICORE inline int RankFromCoord(GridCoord coord, GridShape shape)
-{
-    return coord.row * shape.gridCols + coord.col;
-}
+AICORE inline int RankFromCoord(GridCoord coord, GridShape shape) { return coord.row * shape.gridCols + coord.col; }
 
 // ---------------------------------------------------------------------------
 // Compile-time / run-time direction validity (design doc 2.3).
@@ -336,13 +328,13 @@ AICORE constexpr bool CanPopK(GridDirection dir, GridCoord c, GridShape s, int k
         case GridDirection::NORTH:
             return c.row + k < s.gridRows; // upstream to the south
         case GridDirection::EAST:
-            return c.col - k >= 0;         // upstream to the west
+            return c.col - k >= 0; // upstream to the west
         case GridDirection::WEST:
             return c.col + k < s.gridCols; // upstream to the east
         case GridDirection::SOUTH:
-            return c.row - k >= 0;         // upstream to the north
+            return c.row - k >= 0; // upstream to the north
         case GridDirection::SOURCE:
-            return true;                   // SOURCE pop is bound to the runtime queue, distance-free.
+            return true; // SOURCE pop is bound to the runtime queue, distance-free.
     }
     return false;
 }
@@ -456,29 +448,29 @@ inline constexpr uint32_t kFaultFlagWordOffset = 2 * kGridDirectionCount;
 // store: AICORE caches are not coherent between cores, so without the dcci the
 // pairing MockWfe spin on the remote rank may never observe the write.  This
 // matches the SetLocalSummaryReady pattern in ready_queue.hpp (allgather_gemm).
-inline AICORE void MockMtsprCounter(__gm__ uint32_t *remoteFlag, uint32_t newValue)
+inline AICORE void MockMtsprCounter(__gm__ uint32_t* remoteFlag, uint32_t newValue)
 {
     if (remoteFlag != nullptr) {
-        volatile __gm__ uint32_t *ptr = reinterpret_cast<volatile __gm__ uint32_t *>(remoteFlag);
+        volatile __gm__ uint32_t* ptr = reinterpret_cast<volatile __gm__ uint32_t*>(remoteFlag);
         // Match the canonical TNotify Set pattern: pre-invalidate, store,
         // post-invalidate, dsb(DSB_DDR).  Compiler barriers prevent reordering.
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void*>(const_cast<__gm__ uint32_t*>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
         __asm__ __volatile__("" ::: "memory");
         *ptr = newValue;
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void*>(const_cast<__gm__ uint32_t*>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
         __asm__ __volatile__("" ::: "memory");
         dsb(DSB_DDR);
     }
 }
 
-inline AICORE void MockMtsprReady(__gm__ uint32_t *remoteFlag, uint32_t newValue)
+inline AICORE void MockMtsprReady(__gm__ uint32_t* remoteFlag, uint32_t newValue)
 {
     MockMtsprCounter(remoteFlag, newValue);
 }
 
-inline AICORE void MockMtsprFree(__gm__ uint32_t *remoteFlag, uint32_t newValue)
+inline AICORE void MockMtsprFree(__gm__ uint32_t* remoteFlag, uint32_t newValue)
 {
     MockMtsprCounter(remoteFlag, newValue);
 }
@@ -489,12 +481,12 @@ inline AICORE void MockMtsprFree(__gm__ uint32_t *remoteFlag, uint32_t newValue)
 // LPU WSE: mfspr r_free,  SPR_FREE_<DIR>
 //
 // A2/A3 mock: volatile read of the local mirror of the flag.
-inline AICORE uint32_t MockMfspr(__gm__ uint32_t *localFlag)
+inline AICORE uint32_t MockMfspr(__gm__ uint32_t* localFlag)
 {
     if (localFlag == nullptr) {
         return 0;
     }
-    return *reinterpret_cast<volatile __gm__ uint32_t *>(localFlag);
+    return *reinterpret_cast<volatile __gm__ uint32_t*>(localFlag);
 }
 
 // MOCK: design doc 5.3 producer step (1) wait, consumer step (1) wait.
@@ -506,18 +498,18 @@ inline AICORE uint32_t MockMfspr(__gm__ uint32_t *localFlag)
 // the local cache line so the next load fetches from DDR.  Without the dcci,
 // the AICORE may cache the original 0 indefinitely and never observe the
 // producer's write (cross-core caches are not auto-coherent on A2/A3).
-inline AICORE bool MockTryWfeCounter(__gm__ uint32_t *localFlag, uint32_t threshold,
-                                     uint32_t maxSpins = kDefaultWfeMaxSpins)
+inline AICORE bool MockTryWfeCounter(
+    __gm__ uint32_t* localFlag, uint32_t threshold, uint32_t maxSpins = kDefaultWfeMaxSpins)
 {
     if (localFlag == nullptr) {
         return true;
     }
-    volatile __gm__ uint32_t *p = reinterpret_cast<volatile __gm__ uint32_t *>(localFlag);
+    volatile __gm__ uint32_t* p = reinterpret_cast<volatile __gm__ uint32_t*>(localFlag);
     uint32_t spin = 0;
     constexpr uint32_t kFenceInterval = 64;
     while (true) {
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(p)), cache_line_t::SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void*>(const_cast<__gm__ uint32_t*>(p)), cache_line_t::SINGLE_CACHE_LINE);
         __asm__ __volatile__("" ::: "memory");
         if (*p >= threshold) {
             return true;
@@ -531,36 +523,36 @@ inline AICORE bool MockTryWfeCounter(__gm__ uint32_t *localFlag, uint32_t thresh
     }
 }
 
-inline AICORE bool MockTryWfeReady(__gm__ uint32_t *localFlag, uint32_t threshold,
-                                   uint32_t maxSpins = kDefaultWfeMaxSpins)
+inline AICORE bool MockTryWfeReady(
+    __gm__ uint32_t* localFlag, uint32_t threshold, uint32_t maxSpins = kDefaultWfeMaxSpins)
 {
     return MockTryWfeCounter(localFlag, threshold, maxSpins);
 }
 
-inline AICORE bool MockTryWfeFree(__gm__ uint32_t *localFlag, uint32_t threshold,
-                                  uint32_t maxSpins = kDefaultWfeMaxSpins)
+inline AICORE bool MockTryWfeFree(
+    __gm__ uint32_t* localFlag, uint32_t threshold, uint32_t maxSpins = kDefaultWfeMaxSpins)
 {
     return MockTryWfeCounter(localFlag, threshold, maxSpins);
 }
 
-inline AICORE void MockWfeReady(__gm__ uint32_t *localFlag, uint32_t threshold)
+inline AICORE void MockWfeReady(__gm__ uint32_t* localFlag, uint32_t threshold)
 {
     (void)MockTryWfeReady(localFlag, threshold, 0);
 }
 
-inline AICORE void MockWfeFree(__gm__ uint32_t *localFlag, uint32_t threshold)
+inline AICORE void MockWfeFree(__gm__ uint32_t* localFlag, uint32_t threshold)
 {
     (void)MockTryWfeFree(localFlag, threshold, 0);
 }
 
-inline AICORE void MockSetFault(__gm__ uint32_t *faultFlag, uint32_t faultCode)
+inline AICORE void MockSetFault(__gm__ uint32_t* faultFlag, uint32_t faultCode)
 {
     if (faultFlag != nullptr) {
-        volatile __gm__ uint32_t *ptr = reinterpret_cast<volatile __gm__ uint32_t *>(faultFlag);
+        volatile __gm__ uint32_t* ptr = reinterpret_cast<volatile __gm__ uint32_t*>(faultFlag);
         __asm__ __volatile__("" ::: "memory");
         *ptr = faultCode;
         __asm__ __volatile__("" ::: "memory");
-        dcci(reinterpret_cast<__gm__ void *>(const_cast<__gm__ uint32_t *>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
+        dcci(reinterpret_cast<__gm__ void*>(const_cast<__gm__ uint32_t*>(ptr)), cache_line_t::SINGLE_CACHE_LINE);
         dsb(DSB_DDR);
     }
 }
@@ -574,10 +566,10 @@ inline AICORE void MockSetFault(__gm__ uint32_t *faultFlag, uint32_t faultCode)
 // out-of-bound attempt.  Real boards will raise a fault; here we trap softly
 // by writing a sentinel and aborting the kernel branch.  The host launcher
 // inspects a "fault sentinel" GM word after each kernel and fails the run.
-inline AICORE void MockBoundaryFault(__gm__ uint32_t *faultSentinel, uint32_t faultCode)
+inline AICORE void MockBoundaryFault(__gm__ uint32_t* faultSentinel, uint32_t faultCode)
 {
     if (faultSentinel != nullptr) {
-        *reinterpret_cast<volatile __gm__ uint32_t *>(faultSentinel) = faultCode;
+        *reinterpret_cast<volatile __gm__ uint32_t*>(faultSentinel) = faultCode;
     }
     // Best-effort halt of the current kernel branch.  Real silicon will fault
     // here; on A2/A3 we just stop emitting further GridPipe ops in this branch.
@@ -657,8 +649,7 @@ AICORE constexpr uint32_t PopFaultCode(GridDirection dir)
 
 namespace pto {
 
-enum class NeighborCounterKind : uint8_t
-{
+enum class NeighborCounterKind : uint8_t {
     Ready = 0,
     Free = 1,
 };
@@ -670,7 +661,7 @@ enum class NeighborCounterKind : uint8_t
 // Current mock: `addr` points to the GM counter that represents either the
 // peer-visible counter for set or the local mirror counter for wait.
 struct NeighborCounterOperand {
-    __gm__ uint32_t *addr = nullptr;
+    __gm__ uint32_t* addr = nullptr;
 };
 
 // Set a neighbor-visible monotonic counter `dist` hops away along `dir`.
@@ -690,8 +681,8 @@ struct NeighborCounterOperand {
 //
 // Memory ordering: release.  Earlier payload writes must become visible before
 // the peer can observe this counter update.
-AICORE inline void mtspr_neighbor_counter(NeighborCounterKind kind, uint32_t dir, uint32_t dist, uint32_t value,
-                                          NeighborCounterOperand operand = {})
+AICORE inline void mtspr_neighbor_counter(
+    NeighborCounterKind kind, uint32_t dir, uint32_t dist, uint32_t value, NeighborCounterOperand operand = {})
 {
 #if defined(PTO_GRID_COUNTER_NATIVE_INTRINSIC)
     (void)operand;
@@ -718,8 +709,9 @@ AICORE inline void mtspr_neighbor_counter(NeighborCounterKind kind, uint32_t dir
 //
 // Memory ordering: acquire.  Operations after the wait must not be reordered
 // before the counter condition has been satisfied.
-AICORE inline bool wfe_neighbor_counter(NeighborCounterKind kind, uint32_t dir, uint32_t threshold,
-                                        NeighborCounterOperand operand = {}, uint32_t maxSpins = 0)
+AICORE inline bool wfe_neighbor_counter(
+    NeighborCounterKind kind, uint32_t dir, uint32_t threshold, NeighborCounterOperand operand = {},
+    uint32_t maxSpins = 0)
 {
 #if defined(PTO_GRID_COUNTER_NATIVE_INTRINSIC)
     (void)operand;
@@ -764,7 +756,7 @@ struct neighbor_sram_addr {
 // Backend operand used only by the mock lowering. Native hardware ignores it
 // and derives the neighbor SRAM mapping from dir/peer configuration registers.
 struct NeighborSramOperand {
-    __gm__ void *runtimeCtx = nullptr;
+    __gm__ void* runtimeCtx = nullptr;
 };
 
 // ---------------------------------------------------------------------------
@@ -792,10 +784,7 @@ struct GmSramArena {
     uint64_t segBytes = 0; // bytes per per-core segment (== HCCL winSize in the demo)
     uint32_t numSegs = 0;  // number of cores / segments
 
-    AICORE constexpr uint64_t SegmentBase(int seg) const
-    {
-        return base + static_cast<uint64_t>(seg) * segBytes;
-    }
+    AICORE constexpr uint64_t SegmentBase(int seg) const { return base + static_cast<uint64_t>(seg) * segBytes; }
 
     // Index of the segment that owns `addr`, or -1 if `addr` is outside the arena.
     AICORE constexpr int SegmentOf(uint64_t addr) const
@@ -826,7 +815,7 @@ struct GmSramArena {
 // mis-routing a TPOP.  It also doubles as executable documentation of the rule.
 AICORE constexpr bool GmSramArenaSelfCheck()
 {
-    GmSramArena arena{0x1000, 0x100, 4};          // 4 cores, 0x100-byte segments, based at 0x1000
+    GmSramArena arena{0x1000, 0x100, 4}; // 4 cores, 0x100-byte segments, based at 0x1000
     bool ok = true;
     ok = ok && (arena.SegmentOf(0x1000) == 0);    // first byte of core 0
     ok = ok && (arena.SegmentOf(0x11FF) == 1);    // last byte of core 1
@@ -842,13 +831,13 @@ static_assert(GmSramArenaSelfCheck(), "GmSramArena segment classifier self-test 
 
 namespace grid_sram_mock {
 
-AICORE uint64_t MockGetNeighborSramAddr(__gm__ void *runtimeCtx, uint64_t localSramAddr, int32_t peerRank);
+AICORE uint64_t MockGetNeighborSramAddr(__gm__ void* runtimeCtx, uint64_t localSramAddr, int32_t peerRank);
 AICORE void MockCopySramToNeighborSram(neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes, uint64_t config);
 AICORE void MockCopyNeighborSramToSram(neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes, uint64_t config);
 // Read-locality predicate for the TPOP guard.  Returns true iff
 // [slotAddr, slotAddr+bytes) lies inside callerRank's own GmSramArena segment.
 // The demo owns the definition because it knows the runtime window layout.
-AICORE bool MockSramPopIsLocal(__gm__ void *runtimeCtx, uint64_t slotAddr, uint32_t bytes, int32_t callerRank);
+AICORE bool MockSramPopIsLocal(__gm__ void* runtimeCtx, uint64_t slotAddr, uint32_t bytes, int32_t callerRank);
 
 } // namespace grid_sram_mock
 
@@ -856,8 +845,8 @@ AICORE bool MockSramPopIsLocal(__gm__ void *runtimeCtx, uint64_t slotAddr, uint3
 //
 // Parameter order follows CCE data/address instructions: output register first,
 // source address register next, then topology/control operands.
-AICORE inline void get_neighbor_sram_addr(neighbor_sram_addr &dst, neighbor_sram_addr src, uint32_t dir,
-                                          int32_t peerRank, NeighborSramOperand operand = {})
+AICORE inline void get_neighbor_sram_addr(
+    neighbor_sram_addr& dst, neighbor_sram_addr src, uint32_t dir, int32_t peerRank, NeighborSramOperand operand = {})
 {
 #if defined(PTO_GRID_SRAM_NATIVE_INTRINSIC)
     (void)operand;
@@ -870,8 +859,8 @@ AICORE inline void get_neighbor_sram_addr(neighbor_sram_addr &dst, neighbor_sram
 
 // Cross-core payload writes. Source and destination are SRAM address-register
 // values; the intrinsic name intentionally does not expose UB/CBUF variants.
-AICORE inline void copy_sram_to_neighbor_sram(neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes,
-                                              uint64_t config)
+AICORE inline void copy_sram_to_neighbor_sram(
+    neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes, uint64_t config)
 {
 #if defined(PTO_GRID_SRAM_NATIVE_INTRINSIC)
     __builtin_pto_copy_sram_to_neighbor_sram(dst.value, src.value, bytes, config);
@@ -884,8 +873,8 @@ AICORE inline void copy_sram_to_neighbor_sram(neighbor_sram_addr dst, neighbor_s
 
 // Cross-core payload read interface. The native lowering is intentionally left
 // as an interface placeholder until hardware/compiler support is available.
-AICORE inline void copy_neighbor_sram_to_sram(neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes,
-                                              uint64_t config)
+AICORE inline void copy_neighbor_sram_to_sram(
+    neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes, uint64_t config)
 {
 #if defined(PTO_GRID_SRAM_NATIVE_INTRINSIC)
     (void)dst;
@@ -908,8 +897,8 @@ AICORE inline void copy_neighbor_sram_to_sram(neighbor_sram_addr dst, neighbor_s
 // with a GM-mapped fake window that *can* be read at any address, so we must
 // check explicitly: the mock validates `slot` against callerRank's GmSramArena
 // segment and reports a cross-segment read instead of silently servicing it.
-AICORE inline bool sram_pop_is_local(neighbor_sram_addr slot, uint32_t bytes, int32_t callerRank,
-                                     NeighborSramOperand operand = {})
+AICORE inline bool sram_pop_is_local(
+    neighbor_sram_addr slot, uint32_t bytes, int32_t callerRank, NeighborSramOperand operand = {})
 {
 #if defined(PTO_GRID_SRAM_NATIVE_INTRINSIC)
     (void)slot;

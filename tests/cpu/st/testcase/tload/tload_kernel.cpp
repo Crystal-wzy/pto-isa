@@ -510,7 +510,7 @@ int get_input_golden_case_DN(uint8_t* input, uint8_t* golden)
 }
 
 template <typename T, int Shape0, int Shape1, int Shape2, int Shape3, int Shape4, int kTRows_, int kTCols_>
-int get_input_golden_case_DN_flat_rows(uint8_t *input, uint8_t *golden)
+int get_input_golden_case_DN_flat_rows(uint8_t* input, uint8_t* golden)
 {
     int in_byteSize = Shape0 * Shape1 * Shape2 * Shape3 * Shape4 * sizeof(T);
     int out_byteSize = kTRows_ * kTCols_ * sizeof(T);
@@ -530,8 +530,8 @@ int get_input_golden_case_DN_flat_rows(uint8_t *input, uint8_t *golden)
                         gold_arr[j][flatRow] = value;
                     }
 
-    std::copy((uint8_t *)in_arr, ((uint8_t *)(in_arr)) + in_byteSize, input);
-    std::copy((uint8_t *)gold_arr, ((uint8_t *)(gold_arr)) + out_byteSize, golden);
+    std::copy((uint8_t*)in_arr, ((uint8_t*)(in_arr)) + in_byteSize, input);
+    std::copy((uint8_t*)gold_arr, ((uint8_t*)(gold_arr)) + out_byteSize, golden);
     return out_byteSize;
 }
 

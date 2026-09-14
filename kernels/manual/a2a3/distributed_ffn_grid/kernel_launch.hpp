@@ -22,18 +22,17 @@ See LICENSE in the root of the software repository for the full text of the Lice
 // run concurrently and exchange gate/up/hidden/down intermediates through
 // regular A2/A3 TPipe ready/free synchronization.  The final row-local EAST
 // reduce still uses GridPipe windows.
-void launchDistributedFfnGridMixedKernel(uint8_t *ffts, uint8_t *reducePipeWindow, uint8_t *x, uint8_t *wGate,
-                                         uint8_t *wUp, uint8_t *wDown, uint8_t *gatePartial, uint8_t *upPartial,
-                                         uint8_t *hiddenIn, uint8_t *downPartial, uint8_t *yOutput, uint8_t *hcclCtx,
-                                         int gridRows, int gridCols, void *stream);
+void launchDistributedFfnGridMixedKernel(
+    uint8_t* ffts, uint8_t* reducePipeWindow, uint8_t* x, uint8_t* wGate, uint8_t* wUp, uint8_t* wDown,
+    uint8_t* gatePartial, uint8_t* upPartial, uint8_t* hiddenIn, uint8_t* downPartial, uint8_t* yOutput,
+    uint8_t* hcclCtx, int gridRows, int gridCols, void* stream);
 
 // AllGather split variant.  The GridPipe window carries fp16 hidden shards
 // [T, Fi] across columns, then each column computes and stores its [T, Hc]
 // output shard directly.
-void launchDistributedFfnGridAllGatherMixedKernel(uint8_t *ffts, uint8_t *gatherPipeWindow, uint8_t *x, uint8_t *wGate,
-                                                  uint8_t *wUp, uint8_t *wDown, uint8_t *gatePartial,
-                                                  uint8_t *upPartial, uint8_t *hiddenIn, uint8_t *downPartial,
-                                                  uint8_t *yOutput, uint8_t *hcclCtx, int gridRows, int gridCols,
-                                                  void *stream);
+void launchDistributedFfnGridAllGatherMixedKernel(
+    uint8_t* ffts, uint8_t* gatherPipeWindow, uint8_t* x, uint8_t* wGate, uint8_t* wUp, uint8_t* wDown,
+    uint8_t* gatePartial, uint8_t* upPartial, uint8_t* hiddenIn, uint8_t* downPartial, uint8_t* yOutput,
+    uint8_t* hcclCtx, int gridRows, int gridCols, void* stream);
 
 #endif // DISTRIBUTED_FFN_GRID_KERNEL_LAUNCH_HPP

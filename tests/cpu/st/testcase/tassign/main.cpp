@@ -103,12 +103,12 @@ protected:
 // still be accepted (valid-region footprint equals the full block Numel here).
 TEST_F(TAssignWindowTest, full_accumulator_exactly_fills_l0c)
 {
-    auto *base = NPUMemoryModel::Instance().GetL0CBase();
+    auto* base = NPUMemoryModel::Instance().GetL0CBase();
     ASSERT_NE(base, nullptr);
 
     AccFull full(kRows, kCols);
     TASSIGN(full, static_cast<uint64_t>(0));
-    EXPECT_EQ(reinterpret_cast<char *>(full.data()), base);
+    EXPECT_EQ(reinterpret_cast<char*>(full.data()), base);
 }
 
 // Each 16-row strip is TASSIGN'd at byte offset rowStart * kStripRows * sizeof,
@@ -117,7 +117,7 @@ TEST_F(TAssignWindowTest, full_accumulator_exactly_fills_l0c)
 // to a pointer inside L0C.
 TEST_F(TAssignWindowTest, windowed_strip_offsets_stay_in_bounds)
 {
-    auto *base = NPUMemoryModel::Instance().GetL0CBase();
+    auto* base = NPUMemoryModel::Instance().GetL0CBase();
     ASSERT_NE(base, nullptr);
 
     for (int rowStart = 0; rowStart < kRows; rowStart += kStripRows) {
@@ -127,7 +127,7 @@ TEST_F(TAssignWindowTest, windowed_strip_offsets_stay_in_bounds)
         AccStrip strip;
         TASSIGN(strip, static_cast<uint64_t>(byteOffset));
 
-        auto *ptr = reinterpret_cast<char *>(strip.data());
+        auto* ptr = reinterpret_cast<char*>(strip.data());
         EXPECT_EQ(ptr, base + byteOffset) << "strip offset " << byteOffset;
         // The strip's whole valid-region footprint must lie within the L0C buffer.
         const std::size_t footprintBytes =
@@ -140,7 +140,7 @@ TEST_F(TAssignWindowTest, windowed_strip_offsets_stay_in_bounds)
 // the resolved pointer addresses real, in-bounds backing storage (no overflow).
 TEST_F(TAssignWindowTest, windowed_strip_roundtrips_through_backing_storage)
 {
-    auto *base = reinterpret_cast<int32_t *>(NPUMemoryModel::Instance().GetL0CBase());
+    auto* base = reinterpret_cast<int32_t*>(NPUMemoryModel::Instance().GetL0CBase());
     ASSERT_NE(base, nullptr);
 
     constexpr std::size_t byteOffset =

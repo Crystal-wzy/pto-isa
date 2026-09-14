@@ -332,25 +332,25 @@ PTO_INTERNAL void CheckConvTileData(TileDataDst& dst, GlobalDataSrc& src)
 }
 
 template <typename TileData, typename GlobalData>
-PTO_INTERNAL void TLOAD_CONVTILE_IMPL(TileData &dst, GlobalData &src)
+PTO_INTERNAL void TLOAD_CONVTILE_IMPL(TileData& dst, GlobalData& src)
 {
     CheckConvTileData<TileData, GlobalData>(dst, src);
     if constexpr (GlobalData::layout == pto::Layout::NC1HWC0) { // layout is NC1HWC0, dst dim4 is c0Size
-        TLoad5HD<TileData, GlobalData>(dst.data(), src.data(), src.GetShape(0), src.GetShape(1), src.GetShape(2),
-                                       src.GetShape(3), src.GetStride(0), src.GetStride(1), src.GetStride(2),
-                                       src.GetStride(3), src.GetStride(4), dst.GetShape(0), dst.GetShape(1),
-                                       dst.GetShape(2), dst.GetShape(3));
-    } else if constexpr (GlobalData::layout == pto::Layout::FRACTAL_Z ||
-                         GlobalData::layout == pto::Layout::FRACTAL_Z_3D) {
-        TLoadFractalZ<TileData, GlobalData>(dst.data(), src.data(), src.GetShape(0), src.GetShape(1), src.GetShape(2),
-                                            src.GetShape(3), src.GetShape(4), src.GetStride(0), src.GetStride(1),
-                                            src.GetStride(2), src.GetStride(3), src.GetStride(4), dst.GetShape(0),
-                                            dst.GetShape(1), dst.GetShape(2), dst.GetShape(3));
+        TLoad5HD<TileData, GlobalData>(
+            dst.data(), src.data(), src.GetShape(0), src.GetShape(1), src.GetShape(2), src.GetShape(3),
+            src.GetStride(0), src.GetStride(1), src.GetStride(2), src.GetStride(3), src.GetStride(4), dst.GetShape(0),
+            dst.GetShape(1), dst.GetShape(2), dst.GetShape(3));
+    } else if constexpr (
+        GlobalData::layout == pto::Layout::FRACTAL_Z || GlobalData::layout == pto::Layout::FRACTAL_Z_3D) {
+        TLoadFractalZ<TileData, GlobalData>(
+            dst.data(), src.data(), src.GetShape(0), src.GetShape(1), src.GetShape(2), src.GetShape(3), src.GetShape(4),
+            src.GetStride(0), src.GetStride(1), src.GetStride(2), src.GetStride(3), src.GetStride(4), dst.GetShape(0),
+            dst.GetShape(1), dst.GetShape(2), dst.GetShape(3));
     } else if constexpr (GlobalData::layout == pto::Layout::NDC1HWC0) { // NDC1HWC0, globaltensor is NDC1HW
-        TLoadNDC1HWC0<TileData, GlobalData>(dst.data(), src.data(), src.GetShape(0), src.GetShape(1), src.GetShape(2),
-                                            src.GetShape(3), src.GetShape(4), src.GetStride(0), src.GetStride(1),
-                                            src.GetStride(2), src.GetStride(3), src.GetStride(4), dst.GetShape(0),
-                                            dst.GetShape(1), dst.GetShape(2), dst.GetShape(3), dst.GetShape(4));
+        TLoadNDC1HWC0<TileData, GlobalData>(
+            dst.data(), src.data(), src.GetShape(0), src.GetShape(1), src.GetShape(2), src.GetShape(3), src.GetShape(4),
+            src.GetStride(0), src.GetStride(1), src.GetStride(2), src.GetStride(3), src.GetStride(4), dst.GetShape(0),
+            dst.GetShape(1), dst.GetShape(2), dst.GetShape(3), dst.GetShape(4));
     }
 }
 

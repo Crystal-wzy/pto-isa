@@ -46,19 +46,19 @@ See LICENSE in the root of the software repository for the full text of the Lice
 namespace pto {
 namespace a2a3_grid_payload {
 
-AICORE inline uint64_t ResolvePeerWindowAddress(__gm__ void *runtimeCtx, uint64_t localAddr, int peerRank)
+AICORE inline uint64_t ResolvePeerWindowAddress(__gm__ void* runtimeCtx, uint64_t localAddr, int peerRank)
 {
-    auto *ctx = reinterpret_cast<__gm__ HcclDeviceContext *>(runtimeCtx);
+    auto* ctx = reinterpret_cast<__gm__ HcclDeviceContext*>(runtimeCtx);
     for (uint32_t i = 0; i < ctx->rankNum && i < HCCL_MAX_RANK_NUM; ++i) {
         uint64_t base = ctx->windowsIn[i];
         if (localAddr >= base && localAddr < base + ctx->winSize) {
             return ctx->windowsIn[peerRank] + (localAddr - base);
         }
     }
-    return reinterpret_cast<uint64_t>(HcclRemotePtr(ctx, reinterpret_cast<__gm__ void *>(localAddr), peerRank));
+    return reinterpret_cast<uint64_t>(HcclRemotePtr(ctx, reinterpret_cast<__gm__ void*>(localAddr), peerRank));
 }
 
-AICORE inline neighbor_sram_addr LocalSramAddr(__gm__ uint8_t *localSlot)
+AICORE inline neighbor_sram_addr LocalSramAddr(__gm__ uint8_t* localSlot)
 {
     return neighbor_sram_addr{reinterpret_cast<uint64_t>(localSlot)};
 }
@@ -68,9 +68,9 @@ AICORE inline neighbor_sram_addr LocalSramAddr(__gm__ uint8_t *localSlot)
 // (windowsIn[i] == windowsIn[0] + i*winSize), so segment c == window c == the
 // private SRAM of core c.  This is the single source of truth the TPOP guard
 // uses to decide whether a read stays inside the caller's own segment.
-AICORE inline GmSramArena SramArenaFromCtx(__gm__ void *runtimeCtx)
+AICORE inline GmSramArena SramArenaFromCtx(__gm__ void* runtimeCtx)
 {
-    auto *ctx = reinterpret_cast<__gm__ HcclDeviceContext *>(runtimeCtx);
+    auto* ctx = reinterpret_cast<__gm__ HcclDeviceContext*>(runtimeCtx);
     GmSramArena arena;
     arena.base = ctx->windowsIn[0];
     arena.segBytes = ctx->winSize;
@@ -78,14 +78,14 @@ AICORE inline GmSramArena SramArenaFromCtx(__gm__ void *runtimeCtx)
     return arena;
 }
 
-AICORE inline __gm__ uint32_t *RemoteCounterPtr(__gm__ void *runtimeCtx, __gm__ uint32_t *localCounter, int peerRank)
+AICORE inline __gm__ uint32_t* RemoteCounterPtr(__gm__ void* runtimeCtx, __gm__ uint32_t* localCounter, int peerRank)
 {
     uint64_t remoteAddr = ResolvePeerWindowAddress(runtimeCtx, reinterpret_cast<uint64_t>(localCounter), peerRank);
-    return reinterpret_cast<__gm__ uint32_t *>(remoteAddr);
+    return reinterpret_cast<__gm__ uint32_t*>(remoteAddr);
 }
 
 template <typename TileT>
-__tf__ AICORE inline void CopyTileToNeighborSramSlot(neighbor_sram_addr remoteSlot, TileT &tile, int slotBytes)
+__tf__ AICORE inline void CopyTileToNeighborSramSlot(neighbor_sram_addr remoteSlot, TileT& tile, int slotBytes)
 {
     neighbor_sram_addr src{reinterpret_cast<uint64_t>(__cce_get_tile_ptr(tile.data()))};
     // Producer-side cross-core payload transfer in CCE-intrinsic form.
@@ -93,7 +93,7 @@ __tf__ AICORE inline void CopyTileToNeighborSramSlot(neighbor_sram_addr remoteSl
 }
 
 template <typename TileT>
-__tf__ AICORE inline void CopyNeighborSramSlotToTile(TileT &tile, neighbor_sram_addr localSlot, int slotBytes)
+__tf__ AICORE inline void CopyNeighborSramSlotToTile(TileT& tile, neighbor_sram_addr localSlot, int slotBytes)
 {
     neighbor_sram_addr dst{reinterpret_cast<uint64_t>(__cce_get_tile_ptr(tile.data()))};
     // Consumer-side counterpart of the same intrinsic-style payload transfer.
@@ -104,20 +104,20 @@ __tf__ AICORE inline void CopyNeighborSramSlotToTile(TileT &tile, neighbor_sram_
 
 namespace grid_sram_mock {
 
-AICORE inline uint64_t MockGetNeighborSramAddr(__gm__ void *runtimeCtx, uint64_t localSramAddr, int32_t peerRank)
+AICORE inline uint64_t MockGetNeighborSramAddr(__gm__ void* runtimeCtx, uint64_t localSramAddr, int32_t peerRank)
 {
     return a2a3_grid_payload::ResolvePeerWindowAddress(runtimeCtx, localSramAddr, peerRank);
 }
 
-AICORE inline void MockCopySramToNeighborSram(neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes,
-                                              uint64_t config)
+AICORE inline void MockCopySramToNeighborSram(
+    neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes, uint64_t config)
 {
     (void)config;
     // A2/A3 mock lowering of copy_sram_to_neighbor_sram:
     // SRAM(local core, currently tile UB) -> GM-backed peer slot window.
     constexpr uint32_t kChunkBytes = 256;
-    auto *dstBytes = reinterpret_cast<__gm__ uint8_t *>(dst.value);
-    auto *srcBytes = reinterpret_cast<__ubuf__ uint8_t *>(src.value);
+    auto* dstBytes = reinterpret_cast<__gm__ uint8_t*>(dst.value);
+    auto* srcBytes = reinterpret_cast<__ubuf__ uint8_t*>(src.value);
     uint32_t offset = 0;
     while (offset < bytes) {
         uint32_t chunk = (bytes - offset > kChunkBytes) ? kChunkBytes : (bytes - offset);
@@ -126,15 +126,15 @@ AICORE inline void MockCopySramToNeighborSram(neighbor_sram_addr dst, neighbor_s
     }
 }
 
-AICORE inline void MockCopyNeighborSramToSram(neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes,
-                                              uint64_t config)
+AICORE inline void MockCopyNeighborSramToSram(
+    neighbor_sram_addr dst, neighbor_sram_addr src, uint32_t bytes, uint64_t config)
 {
     (void)config;
     // A2/A3 mock lowering of copy_neighbor_sram_to_sram:
     // GM-backed local slot window -> SRAM(local core, currently tile UB).
     constexpr uint32_t kChunkBytes = 256;
-    auto *dstBytes = reinterpret_cast<__ubuf__ uint8_t *>(dst.value);
-    auto *srcBytes = reinterpret_cast<__gm__ uint8_t *>(src.value);
+    auto* dstBytes = reinterpret_cast<__ubuf__ uint8_t*>(dst.value);
+    auto* srcBytes = reinterpret_cast<__gm__ uint8_t*>(src.value);
     uint32_t offset = 0;
     while (offset < bytes) {
         uint32_t chunk = (bytes - offset > kChunkBytes) ? kChunkBytes : (bytes - offset);
@@ -143,7 +143,7 @@ AICORE inline void MockCopyNeighborSramToSram(neighbor_sram_addr dst, neighbor_s
     }
 }
 
-AICORE inline bool MockSramPopIsLocal(__gm__ void *runtimeCtx, uint64_t slotAddr, uint32_t bytes, int32_t callerRank)
+AICORE inline bool MockSramPopIsLocal(__gm__ void* runtimeCtx, uint64_t slotAddr, uint32_t bytes, int32_t callerRank)
 {
     // Enforce the NoC "TPOP only pops local SRAM" rule: the read is legal only
     // when the whole slot lies inside the caller core's own arena segment.

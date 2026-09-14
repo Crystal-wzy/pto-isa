@@ -42,14 +42,14 @@ namespace pto {
 namespace a2a3_grid_payload {
 
 template <typename TileT>
-__tf__ AICORE void CopyTileToNeighborSramSlot(neighbor_sram_addr remoteSlot, TileT &tile, int slotBytes);
+__tf__ AICORE void CopyTileToNeighborSramSlot(neighbor_sram_addr remoteSlot, TileT& tile, int slotBytes);
 
 template <typename TileT>
-__tf__ AICORE void CopyNeighborSramSlotToTile(TileT &tile, neighbor_sram_addr localSlot, int slotBytes);
+__tf__ AICORE void CopyNeighborSramSlotToTile(TileT& tile, neighbor_sram_addr localSlot, int slotBytes);
 
-AICORE neighbor_sram_addr LocalSramAddr(__gm__ uint8_t *localSlot);
+AICORE neighbor_sram_addr LocalSramAddr(__gm__ uint8_t* localSlot);
 
-AICORE __gm__ uint32_t *RemoteCounterPtr(__gm__ void *runtimeCtx, __gm__ uint32_t *localCounter, int peerRank);
+AICORE __gm__ uint32_t* RemoteCounterPtr(__gm__ void* runtimeCtx, __gm__ uint32_t* localCounter, int peerRank);
 
 } // namespace a2a3_grid_payload
 } // namespace pto
@@ -61,7 +61,7 @@ namespace pto {
 // with a clear symbol name; the static_assert in pto_instr.hpp catches this
 // earlier at compile time.
 template <pto::GridDirection Dir, int Dist, typename Pipe, typename TileProd>
-AICORE bool GRID_TRY_TPUSH_IMPL(Pipe &pipe, TileProd &tile, uint32_t maxSpins = grid_mock::kDefaultWfeMaxSpins)
+AICORE bool GRID_TRY_TPUSH_IMPL(Pipe& pipe, TileProd& tile, uint32_t maxSpins = grid_mock::kDefaultWfeMaxSpins)
 {
     static_assert(Dir != GridDirection::SOURCE, "GridPipe TPUSH<SOURCE> is illegal (design doc 4.3)");
     static_assert(Dist >= 1, "GridPipe TPUSH distance must be >= 1 (routed K-hop unicast)");
@@ -85,10 +85,10 @@ AICORE bool GRID_TRY_TPUSH_IMPL(Pipe &pipe, TileProd &tile, uint32_t maxSpins = 
 #else
         NeighborCounterOperand freeCounter{pipe.freeFlags[dirIdx]};
 #endif
-        if (!wfe_neighbor_counter(NeighborCounterKind::Free, dirIdx, expectedFree - Pipe::SlotCount, freeCounter,
-                                  maxSpins)) {
-            grid_mock::MockSetFault(pipe.freeFlags[dirIdx] + grid_mock::kFaultFlagWordOffset,
-                                    grid_mock::kFaultWaitFreeTimeout);
+        if (!wfe_neighbor_counter(
+                NeighborCounterKind::Free, dirIdx, expectedFree - Pipe::SlotCount, freeCounter, maxSpins)) {
+            grid_mock::MockSetFault(
+                pipe.freeFlags[dirIdx] + grid_mock::kFaultFlagWordOffset, grid_mock::kFaultWaitFreeTimeout);
             return false;
         }
     }
@@ -99,7 +99,7 @@ AICORE bool GRID_TRY_TPUSH_IMPL(Pipe &pipe, TileProd &tile, uint32_t maxSpins = 
     //            and / mla -> r_slot
     const uint32_t idx = pipe.prodIndex[dirIdx];
     const uint32_t slotOff = (idx % Pipe::SlotCount) * Pipe::SlotBytes;
-    __gm__ uint8_t *localSlot = pipe.slotBase[dirIdx] + slotOff;
+    __gm__ uint8_t* localSlot = pipe.slotBase[dirIdx] + slotOff;
     neighbor_sram_addr localSramSlot = a2a3_grid_payload::LocalSramAddr(localSlot);
 
     // Step 3: payload transfer to the *target's* SRAM slot region.  For Dist > 1
@@ -142,7 +142,7 @@ AICORE bool GRID_TRY_TPUSH_IMPL(Pipe &pipe, TileProd &tile, uint32_t maxSpins = 
 #if defined(PTO_GRID_COUNTER_NATIVE_INTRINSIC)
     NeighborCounterOperand readyCounter{};
 #else
-    __gm__ uint32_t *neighborReady =
+    __gm__ uint32_t* neighborReady =
         a2a3_grid_payload::RemoteCounterPtr(pipe.runtimeCtx, pipe.readyFlags[dirIdx], peerRank);
     NeighborCounterOperand readyCounter{neighborReady};
 #endif
@@ -155,7 +155,7 @@ AICORE bool GRID_TRY_TPUSH_IMPL(Pipe &pipe, TileProd &tile, uint32_t maxSpins = 
 }
 
 template <pto::GridDirection Dir, int Dist, typename Pipe, typename TileProd>
-AICORE void GRID_TPUSH_IMPL(Pipe &pipe, TileProd &tile)
+AICORE void GRID_TPUSH_IMPL(Pipe& pipe, TileProd& tile)
 {
     (void)GRID_TRY_TPUSH_IMPL<Dir, Dist, Pipe, TileProd>(pipe, tile, 0);
 }
@@ -189,12 +189,12 @@ AICORE void GRID_TPUSH_IMPL(Pipe &pipe, TileProd &tile)
 // publish fence (the fence is hoisted to the caller so all arms' bursts overlap
 // and commit together).  Returns the number of targets written.
 template <pto::GridDirection Dir, typename Pipe, typename TileProd>
-AICORE int GridBcastArmWrite(Pipe &pipe, TileProd &tile)
+AICORE int GridBcastArmWrite(Pipe& pipe, TileProd& tile)
 {
     constexpr int dirIdx = GridDirectionIndex(Dir);
     const uint32_t idx = pipe.prodIndex[dirIdx];
     const uint32_t slotOff = (idx % static_cast<uint32_t>(Pipe::SlotCount)) * static_cast<uint32_t>(Pipe::SlotBytes);
-    __gm__ uint8_t *localSlot = pipe.slotBase[dirIdx] + slotOff;
+    __gm__ uint8_t* localSlot = pipe.slotBase[dirIdx] + slotOff;
     neighbor_sram_addr localSramSlot = a2a3_grid_payload::LocalSramAddr(localSlot);
     NeighborSramOperand sramOperand{pipe.runtimeCtx};
 
@@ -217,7 +217,7 @@ AICORE int GridBcastArmWrite(Pipe &pipe, TileProd &tile)
 // ONLY after the single shared publish fence.  Bumps the local producer index
 // for this direction by one (one broadcast == one slot consumed on this arm).
 template <pto::GridDirection Dir, typename Pipe>
-AICORE void GridBcastArmRing(Pipe &pipe, int nWritten)
+AICORE void GridBcastArmRing(Pipe& pipe, int nWritten)
 {
     if (nWritten == 0) {
         return;
@@ -229,7 +229,7 @@ AICORE void GridBcastArmRing(Pipe &pipe, int nWritten)
 #if defined(PTO_GRID_COUNTER_NATIVE_INTRINSIC)
         NeighborCounterOperand readyCounter{};
 #else
-        __gm__ uint32_t *neighborReady =
+        __gm__ uint32_t* neighborReady =
             a2a3_grid_payload::RemoteCounterPtr(pipe.runtimeCtx, pipe.readyFlags[dirIdx], peerRank);
         NeighborCounterOperand readyCounter{neighborReady};
 #endif
@@ -239,7 +239,7 @@ AICORE void GridBcastArmRing(Pipe &pipe, int nWritten)
 }
 
 template <pto::GridSpan Span, typename Pipe, typename TileProd>
-AICORE bool GRID_TRY_TPUSH_BCAST_IMPL(Pipe &pipe, TileProd &tile)
+AICORE bool GRID_TRY_TPUSH_BCAST_IMPL(Pipe& pipe, TileProd& tile)
 {
     constexpr GridDirection dirA = SpanArmA(Span);
     constexpr GridDirection dirB = SpanArmB(Span);
@@ -265,7 +265,7 @@ AICORE bool GRID_TRY_TPUSH_BCAST_IMPL(Pipe &pipe, TileProd &tile)
 }
 
 template <pto::GridSpan Span, typename Pipe, typename TileProd>
-AICORE void GRID_TPUSH_BCAST_IMPL(Pipe &pipe, TileProd &tile)
+AICORE void GRID_TPUSH_BCAST_IMPL(Pipe& pipe, TileProd& tile)
 {
     (void)GRID_TRY_TPUSH_BCAST_IMPL<Span, Pipe, TileProd>(pipe, tile);
 }

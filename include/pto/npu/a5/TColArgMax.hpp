@@ -18,45 +18,47 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto {
 template <typename TileDataOut, typename TileDataIn>
-PTO_INTERNAL void TColArgMaxCheck(unsigned srcValidRow, unsigned srcValidCol, unsigned dstValidRow,
-                                  unsigned dstValidCol)
+PTO_INTERNAL void TColArgMaxCheck(
+    unsigned srcValidRow, unsigned srcValidCol, unsigned dstValidRow, unsigned dstValidCol)
 {
-    static_assert(TileDataIn::ValidCol == 1 || TileDataIn::ValidCol == -1,
-                  "Fix: TCOLARGMAX Src ValidCol must be 1 or -1");
-    static_assert((sizeof(typename TileDataIn::DType) == 1) || (sizeof(typename TileDataIn::DType) == 2) ||
-                      (sizeof(typename TileDataIn::DType) == 4),
-                  "Fix: TCOLARGMAX data type must be b8/b16/b32");
+    static_assert(
+        TileDataIn::ValidCol == 1 || TileDataIn::ValidCol == -1, "Fix: TCOLARGMAX Src ValidCol must be 1 or -1");
+    static_assert(
+        (sizeof(typename TileDataIn::DType) == 1) || (sizeof(typename TileDataIn::DType) == 2) ||
+            (sizeof(typename TileDataIn::DType) == 4),
+        "Fix: TCOLARGMAX data type must be b8/b16/b32");
     static_assert(TileDataIn::Loc == pto::TileType::Vec, "Fix: TCOLARGMAX Src TileType must be Vec Tile!");
     static_assert(TileDataOut::Loc == pto::TileType::Vec, "Fix: TCOLARGMAX Dst TileType must be Vec Tile!");
     static_assert(TileDataIn::SFractal == SLayout::NoneBox, "Fix: TCOLARGMAX only support Nd or Dn fractal Tile");
-    static_assert(TileDataOut::isRowMajor && TileDataOut::SFractal == SLayout::NoneBox,
-                  "Fix: TCOLARGMAX only support Nd fractal Tile");
+    static_assert(
+        TileDataOut::isRowMajor && TileDataOut::SFractal == SLayout::NoneBox,
+        "Fix: TCOLARGMAX only support Nd fractal Tile");
     static_assert(
         std::is_same_v<typename TileDataOut::DType, uint32_t> || std::is_same_v<typename TileDataOut::DType, int32_t>,
         "Fix: TCOLARGMAX output data type must be s32 or u32.");
-    PTO_ASSERT(srcValidRow != 0 && srcValidCol != 0,
-               "Fix: TCOLARGMAX input shape is invalid, validCol or validRow is 0.");
+    PTO_ASSERT(
+        srcValidRow != 0 && srcValidCol != 0, "Fix: TCOLARGMAX input shape is invalid, validCol or validRow is 0.");
     PTO_ASSERT(dstValidRow != 1, "Fix: TCOLARGMAX output validRow must be 1");
-    PTO_ASSERT(srcValidCol != dstValidCol,
-               "Fix: TCOLARGMAX input validCol must be consistent with the output validCol");
+    PTO_ASSERT(
+        srcValidCol != dstValidCol, "Fix: TCOLARGMAX input validCol must be consistent with the output validCol");
 }
 
 template <typename TileDataOut, typename TileDataIn>
-__tf__ PTO_INTERNAL void TColArgMax8(typename TileDataOut::TileDType __out__ dst,
-                                     typename TileDataIn::TileDType __in__ src, unsigned srcValidRow,
-                                     unsigned srcValidCol)
+__tf__ PTO_INTERNAL void TColArgMax8(
+    typename TileDataOut::TileDType __out__ dst, typename TileDataIn::TileDType __in__ src, unsigned srcValidRow,
+    unsigned srcValidCol)
 {
     using TOUT = typename TileDataOut::DType;
     using TIN = typename TileDataIn::DType;
-    using T = std::conditional_t<std::is_same_v<TIN, int8_t>, vector_s16,
-                                 std::conditional_t<std::is_same_v<TIN, uint8_t>, vector_u16, void>>;
+    using T = std::conditional_t<
+        std::is_same_v<TIN, int8_t>, vector_s16, std::conditional_t<std::is_same_v<TIN, uint8_t>, vector_u16, void>>;
 
     constexpr unsigned srcRowStride = TileDataIn::Cols;
     constexpr unsigned elementsPerRepeat = REPEAT_BYTE / sizeof(TIN);
     uint16_t repeatTimes = CeilDivision(srcValidCol, elementsPerRepeat);
 
-    __ubuf__ TOUT *dstPtr = (__ubuf__ TOUT *)__cce_get_tile_ptr(dst);
-    __ubuf__ TIN *srcPtr = (__ubuf__ TIN *)__cce_get_tile_ptr(src);
+    __ubuf__ TOUT* dstPtr = (__ubuf__ TOUT*)__cce_get_tile_ptr(dst);
+    __ubuf__ TIN* srcPtr = (__ubuf__ TIN*)__cce_get_tile_ptr(src);
     __VEC_SCOPE__
     {
         vector_s16 vregIndexOldEven;
@@ -128,17 +130,17 @@ __tf__ PTO_INTERNAL void TColArgMax8(typename TileDataOut::TileDType __out__ dst
 }
 
 template <typename TileDataOut, typename TileDataIn>
-__tf__ PTO_INTERNAL void TColArgMax16(typename TileDataOut::TileDType __out__ dst,
-                                      typename TileDataIn::TileDType __in__ src, unsigned srcValidRow,
-                                      unsigned srcValidCol)
+__tf__ PTO_INTERNAL void TColArgMax16(
+    typename TileDataOut::TileDType __out__ dst, typename TileDataIn::TileDType __in__ src, unsigned srcValidRow,
+    unsigned srcValidCol)
 {
     using TIN = typename TileDataIn::DType;
     using TOUT = typename TileDataOut::DType;
     constexpr unsigned srcRowStride = TileDataIn::Cols;
     constexpr unsigned elementsPerRepeat = REPEAT_BYTE / sizeof(TIN);
     uint16_t repeatTimes = CeilDivision(srcValidCol, elementsPerRepeat);
-    __ubuf__ TOUT *dstPtr = (__ubuf__ TOUT *)__cce_get_tile_ptr(dst);
-    __ubuf__ TIN *srcPtr = (__ubuf__ TIN *)__cce_get_tile_ptr(src);
+    __ubuf__ TOUT* dstPtr = (__ubuf__ TOUT*)__cce_get_tile_ptr(dst);
+    __ubuf__ TIN* srcPtr = (__ubuf__ TIN*)__cce_get_tile_ptr(src);
 
     __VEC_SCOPE__
     {
@@ -180,9 +182,9 @@ __tf__ PTO_INTERNAL void TColArgMax16(typename TileDataOut::TileDType __out__ ds
 }
 
 template <typename TileDataOut, typename TileDataIn>
-__tf__ PTO_INTERNAL void TColArgMax32(typename TileDataOut::TileDType __out__ dst,
-                                      typename TileDataIn::TileDType __in__ src, unsigned srcValidRow,
-                                      unsigned srcValidCol)
+__tf__ PTO_INTERNAL void TColArgMax32(
+    typename TileDataOut::TileDType __out__ dst, typename TileDataIn::TileDType __in__ src, unsigned srcValidRow,
+    unsigned srcValidCol)
 {
     using TIN = typename TileDataIn::DType;
     using TOUT = typename TileDataOut::DType;
@@ -190,8 +192,8 @@ __tf__ PTO_INTERNAL void TColArgMax32(typename TileDataOut::TileDType __out__ ds
     constexpr unsigned srcRowStride = TileDataIn::Cols;
     constexpr unsigned elementsPerRepeat = REPEAT_BYTE / sizeof(TIN);
     uint16_t repeatTimes = CeilDivision(srcValidCol, elementsPerRepeat);
-    __ubuf__ TOUT *dstPtr = (__ubuf__ TOUT *)__cce_get_tile_ptr(dst);
-    __ubuf__ TIN *srcPtr = (__ubuf__ TIN *)__cce_get_tile_ptr(src);
+    __ubuf__ TOUT* dstPtr = (__ubuf__ TOUT*)__cce_get_tile_ptr(dst);
+    __ubuf__ TIN* srcPtr = (__ubuf__ TIN*)__cce_get_tile_ptr(src);
 
     __VEC_SCOPE__
     {
@@ -221,7 +223,7 @@ __tf__ PTO_INTERNAL void TColArgMax32(typename TileDataOut::TileDType __out__ ds
 }
 
 template <typename TileDataOut, typename TileDataIn, typename TileDataTmp>
-PTO_INTERNAL void TCOLARGMAX_IMPL(TileDataOut &dst, TileDataIn &src, TileDataTmp &tmp)
+PTO_INTERNAL void TCOLARGMAX_IMPL(TileDataOut& dst, TileDataIn& src, TileDataTmp& tmp)
 {
     unsigned dstValidRow = dst.GetValidRow();
     unsigned dstValidCol = dst.GetValidCol();

@@ -39,10 +39,7 @@ namespace a2a3_grid {
 inline constexpr uint32_t kFlagsBytes = 128;
 inline constexpr uint32_t kSlotRegionOffset = kFlagsBytes;
 
-inline constexpr uint32_t kReadyFlagOffset(GridDirection d)
-{
-    return static_cast<uint32_t>(d) * sizeof(uint32_t);
-}
+inline constexpr uint32_t kReadyFlagOffset(GridDirection d) { return static_cast<uint32_t>(d) * sizeof(uint32_t); }
 
 inline constexpr uint32_t kFreeFlagOffset(GridDirection d)
 {
@@ -72,15 +69,15 @@ inline constexpr uint32_t kDirSlotRegionOffset(GridDirection d)
 // in the kernel prologue.  `runtimeCtx` is the HCCL device context handle used
 // later by GridTPush/GridTPop to resolve cross-rank addresses.
 template <typename Pipe>
-AICORE inline void InitGridPipeFromWindow(Pipe &pipe, GridShape shape, GridCoord coord, __gm__ uint8_t *window,
-                                          __gm__ void *runtimeCtx, uint32_t pipeId)
+AICORE inline void InitGridPipeFromWindow(
+    Pipe& pipe, GridShape shape, GridCoord coord, __gm__ uint8_t* window, __gm__ void* runtimeCtx, uint32_t pipeId)
 {
     pipe.shape = shape;
     pipe.coord = coord;
     pipe.runtimeCtx = runtimeCtx;
     pipe.pipeId = pipeId;
 
-    __gm__ uint32_t *flags = reinterpret_cast<__gm__ uint32_t *>(window);
+    __gm__ uint32_t* flags = reinterpret_cast<__gm__ uint32_t*>(window);
     for (int i = 0; i < kGridDirectionCount; ++i) {
         pipe.readyFlags[i] = flags + i;
         pipe.freeFlags[i] = flags + kGridDirectionCount + i;

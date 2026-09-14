@@ -8,7 +8,7 @@ INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A
 See LICENSE in the root of the software repository for the full text of the License.
 */
 
-static void WritePipelineSummaryCSV(const std::string &path, const SimReport &report)
+static void WritePipelineSummaryCSV(const std::string& path, const SimReport& report)
 {
     if (!EnsureParentDir(path)) {
         return;
@@ -24,7 +24,7 @@ static void WritePipelineSummaryCSV(const std::string &path, const SimReport &re
         << "scalar_cycles,mte2_aic_cycles,mte2_aiv_cycles,mte1_cycles,cube_cycles,fixp_cycles,vec_cycles,"
         << "mte3_cycles\n";
 
-    for (const auto &row : BuildPipelineSummary(report)) {
+    for (const auto& row : BuildPipelineSummary(report)) {
         out << report.op_name << "," << row.core_id << "," << row.unit << "," << row.total_cycles << ","
             << row.active_start_cycle << "," << row.active_end_cycle << "," << row.active_cycles << ","
             << row.busy_cycles << "," << row.scalar_cycles << "," << row.mte2_aic_cycles << "," << row.mte2_aiv_cycles
@@ -45,7 +45,7 @@ struct DotNodeInfo {
     bool is_sync;
 };
 
-static const char *DotPipeColor(const std::string &pipe)
+static const char* DotPipeColor(const std::string& pipe)
 {
     if (pipe == "Scalar")
         return "\"#D5D5D5\"";
@@ -66,7 +66,7 @@ static const char *DotPipeColor(const std::string &pipe)
     return "white";
 }
 
-static const char *DotGroupColor(const std::string &pipe)
+static const char* DotGroupColor(const std::string& pipe)
 {
     if (pipe == "Scalar")
         return "#EEEEEE";
@@ -87,10 +87,11 @@ static const char *DotGroupColor(const std::string &pipe)
     return "#F0F0F0";
 }
 
-static void AddDotEvents(const SimReport &report, int pid, const std::vector<PipeEvent> &events,
-                         std::vector<DotNodeInfo> &nodes, std::unordered_map<event_t, int> &signal_to_node, int &dot_id)
+static void AddDotEvents(
+    const SimReport& report, int pid, const std::vector<PipeEvent>& events, std::vector<DotNodeInfo>& nodes,
+    std::unordered_map<event_t, int>& signal_to_node, int& dot_id)
 {
-    for (auto &ev : events) {
+    for (auto& ev : events) {
         if (ev.end_cycle == ev.start_cycle && ev.pipe_label == "Scalar" && !ev.is_sync)
             continue;
 
@@ -114,7 +115,7 @@ static void AddDotEvents(const SimReport &report, int pid, const std::vector<Pip
     }
 }
 
-static std::vector<DotNodeInfo> BuildDotNodes(const SimReport &report, std::unordered_map<event_t, int> &signal_to_node)
+static std::vector<DotNodeInfo> BuildDotNodes(const SimReport& report, std::unordered_map<event_t, int>& signal_to_node)
 {
     std::vector<DotNodeInfo> nodes;
     int dot_id = 0;
@@ -123,13 +124,13 @@ static std::vector<DotNodeInfo> BuildDotNodes(const SimReport &report, std::unor
         return nodes;
     }
     for (uint32_t c = 0; c < report.num_cores; ++c) {
-        AddDotEvents(report, static_cast<int>(c), report.multi_timeline.per_core[c].events, nodes, signal_to_node,
-                     dot_id);
+        AddDotEvents(
+            report, static_cast<int>(c), report.multi_timeline.per_core[c].events, nodes, signal_to_node, dot_id);
     }
     return nodes;
 }
 
-static std::unordered_map<std::string, std::vector<int>> BuildDotPipeGroups(const std::vector<DotNodeInfo> &nodes)
+static std::unordered_map<std::string, std::vector<int>> BuildDotPipeGroups(const std::vector<DotNodeInfo>& nodes)
 {
     std::unordered_map<std::string, std::vector<int>> pipe_groups;
     for (int i = 0; i < static_cast<int>(nodes.size()); ++i) {
@@ -138,7 +139,7 @@ static std::unordered_map<std::string, std::vector<int>> BuildDotPipeGroups(cons
     return pipe_groups;
 }
 
-static void WriteDotNode(std::ostream &out, const DotNodeInfo &node)
+static void WriteDotNode(std::ostream& out, const DotNodeInfo& node)
 {
     out << "    n" << node.dot_id << " [label=\"" << node.label << "\", fillcolor=" << node.color;
     if (node.is_sync)
@@ -148,9 +149,9 @@ static void WriteDotNode(std::ostream &out, const DotNodeInfo &node)
     out << "];\n";
 }
 
-static void WriteDotGroups(std::ostream &out, const std::vector<DotNodeInfo> &nodes)
+static void WriteDotGroups(std::ostream& out, const std::vector<DotNodeInfo>& nodes)
 {
-    for (auto &[pipe_name, indices] : BuildDotPipeGroups(nodes)) {
+    for (auto& [pipe_name, indices] : BuildDotPipeGroups(nodes)) {
         out << "  subgraph \"cluster_" << pipe_name << "\" {\n";
         out << "    label=\"" << pipe_name << "\";\n";
         out << "    style=filled;\n";
@@ -162,10 +163,10 @@ static void WriteDotGroups(std::ostream &out, const std::vector<DotNodeInfo> &no
     }
 }
 
-static void WriteDotEdges(std::ostream &out, const std::vector<DotNodeInfo> &nodes,
-                          const std::unordered_map<event_t, int> &signal_to_node)
+static void WriteDotEdges(
+    std::ostream& out, const std::vector<DotNodeInfo>& nodes, const std::unordered_map<event_t, int>& signal_to_node)
 {
-    for (auto &node : nodes) {
+    for (auto& node : nodes) {
         for (int i = 0; i < node.wait_count; ++i) {
             auto it = signal_to_node.find(node.wait_events[i]);
             if (it != signal_to_node.end()) {
@@ -175,7 +176,7 @@ static void WriteDotEdges(std::ostream &out, const std::vector<DotNodeInfo> &nod
     }
 }
 
-static void WriteDotLegend(std::ostream &out)
+static void WriteDotLegend(std::ostream& out)
 {
     out << "\n  subgraph cluster_legend {\n";
     out << "    label=\"Legend\";\n";
@@ -195,7 +196,7 @@ static void WriteDotLegend(std::ostream &out)
     out << "  }\n";
 }
 
-static void WriteDependencyDOT(const std::string &path, const SimReport &report)
+static void WriteDependencyDOT(const std::string& path, const SimReport& report)
 {
     if (!EnsureParentDir(path)) {
         return;
@@ -225,9 +226,9 @@ static void WriteDependencyDOT(const std::string &path, const SimReport &report)
 
 // ── Sync Edge Audit: count SIGNAL/WAIT per channel, check balance ──
 
-static const char *HwPipeLabel(int hw_pipe)
+static const char* HwPipeLabel(int hw_pipe)
 {
-    static const char *names[] = {"S", "VEC", "MTE1", "MTE2", "MTE3", "CUBE", "ALL", "FIXP"};
+    static const char* names[] = {"S", "VEC", "MTE1", "MTE2", "MTE3", "CUBE", "ALL", "FIXP"};
     return (hw_pipe >= 0 && hw_pipe < 8) ? names[hw_pipe] : "?";
 }
 
@@ -239,40 +240,40 @@ struct EdgeStat {
     int wait = 0;
 };
 
-static void DecodeSyncChannel(event_t channel, int sync_base, EdgeStat &stat)
+static void DecodeSyncChannel(event_t channel, int sync_base, EdgeStat& stat)
 {
     int off = channel - sync_base;
     stat.hw_dst = off / EVENTS_PER_PIPE;
     stat.evt_id = off % EVENTS_PER_PIPE;
 }
 
-static void AddSyncSignal(std::unordered_map<event_t, EdgeStat> &stats, event_t channel, int sync_base,
-                          const std::string &pipe_label)
+static void AddSyncSignal(
+    std::unordered_map<event_t, EdgeStat>& stats, event_t channel, int sync_base, const std::string& pipe_label)
 {
     if (channel < sync_base) {
         return;
     }
-    auto &stat = stats[channel];
+    auto& stat = stats[channel];
     stat.src_counts[pipe_label]++;
     DecodeSyncChannel(channel, sync_base, stat);
     stat.sig++;
 }
 
-static void AddSyncWait(std::unordered_map<event_t, EdgeStat> &stats, event_t channel, int sync_base)
+static void AddSyncWait(std::unordered_map<event_t, EdgeStat>& stats, event_t channel, int sync_base)
 {
     if (channel < sync_base) {
         return;
     }
-    auto &stat = stats[channel];
+    auto& stat = stats[channel];
     DecodeSyncChannel(channel, sync_base, stat);
     stat.wait++;
 }
 
-static std::string BuildSourceSummary(const std::unordered_map<std::string, int> &src_counts)
+static std::string BuildSourceSummary(const std::unordered_map<std::string, int>& src_counts)
 {
     std::string src_str;
     std::vector<std::pair<std::string, int>> src_sorted(src_counts.begin(), src_counts.end());
-    std::sort(src_sorted.begin(), src_sorted.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
+    std::sort(src_sorted.begin(), src_sorted.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
     for (size_t i = 0; i < src_sorted.size(); ++i) {
         if (i > 0) {
             src_str += " + ";
@@ -282,12 +283,12 @@ static std::string BuildSourceSummary(const std::unordered_map<std::string, int>
     return src_str;
 }
 
-static void PrintSyncEdgeAudit(const std::vector<PipeEvent> &events, std::ostream &os)
+static void PrintSyncEdgeAudit(const std::vector<PipeEvent>& events, std::ostream& os)
 {
     int sync_base = SyncChannelBase();
     std::unordered_map<event_t, EdgeStat> stats;
 
-    for (auto &ev : events) {
+    for (auto& ev : events) {
         bool is_sig = (ev.name.find("SIGNAL(") == 0);
         bool is_wait_ev = (ev.name.find("WAIT(") == 0);
 
@@ -315,13 +316,13 @@ static void PrintSyncEdgeAudit(const std::vector<PipeEvent> &events, std::ostrea
 
     // Sort by channel key
     std::vector<std::pair<event_t, EdgeStat>> sorted(stats.begin(), stats.end());
-    std::sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
 
     os << "\n-- Sync Edge Audit --\n";
     os << "  #   Ch    -> Dst   Flag  SIG  WAIT  OK  Sources\n";
     int n = 0;
     int tot_sig = 0, tot_wait = 0, unbal = 0;
-    for (auto &[ch, st] : sorted) {
+    for (auto& [ch, st] : sorted) {
         bool ok = (st.sig == st.wait);
         if (!ok)
             unbal++;
@@ -337,12 +338,12 @@ static void PrintSyncEdgeAudit(const std::vector<PipeEvent> &events, std::ostrea
 }
 
 private:
-static void PrintCoreDetail(const PipeTimeline &timeline, uint64_t total_cycles, uint32_t core_id, std::ostream &os)
+static void PrintCoreDetail(const PipeTimeline& timeline, uint64_t total_cycles, uint32_t core_id, std::ostream& os)
 {
     // Collect pipe stats by label
     std::unordered_map<std::string, std::pair<uint64_t, uint64_t>> pipe_stats;
-    for (auto &ev : timeline.events) {
-        auto &[busy, count] = pipe_stats[ev.pipe_label];
+    for (auto& ev : timeline.events) {
+        auto& [busy, count] = pipe_stats[ev.pipe_label];
         busy += ev.stuck ? ev.duration : (ev.end_cycle - ev.start_cycle);
         count++;
     }
@@ -350,31 +351,31 @@ static void PrintCoreDetail(const PipeTimeline &timeline, uint64_t total_cycles,
     // Print in fixed track order (AIC → AIV-0 → AIV-1)
     auto tracks = GetTracksForCore(core_id);
     os << "Pipe utilization:\n";
-    for (auto &t : tracks) {
+    for (auto& t : tracks) {
         auto it = pipe_stats.find(t.tid);
         if (it == pipe_stats.end())
             continue;
-        auto &[busy, count] = it->second;
+        auto& [busy, count] = it->second;
         double util = total_cycles > 0 ? 100.0 * busy / total_cycles : 0.0;
         os << "  " << t.display_name << " : " << count << " ops, busy " << busy << " cycles (" << util << "%)\n";
     }
     // Print any pipes not in tracks (e.g., Scalar)
-    for (auto &[name, stats] : pipe_stats) {
+    for (auto& [name, stats] : pipe_stats) {
         bool found = false;
-        for (auto &t : tracks)
+        for (auto& t : tracks)
             if (t.tid == name) {
                 found = true;
                 break;
             }
         if (found)
             continue;
-        auto &[busy, count] = stats;
+        auto& [busy, count] = stats;
         double util = total_cycles > 0 ? 100.0 * busy / total_cycles : 0.0;
         os << "  " << name << " : " << count << " ops, busy " << busy << " cycles (" << util << "%)\n";
     }
 
     os << "\nTimeline:\n";
-    for (auto &ev : timeline.events) {
+    for (auto& ev : timeline.events) {
         os << "  [" << ev.pipe_label << "] " << ev.name << "  " << ev.start_cycle << " - " << ev.end_cycle << " ("
            << (ev.stuck ? ev.duration : (ev.end_cycle - ev.start_cycle)) << " cycles)\n";
     }
