@@ -123,6 +123,32 @@ jobs:
             --build-dir build/cpu_smoke_tadd \
             --clean
 
+      - name: Run CPU SIM trace regression tests
+        run: |
+          python3 tests/run_cpu.py \
+            --testcase ttrace \
+            --trace-mode \
+            --generator Ninja \
+            --build-dir build/cpu_trace \
+            --clean
+
+      - name: Run CPU SIM trace-disabled regression tests
+        run: |
+          python3 tests/run_cpu.py \
+            --testcase ttrace \
+            --generator Ninja \
+            --build-dir build/cpu_trace_off \
+            --clean
+
+      - name: Build and run standalone CPU trace example
+        run: |
+          cmake -S kernels/custom/fused_add_relu_mul -B build/fused_trace -G Ninja \
+            -DPTO_CPU_SIM_STANDALONE=ON -DPTO_CPU_SIM_TRACE_MODE=ON \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/fused_trace --parallel 2
+          PTO_CPU_SIM_NUM_CORES=4 PTO_CPU_SIM_TRACE_ENABLE=1 \
+            build/fused_trace/fused_add_relu_mul_cpu_sim --functional-only
+
   system-tests:
     name: CPU SIM full ST
     needs: [pre-commit, docs-build, unit-tests]
