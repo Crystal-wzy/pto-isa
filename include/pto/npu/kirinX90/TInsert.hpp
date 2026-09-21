@@ -14,13 +14,11 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto {
 
-#ifndef TINSERT_MODE_DEFINED
-#define TINSERT_MODE_DEFINED
-enum class TInsertMode : uint8_t {
-    SPLIT2 = 2,
-    SPLIT4 = 3,
-};
-#endif
+template <typename PtrT>
+__tf__ PTO_INTERNAL PtrT GetTilePtr(PtrT ptr)
+{
+    return (PtrT)__cce_get_tile_ptr(ptr);
+}
 
 template <typename T, typename DstTileData, typename SrcTileData>
 __tf__ AICORE void TInsertVecToVecNDUnaligned(
@@ -352,8 +350,8 @@ PTO_INTERNAL void TINSERT_IMPL(DstTileData& dst, SrcTileData& src, uint16_t inde
             ComputeNZBlockParams<T, DstTileData, SrcTileData>(
                 validRow, validCol, static_cast<uint32_t>(DstTileData::Rows), burstNum, burstLen, srcGap, dstGap,
                 dstOffset, indexRow, indexCol);
-            __ubuf__ T* dstAddr = (__ubuf__ T*)__cce_get_tile_ptr(dst.data());
-            __ubuf__ T* srcAddr = (__ubuf__ T*)__cce_get_tile_ptr(src.data());
+            __ubuf__ T* dstAddr = (__ubuf__ T*)GetTilePtr(dst.data());
+            __ubuf__ T* srcAddr = (__ubuf__ T*)GetTilePtr(src.data());
             pto_copy_ubuf_to_ubuf(
                 (__ubuf__ void*)(dstAddr + dstOffset), (__ubuf__ void*)srcAddr, burstNum, burstLen, srcGap, dstGap);
         } else {
