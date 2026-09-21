@@ -176,7 +176,7 @@ PTO_CPU_SIM_NUM_CORES=4 PTO_CPU_SIM_TRACE_ENABLE=1 PTO_CPU_SIM_TRACE_DIR=build/f
 ```
 
 该命令验证基础、双缓冲和大 Tile kernel，覆盖不足一个 Tile 的尾块，并跳过性能基准。每次启动分别生成一个 `trace.jsonl` 文件。
-CI 运行该功能示例，以及分别编译开启和关闭 Trace 的 `ttrace` 回归。示例检查数值结果，`ttrace` 检查指令记录和文件导出。
+回归验证应运行该功能示例，以及分别编译开启和关闭 Trace 的 `ttrace` 回归。示例检查数值结果，`ttrace` 检查指令记录和文件导出。
 
 外部运行时若直接调用 kernel，必须在编译时设置 `PTO_CPU_SIM_TRACE_MODE=1`，并在执行 kernel 的线程上管理 `ResetInstructionTrace()` / `DumpInstructionTraceJson()`。直接调用 kernel 不会经过 `LaunchKernelMultiCore`，也不会自动导出 Trace。
 
