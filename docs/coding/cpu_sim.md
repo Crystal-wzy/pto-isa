@@ -296,8 +296,8 @@ PTO_CPU_SIM_NUM_CORES=4 PTO_CPU_SIM_TRACE_ENABLE=1 PTO_CPU_SIM_TRACE_DIR=build/f
 
 This validates basic, double-buffered, and large-tile kernels, including partial tiles, without running the
 performance benchmark. Each launch produces a separate `trace.jsonl` file.
-CI runs this functional example with tracing enabled and the `ttrace` regressions with tracing compiled both
-in and out. The example checks numerical results; the `ttrace` regressions check trace records and file export.
+For regression coverage, run this functional example with tracing enabled and the `ttrace` regressions with tracing
+compiled both in and out. The example checks numerical results; the `ttrace` regressions check trace records and file export.
 
 An external runtime that calls kernels directly must compile them with `PTO_CPU_SIM_TRACE_MODE=1` and manage
 `ResetInstructionTrace()` / `DumpInstructionTraceJson()` on the executing thread. Calling a kernel directly
