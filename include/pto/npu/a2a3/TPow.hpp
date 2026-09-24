@@ -12,6 +12,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #define TPOW_HPP
 
 namespace pto {
+#ifndef __COSTMODEL
 PTO_INTERNAL bool IsInteger(float f) noexcept
 {
     FloatUnion converter;
@@ -139,6 +140,7 @@ PTO_INTERNAL void ProcessSpecialCaseForPowF(
         }
     }
 }
+#endif
 
 template <typename T, bool NeedAbs>
 struct PowOp {
@@ -172,7 +174,12 @@ PTO_INTERNAL void TPowF(
     BinaryInstr<PowOp<T, false>, T, elementsPerRepeat, blockSizeElem, DstStride, BaseStride, ExpStride>(
         dst, base, exp, validRow, validCol);
     PtoSetWaitFlag<PIPE_V, PIPE_S>();
+#ifndef __COSTMODEL
+    // The scalar repair loop reads UB data directly. Costmodel tiles only carry
+    // symbolic addresses, so the mock records the CCE lowering and its waits
+    // but must not dereference those addresses on the host.
     ProcessSpecialCaseForPowF<T, DstStride, BaseStride, ExpStride, TmpStride>(dst, base, exp, tmp, validRow, validCol);
+#endif
     PtoSetWaitFlag<PIPE_S, PIPE_V>();
 }
 
@@ -210,8 +217,10 @@ PTO_INTERNAL void TPowF(__ubuf__ T* dst, __ubuf__ T* base, T exp, __ubuf__ T* tm
         dst, base, exp, validRow, validCol);
 
     PtoSetWaitFlag<PIPE_V, PIPE_S>();
+#ifndef __COSTMODEL
     ProcessSpecialCaseForPowF<T, DstTile::RowStride, BaseTile::RowStride, TmpTile::RowStride>(
         dst, base, exp, tmp, validRow, validCol);
+#endif
     PtoSetWaitFlag<PIPE_S, PIPE_V>();
 }
 
@@ -229,7 +238,9 @@ __tf__ PTO_INTERNAL void TPow(
 
     if constexpr (std::is_integral_v<T>) {
         PtoSetWaitFlag<PIPE_V, PIPE_S>();
+#ifndef __COSTMODEL
         TPowI<T, DstTile::RowStride, BaseTile::RowStride, ExpTile::RowStride>(dst, base, exp, validRow, validCol);
+#endif
         PtoSetWaitFlag<PIPE_S, PIPE_V>();
     } else {
         __ubuf__ T* tmp = (__ubuf__ T*)__cce_get_tile_ptr(tmpData);
@@ -309,7 +320,9 @@ __tf__ PTO_INTERNAL void TPows(
 
     if constexpr (std::is_integral_v<T>) {
         PtoSetWaitFlag<PIPE_V, PIPE_S>();
+#ifndef __COSTMODEL
         TPowI<T, DstTile::RowStride, BaseTile::RowStride>(dst, base, exp, validRow, validCol);
+#endif
         PtoSetWaitFlag<PIPE_S, PIPE_V>();
     } else {
         __ubuf__ T* tmp = (__ubuf__ T*)__cce_get_tile_ptr(tmpData);
