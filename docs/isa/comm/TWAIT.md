@@ -16,13 +16,6 @@ Signal tensor: the NPU waits until **all** elements in the tensor satisfy the co
 
 The signal address must point to local (on-chip) memory on the current NPU.
 
-## Assembly Syntax
-
-```text
-twait %signal, %cmp_value {cmp = #pto.cmp<EQ>} : (!pto.memref<i32>, i32)
-twait %signal_matrix, %cmp_value {cmp = #pto.cmp<GE>} : (!pto.memref<i32, MxN>, i32)
-```
-
 ## C++ Intrinsic
 
 Declared in `include/pto/comm/pto_comm_inst.hpp`:

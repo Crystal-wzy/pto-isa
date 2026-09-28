@@ -122,20 +122,6 @@ When `validCol % 32 != 0`, the trailing partial block ($t = C \bmod 32$ elements
 
 The current A2A3 and A5 implementations use `T minVal = -(0.0 / 0.0)` as the padding sentinel. This expression produces NaN, not negative infinity; `std::numeric_limits<T>::lowest()` is a finite value and is not equivalent either. Padding positions must not be treated as valid output pairs. If `validCol > 32 × 255`, the row is chunked into `REPEAT_MAX`-sized groups, each sorted via a separate `vbitsort` call.
 
-## Assembly Syntax
-
-### AS Level 1 (SSA)
-
-```text
-%dst = pto.tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### AS Level 2 (DPS)
-
-```text
-pto.tsort32 ins(%src, %idx : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## Examples
 
 The following kernel skeletons show manual UB assignment and the two overloads; input loads, output stores, and pipeline synchronization are omitted. Load the valid `src`/`idx` data and synchronize its producer before each `TSORT32` call, then synchronize before consuming `dst`. The UB regions below are 32-byte aligned and do not overlap.
@@ -181,29 +167,4 @@ extern "C" __global__ AICORE void exampleTail()
     // Load srcTile and idxTile, then synchronize before sorting.
     TSORT32(dstTile, srcTile, idxTile, tmpTile);
 }
-```
-
-## ASM Form Examples
-
-### Auto Mode
-
-```text
-%dst = pto.tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### Manual Mode
-
-```text
-# pto.tassign %arg0, @tile(0x1000)
-# pto.tassign %arg1, @tile(0x2000)
-# pto.tassign %arg2, @tile(0x3000)
-%dst = pto.tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### PTO Assembly Form
-
-```text
-%dst = tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-# AS Level 2 (DPS)
-pto.tsort32 ins(%src, %idx : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```

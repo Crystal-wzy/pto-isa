@@ -124,20 +124,6 @@ $$
 
 当前Atlas A2/A3 训练系列产品/Atlas A2/A3 推理系列产品和Ascend 950PR/Ascend 950DT实现使用 `T minVal = -(0.0 / 0.0)` 作为填充值。该表达式产生NaN，并非负无穷；`std::numeric_limits<T>::lowest()` 是有限值，同样不能与之等同。填充位置不能作为有效输出值-索引对使用。若 `validCol > 32 × 255`，行按 `REPEAT_MAX` 大小的组拆分，每组通过独立的 `vbitsort` 调用排序。
 
-## 汇编语法
-
-### AS Level 1（SSA）
-
-```text
-%dst = pto.tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### AS Level 2（DPS）
-
-```text
-pto.tsort32 ins(%src, %idx : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
-```
-
 ## 示例
 
 以下核函数骨架展示手动UB分配和两种重载，省略输入加载、输出存储和流水线同步。每次调用 `TSORT32` 前，应加载有效的 `src`/`idx` 数据并完成生产者同步；读取 `dst` 前也须完成相应同步。下列UB区域均为32Byte对齐且互不重叠。
@@ -183,29 +169,4 @@ extern "C" __global__ AICORE void exampleTail()
     // 加载 srcTile 和 idxTile，并在排序前完成同步。
     TSORT32(dstTile, srcTile, idxTile, tmpTile);
 }
-```
-
-## ASM形式示例
-
-### Auto模式
-
-```text
-%dst = pto.tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### Manual模式
-
-```text
-# pto.tassign %arg0, @tile(0x1000)
-# pto.tassign %arg1, @tile(0x2000)
-# pto.tassign %arg2, @tile(0x3000)
-%dst = pto.tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-```
-
-### PTO汇编形式
-
-```text
-%dst = tsort32 %src, %idx : (!pto.tile<...>, !pto.tile<...>) -> !pto.tile<...>
-# AS Level 2（DPS）
-pto.tsort32 ins(%src, %idx : !pto.tile_buf<...>, !pto.tile_buf<...>) outs(%dst : !pto.tile_buf<...>)
 ```
