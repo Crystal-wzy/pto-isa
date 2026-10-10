@@ -32,6 +32,7 @@ ASCEND_INSTALL_INFO="ascend_install.info"
 ARCH_INFO=$(uname -m)
 PTO_PLATFORM_DIR=pto_isa
 PTO_PLATFORM_UPPER=$(echo "${PTO_PLATFORM_DIR}" | tr '[:lower:]' '[:upper:]')
+PTO_ISA_INCLUDE_HINT="cann/${ARCH_INFO}-linux/include/pto"
 
 TARGET_INSTALL_PATH=""
 TARGET_MOULDE_DIR=""  # TARGET_INSTALL_PATH + PKG_VERSION_DIR + PTO_PLATFORM_DIR
@@ -202,7 +203,7 @@ get_install_path() {
 }
 
 setenv() {
-  logandprint "[INFO]: Set the environment path [ export ASCEND_PTO_ISA_PATH=${relative_path_val}/${PTO_PLATFORM_DIR} ]."
+  logandprint "[INFO]: Set the environment path [ export ASCEND_PTO_ISA_PATH=${relative_path_val}/${PTO_ISA_INCLUDE_HINT} ]."
   if [ "${IS_DOCKER_INSTALL}" = y ]; then
     INSTALL_OPTION="--docker-root=${DOCKER_ROOT}"
   else
@@ -659,7 +660,7 @@ main() {
   if [ "${IS_SETENV}" != "y" ]; then
     logandprint "[INFO]: Using requirements: when pto module install finished or \
  before you run the pto module, execute the command \
- [ export ASCEND_PTO_ISA_PATH=${TARGET_INSTALL_PATH}/cann/${PTO_PLATFORM_DIR} ] to set the environment path."
+ [ export ASCEND_PTO_ISA_PATH=${TARGET_INSTALL_PATH}/${PTO_ISA_INCLUDE_HINT} ] to set the environment path."
   fi
 
   logandprint "[INFO]: Pto package installed successfully! The new version takes effect immediately."
