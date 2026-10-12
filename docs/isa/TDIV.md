@@ -27,8 +27,8 @@ PTO_INST RecordEvent TDIV(TileDataDst &dst, TileDataSrc0 &src0, TileDataSrc1 &sr
 
 `PrecisionType` has the following values available:
 
-* `DivAlgorithm::DEFAULT`: Normal algorithm, faster but with lower precision.
-* `DivAlgorithm::HIGH_PRECISION`: High precision algorithm, but slower.
+* `DivAlgorithm::DEFAULT`: On A2/A3, TDIV uses the hardware `vdiv` instruction and is already the high-precision mode. Passing `DivAlgorithm::DEFAULT` is also the high-precision version. On A5 this is the faster, lower-precision path.
+* `DivAlgorithm::HIGH_PRECISION`: High-precision algorithm, but slower. On A2/A3 this selects the same hardware `vdiv` instruction as `DivAlgorithm::DEFAULT`. On A5 this selects the high-precision algorithm.
 
 ## Constraints
 
@@ -48,8 +48,10 @@ PTO_INST RecordEvent TDIV(TileDataDst &dst, TileDataSrc0 &src0, TileDataSrc1 &sr
     - The op uses `dst.GetValidRow()` / `dst.GetValidCol()` as the iteration domain;.
 - **Division-by-zero**:
     - Behavior is target-defined.
-- **High Precision Algorithm**
-    - Only available on A5, `PrecisionType` option is ignored on A3.
+- **Precision**
+    - On A2/A3, TDIV uses the hardware `vdiv` instruction and is already the high-precision mode. Passing `DivAlgorithm::DEFAULT` from the TDIV interface is also the high-precision version.
+    - On A2/A3, `DivAlgorithm::HIGH_PRECISION` uses the same hardware `vdiv` instruction.
+    - On A5, `DivAlgorithm::HIGH_PRECISION` selects the high-precision algorithm. `DivAlgorithm::DEFAULT` is the faster, lower-precision path.
 
 ## Examples
 

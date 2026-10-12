@@ -118,3 +118,4 @@ TEST_F(TCMPTest, case_le_half_128x128_64x64_128x128) { test_tcmp<aclFloat16, 128
 TEST_F(TCMPTest, case_ne_half_32x32_32x32_32x32_nan) { test_tcmp<aclFloat16, 32, 32, 32, 32, CmpMode::NE, true>(); }
 TEST_F(TCMPTest, case_ne_half_2x4096_2x4096_2x4096) { test_tcmp<aclFloat16, 2, 4096, 2, 4096, CmpMode::NE, true>(); }
 TEST_F(TCMPTest, case_ne_half_128x128_64x64_128x128) { test_tcmp<aclFloat16, 128, 128, 64, 64, CmpMode::NE, true>(); }
+TEST_F(TCMPTest, case_ne_int32_32x32_32x32_32x32) { test_tcmp<int32_t, 32, 32, 32, 32, CmpMode::NE>(); }

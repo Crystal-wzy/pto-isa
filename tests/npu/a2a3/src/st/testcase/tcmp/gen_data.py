@@ -117,6 +117,7 @@ if __name__ == "__main__":
         tcmpParams(np.float32, 128, 128, 64, 64, 128, 128, "CmpMode::LE"),
         tcmpParams(np.int32, 77, 81, 32, 32, 77, 81, "CmpMode::EQ"),
         tcmpParams(np.int32, 32, 32, 32, 32, 32, 32, "CmpMode::EQ"),
+        tcmpParams(np.int32, 32, 32, 32, 32, 32, 32, "CmpMode::NE"),
         tcmpParams(np.float32, 32, 32, 32, 32, 32, 32, "CmpMode::NE"),
         tcmpParams(np.float32, 32, 32, 32, 32, 32, 32, "CmpMode::NE", is_nan=True),
         tcmpParams(np.float32, 2, 4096, 2, 4096, 2, 4096, "CmpMode::LT"),

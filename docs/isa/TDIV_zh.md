@@ -27,8 +27,8 @@ PTO_INST RecordEvent TDIV(TileDataDst &dst, TileDataSrc0 &src0, TileDataSrc1 &sr
 
 `PrecisionType`可指定以下值：
 
-* `DivAlgorithm::DEFAULT`：普通算法，速度快但精度较低。
-* `DivAlgorithm::HIGH_PRECISION`：高精度算法，速度较慢。
+* `DivAlgorithm::DEFAULT`：在 Atlas A2/A3 上，TDIV 使用硬件 `vdiv` 指令，已经是高精度模式。从 TDIV 接口传入 `DivAlgorithm::DEFAULT` 也是高精度版本。在 Ascend 950PR/Ascend 950DT 上为速度更快、精度较低的路径。
+* `DivAlgorithm::HIGH_PRECISION`：高精度算法，速度较慢。在 Atlas A2/A3 上同样选择硬件 `vdiv` 指令，与 `DivAlgorithm::DEFAULT` 相同。在 Ascend 950PR/Ascend 950DT 上选择高精度算法。
 
 ## 约束
 
@@ -48,8 +48,10 @@ PTO_INST RecordEvent TDIV(TileDataDst &dst, TileDataSrc0 &src0, TileDataSrc1 &sr
     - 该操作使用 `dst.GetValidRow()` / `dst.GetValidCol()` 作为迭代域。
 - **除零**:
     - 行为由目标定义。
-- **高精度算法**
-    - 仅在Ascend 950PR/Ascend 950DT上有效，`PrecisionType`选项在Atlas A3 训练系列产品/Atlas A3 推理系列产品上将被忽略。
+- **精度**
+    - 在 Atlas A2/A3 上，TDIV 使用硬件 `vdiv` 指令，已经是高精度模式。从 TDIV 接口传入 `DivAlgorithm::DEFAULT` 也是高精度版本。
+    - 在 Atlas A2/A3 上，`DivAlgorithm::HIGH_PRECISION` 使用同一条硬件 `vdiv` 指令。
+    - 在 Ascend 950PR/Ascend 950DT 上，`DivAlgorithm::HIGH_PRECISION` 选择高精度算法。`DivAlgorithm::DEFAULT` 为速度更快、精度较低的路径。
 
 ## 示例
 

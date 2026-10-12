@@ -66,8 +66,7 @@ PTO_INST RecordEvent TDeInterleave(TileDataDst &dst1, TileDataDst &dst0, TileDat
     - Tile layout must be row-major (`TileData::isRowMajor`).
     - All tiles must have the same `DType`.
     - Two-source form: `src0`, `src1`, `dst0`, `dst1` must all have the same valid shape, and their `validCols` must be even.
-    - Single-source form: `src`, `dst0`, `dst1` must all have the same valid shape; `src`'s `validCols` must be even.
-    - The `validCols` of `dst0`/`dst1` tile must be half the `validCols` of `src` tile.
+    - Single-source form: `src`, `dst0`, and `dst1` must have the same valid row count; `src`'s `validCols` must be even, and the `validCols` of `dst0` and `dst1` must each be half of `src`'s `validCols`.
 - **Valid region**:
     - Two-source form: The op uses `dst0.GetValidRow()` / `dst0.GetValidCol()` as the iteration domain. `dst0/dst1` each hold `validCols` elements per row.
     - Single-source form: `dst0/dst1` each hold `src.GetValidCol() / 2` valid elements per row. Elements beyond `halfValidCols` in each row are **unspecified**.
@@ -98,9 +97,10 @@ void example_auto_two_src() {
 using namespace pto;
 
 void example_auto_single_src() {
-    using TileT = Tile<TileType::Vec, float, 16, 128>;
-    TileT src(16, 128);
-    TileT dst0(16, 128), dst1(16, 128);
+    using SrcTileT = Tile<TileType::Vec, float, 16, 128>;
+    using DstTileT = Tile<TileType::Vec, float, 16, 64>;
+    SrcTileT src(16, 128);
+    DstTileT dst0(16, 64), dst1(16, 64);
 
     TDeInterleave(dst1, dst0, src);
 }
@@ -134,8 +134,10 @@ void example_manual_two_src() {
 using namespace pto;
 
 void example_manual_single_src() {
-    using TileT = Tile<TileType::Vec, half, 16, 256, BLayout::RowMajor, 16, 256>;
-    TileT src, dst0, dst1;
+    using SrcTileT = Tile<TileType::Vec, half, 16, 256, BLayout::RowMajor, 16, 256>;
+    using DstTileT = Tile<TileType::Vec, half, 16, 128, BLayout::RowMajor, 16, 128>;
+    SrcTileT src;
+    DstTileT dst0, dst1;
 
     TASSIGN(src,  0x1000);
     TASSIGN(dst0, 0x2000);
