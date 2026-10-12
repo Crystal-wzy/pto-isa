@@ -88,7 +88,7 @@ PTO_INST RecordEvent TINSERT(DstTileData &dst, SrcTileData &src,
                              WaitEvents &... events);
 
 #if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || \
-    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
+    defined(PTO_NPU_ARCH_KIRIN9050) || defined(__CPU_SIM)
 template <TInsertMode mode, typename DstTileData, typename SrcTileData,
           typename... WaitEvents>
 PTO_INST RecordEvent TINSERT(DstTileData &dst, SrcTileData &src,
@@ -154,7 +154,7 @@ canonical overload.
     - vector-quant form: canonical `TINSERT<..., FpTileData, reluMode>(dst, src, fp, indexRow, indexCol)`,
       legacy `TINSERT_FP<..., reluMode>(dst, src, fp, indexRow, indexCol)`, and target-supported
       `TINSERT<..., FpTileData, mode, reluMode>(dst, src, fp, indexRow, indexCol)` Acc-to-Vec routing
-    - NZ split form *(A5, kirin9030, kirinX90, kirinDev0000, and CPU simulator)*: `TINSERT<TInsertMode::SPLIT2>(dst, src, indexRow, indexCol)` or `TINSERT<TInsertMode::SPLIT4>(...)`
+    - NZ split form *(A5, kirin9030, kirinX90, kirin9050, and CPU simulator)*: `TINSERT<TInsertMode::SPLIT2>(dst, src, indexRow, indexCol)` or `TINSERT<TInsertMode::SPLIT4>(...)`
 - `reluMode` is `ReluPreMode::{NoRelu, NormalRelu}`.
 - `mode` is `AccToVecMode::{SingleModeVec0, SingleModeVec1, DualModeSplitM, DualModeSplitN}`.
   The vector-quantized `fp + mode` overload is exposed only on targets with matching backend support

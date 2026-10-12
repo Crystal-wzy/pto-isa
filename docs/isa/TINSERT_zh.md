@@ -88,7 +88,7 @@ PTO_INST RecordEvent TINSERT(DstTileData &dst, SrcTileData &src,
                              WaitEvents &... events);
 
 #if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || \
-    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
+    defined(PTO_NPU_ARCH_KIRIN9050) || defined(__CPU_SIM)
 template <TInsertMode mode, typename DstTileData, typename SrcTileData,
           typename... WaitEvents>
 PTO_INST RecordEvent TINSERT(DstTileData &dst, SrcTileData &src,
@@ -152,7 +152,7 @@ Ascend 950PR/Ascend 950DT 和 CPU 模拟器），适用范围与配对规则见�
     - 向量量化形式：`TINSERT<..., FpTileData, reluMode>(dst, src, fp, indexRow, indexCol)`、
       `TINSERT_FP<..., reluMode>(dst, src, fp, indexRow, indexCol)`，以及目标支持的
       `TINSERT<..., FpTileData, mode, reluMode>(dst, src, fp, indexRow, indexCol)` Acc-to-Vec 路由
-    - NZ split 形式 *(A5、kirin9030、kirinX90、kirinDev0000 和 CPU 模拟器)*：`TINSERT<TInsertMode::SPLIT2>(dst, src, indexRow, indexCol)` 或 `TINSERT<TInsertMode::SPLIT4>(...)`
+    - NZ split 形式 *(A5、kirin9030、kirinX90、kirin9050 和 CPU 模拟器)*：`TINSERT<TInsertMode::SPLIT2>(dst, src, indexRow, indexCol)` 或 `TINSERT<TInsertMode::SPLIT4>(...)`
 - `reluMode` 取值为 `ReluPreMode::{NoRelu, NormalRelu}`。
 - `mode` 取值为 `AccToVecMode::{SingleModeVec0, SingleModeVec1, DualModeSplitM, DualModeSplitN}`。
   向量量化 `fp + mode` 重载仅在存在对应后端实现的目标上暴露

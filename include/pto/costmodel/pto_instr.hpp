@@ -248,7 +248,7 @@ inline void RecordTPopSync(Pipe& pipe, TileCons& tile, int tile_index)
 #define PTO_SECOND_ARG(_first, second, ...) second
 #define PTO_TEMPLATE_ARGS(...) <__VA_ARGS__>
 
-#if defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRINX90) || defined(PTO_NPU_ARCH_KIRIN9050)
 #define PTO_FORWARD_L2HINT_TO_IMPL 0
 #else
 #define PTO_FORWARD_L2HINT_TO_IMPL 1
@@ -1385,7 +1385,7 @@ PTO_INST RecordEvent TSTORE(GlobalData& dst, TileData& src, FpTileData& fp, Wait
 }
 
 #if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_KIRIN9030) || \
-    defined(PTO_NPU_ARCH_KIRINDEV0000) || defined(__CPU_SIM)
+    defined(PTO_NPU_ARCH_KIRIN9050) || defined(__CPU_SIM)
 template <
     TStoreL2Hint l2Control, STPhase Phase, typename TileData, typename GlobalData, typename FpTileData,
     AtomicType atomicType = AtomicType::AtomicNone, ReluPreMode reluPreMode = ReluPreMode::NoRelu,

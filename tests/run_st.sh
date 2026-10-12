@@ -33,7 +33,7 @@ ENABLE_A3=false
 ENABLE_A5=false
 ENABLE_KIRIN9030=false
 ENABLE_KIRINX90=false
-ENABLE_KIRINDEV0000=false
+ENABLE_KIRIN9050=false
 ENABLE_SIMPLE=false
 ENABLE_ALL=false
 ENABLE_COMM=false
@@ -50,7 +50,7 @@ Platform (choose at least one):
   --a3_a5       both A2/A3 and A5
   --kirin9030   Kirin9030
   --kirinX90    KirinX90
-  --kirinDev0000 KirinDev0000
+  --kirin9050 Kirin9050
 
 Mode (required for --a3/--a5/--a3_a5, choose one):
   --simple      run the curated single-case subset
@@ -94,8 +94,8 @@ checkopts() {
         ENABLE_KIRINX90=true
         shift
         ;;
-      --kirinDev0000)
-        ENABLE_KIRINDEV0000=true
+      --kirin9050)
+        ENABLE_KIRIN9050=true
         shift
         ;;
       --sim)
@@ -150,8 +150,8 @@ fi
 # instead of silently exiting 0 without running any test.
 if [ "$ENABLE_A3" = "false" ] && [ "$ENABLE_A5" = "false" ] && \
    [ "$ENABLE_KIRIN9030" = "false" ] && [ "$ENABLE_KIRINX90" = "false" ] && \
-   [ "$ENABLE_KIRINDEV0000" = "false" ]; then
-  echo "Error: no platform selected (expected one of --a3/--a5/--a3_a5/--kirin9030/--kirinX90/--kirinDev0000)." >&2
+   [ "$ENABLE_KIRIN9050" = "false" ]; then
+  echo "Error: no platform selected (expected one of --a3/--a5/--a3_a5/--kirin9030/--kirinX90/--kirin9050)." >&2
   usage
   exit 1
 fi
@@ -1479,132 +1479,132 @@ if [ "$ENABLE_KIRINX90" = "true" ]; then
   python3 tests/script/run_st.py $ARGS -w -v kirinX90 -t timg2col
 fi
 
-if [ "$ENABLE_KIRINDEV0000" = "true" ]; then
-  python3 tests/script/build_st.py $ARGS -v kirinDev0000 -t all
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tsubs
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmaxs
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tci
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmatmul
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tload_shape2d
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tload
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tload_dn2nz
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmrgsort
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t ttrans
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t ttrans_conv
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tstore
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t textract
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t textract_compact
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowsum
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowprod
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowargmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowargmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolsum
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolprod
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolargmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolargmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tsort32
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpand
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpandadd
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpanddiv
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpandmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpandmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpandmul
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpandsub
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpandexpdif
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tgather
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcvt
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tsub
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trem
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tfmod
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tprelu
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tand
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tor
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tands
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tors
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t txor
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t txors
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tshl
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tshls
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tshr
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tshrs
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tadd
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpartadd
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpartmul
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tfillpad
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmins
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmov
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmul
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tlrelu
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tdiv
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcmps
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmov_acc2vec
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tsel
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tsels
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trsqrt
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tsqrt
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t texp
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tabs
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tlog
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trecip
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tdivs
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmuls
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tadds
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t taxpy
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tgatherb
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpartmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpartmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpartargmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpartargmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmov_vect
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t texpands
-  # python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmov_acc2mat
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tassign
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmov_ub2l1
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcmp
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tadd_tdiv
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmul_tadds
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tsub_texp
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmuls_trowsum
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpand_tsqrt
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpand_trowsum
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowsum_trowexpand
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpand_tdiv
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trems
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tfmods
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tscatter
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tneg
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpandadd
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpandmax
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpandmin
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpanddiv
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpandmul
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpandsub
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpandexpdif
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trowexpandbrcb
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t ttri
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tcolexpand
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tnot
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t trelu
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tquant
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tdequant
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpow
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tpows
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tconcat
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tinsert
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tinsert_acc2vec
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t textract_nd_vec
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t textract_vec
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmov_zz
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmov_nd2nz
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t textract_acc2vec
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmatmul_new
-  python3 tests/script/run_st.py $ARGS -w -v kirinDev0000 -t tmatmul_new_full
+if [ "$ENABLE_KIRIN9050" = "true" ]; then
+  python3 tests/script/build_st.py $ARGS -v kirin9050 -t all
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tsubs
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmaxs
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tci
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmatmul
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tload_shape2d
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tload
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tload_dn2nz
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmrgsort
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t ttrans
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t ttrans_conv
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tstore
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t textract
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t textract_compact
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowsum
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowprod
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowargmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowargmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolsum
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolprod
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolargmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolargmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tsort32
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpand
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpandadd
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpanddiv
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpandmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpandmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpandmul
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpandsub
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpandexpdif
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tgather
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcvt
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tsub
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trem
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tfmod
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tprelu
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tand
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tor
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tands
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tors
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t txor
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t txors
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tshl
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tshls
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tshr
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tshrs
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tadd
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpartadd
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpartmul
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tfillpad
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmins
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmov
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmul
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tlrelu
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tdiv
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcmps
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmov_acc2vec
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tsel
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tsels
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trsqrt
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tsqrt
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t texp
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tabs
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tlog
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trecip
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tdivs
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmuls
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tadds
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t taxpy
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tgatherb
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpartmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpartmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpartargmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpartargmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmov_vect
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t texpands
+  # python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmov_acc2mat
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tassign
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmov_ub2l1
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcmp
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tadd_tdiv
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmul_tadds
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tsub_texp
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmuls_trowsum
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpand_tsqrt
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpand_trowsum
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowsum_trowexpand
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpand_tdiv
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trems
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tfmods
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tscatter
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tneg
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpandadd
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpandmax
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpandmin
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpanddiv
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpandmul
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpandsub
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpandexpdif
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trowexpandbrcb
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t ttri
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tcolexpand
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tnot
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t trelu
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tquant
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tdequant
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpow
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tpows
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tconcat
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tinsert
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tinsert_acc2vec
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t textract_nd_vec
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t textract_vec
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmov_zz
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmov_nd2nz
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t textract_acc2vec
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmatmul_new
+  python3 tests/script/run_st.py $ARGS -w -v kirin9050 -t tmatmul_new_full
 fi
 
 if [ "$ENABLE_COMM" = "true" ]; then

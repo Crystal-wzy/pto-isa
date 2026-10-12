@@ -84,7 +84,7 @@ PTO_INST RecordEvent TSTORE_FP(GlobalData &dst, TileData &src, FpTileData &fp, W
     - Implemented via `TSTORE_IMPL(dst, src, fp)` and validated by `CheckStaticAcc<..., true>()` for the accumulator path (ND/NZ/NHWC/NCHW/NCDHW only, `int32_t/float` source dtype, rows/cols ranges).
     - `FpTileData` legality is checked by the selected backend implementation.
     - The `STPhase` fp alias is exposed on targets with backend support: A2A3, A5, kirin9030,
-      kirinDev0000, and CPU simulator.
+      kirin9050, and CPU simulator.
     - **On A2A3 and Ascend 950PR/Ascend 950DT**, `STPhase` reaches the per-channel on-the-fly quantized move-out,
       so quantization and the unit flag run together; paired with `TMATMUL<AccPhase::Final>` no explicit
       `set_flag`/`wait_flag` is needed. The values follow the same rule as `TSTORE`: `Final` marks the last

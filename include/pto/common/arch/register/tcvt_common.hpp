@@ -508,7 +508,7 @@ inline AICORE void cast32to8_1D_NoPostUpdate(
     uint32_t totalElements = validRows * validCols;
     uint16_t repeatTimes = CeilDivision(totalElements, ELE_CNT_B32);
     uint32_t sReg = totalElements;
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
     MaskReg preg_idx = pset_b8(PAT_ALL);
 
     DST_VEC v_idx;
@@ -519,11 +519,11 @@ inline AICORE void cast32to8_1D_NoPostUpdate(
     for (uint16_t i = 0; i < repeatTimes; ++i) {
         RegTensor<SRC> v_input;
         DST_VEC v_output_p0;
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
         uint32_t cur_len = sReg;
 #endif
         MaskReg preg_b32 = CreatePredicate<float>(sReg);
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
         MaskReg preg_b8 = CreatePredicate<uint8_t>(cur_len);
 #endif
 
@@ -535,7 +535,7 @@ inline AICORE void cast32to8_1D_NoPostUpdate(
             vcvt(v_output_p0, v_input, preg_b32, ARCH_RS_SAT, PART_P0);
         }
 
-#ifdef PTO_NPU_ARCH_KIRINDEV0000
+#ifdef PTO_NPU_ARCH_KIRIN9050
         // Hardware-packed store (PK4_B32): no vselr gather needed
         vsts(v_output_p0, dst, i * ELE_CNT_B32, PK4_B32, preg_b32);
         // sReg is decremented by CreatePredicate with POST_UPDATE
@@ -556,7 +556,7 @@ inline AICORE void cast32to8_1D_NoPostUpdate(
  * ROUND_R (round to nearest even) for correct IEEE-like behavior with 8-bit precision.
  * This is a hardware requirement specific to the hifloat8 format.
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void cast32toH8_1D_NoPostUpdate(
     __ubuf__ hifloat8_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -565,7 +565,7 @@ inline AICORE void cast32toH8_1D_NoPostUpdate(
     uint32_t totalElements = validRows * validCols;
     uint16_t repeatTimes = CeilDivision(totalElements, ELE_CNT_B32);
     uint32_t sReg = totalElements;
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
     MaskReg preg_idx = pset_b8(PAT_ALL);
 
     vector_hif8 v_idx;
@@ -576,17 +576,17 @@ inline AICORE void cast32toH8_1D_NoPostUpdate(
     for (uint16_t i = 0; i < repeatTimes; ++i) {
         vector_f32 v_input;
         vector_hif8 v_output_p0;
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
         uint32_t cur_len = sReg;
 #endif
         MaskReg preg_b32 = CreatePredicate<float>(sReg);
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
         MaskReg preg_b8 = CreatePredicate<uint8_t>(cur_len);
 #endif
 
         vlds(v_input, src, i * ELE_CNT_B32, NORM);
         vcvt(v_output_p0, v_input, preg_b32, ROUND_A, RS_DISABLE, PART_P0);
-#ifdef PTO_NPU_ARCH_KIRINDEV0000
+#ifdef PTO_NPU_ARCH_KIRIN9050
         // Hardware-packed store (PK4_B32): no vselr gather needed
         vsts((vector_u8&)v_output_p0, (__ubuf__ uint8_t*)dst, i * ELE_CNT_B32, PK4_B32, preg_b32);
         // sReg is decremented by CreatePredicate with POST_UPDATE
@@ -1143,7 +1143,7 @@ inline AICORE void cast32to8(
 {
     uint32_t len32 = ELE_CNT_B32;
     MaskReg preg_b32 = CreatePredicate<float>(len32);
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
     MaskReg preg_idx = pset_b8(PAT_ALL);
 
     // Create index vector for vselr (selecting every 4th byte)
@@ -1158,7 +1158,7 @@ inline AICORE void cast32to8(
     FOR_ELEMENTS(ELE_CNT_B32)
     RegTensor<SRC> v_input;
     DST_VEC v_output_p0;
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
     uint32_t preg_len = (idx == repeatTimes - 1) ? preg_len_tail : ELE_CNT_B32;
     MaskReg preg_b8 = CreatePredicate<uint8_t>(preg_len);
 #endif
@@ -1172,7 +1172,7 @@ inline AICORE void cast32to8(
         vcvt(v_output_p0, v_input, preg_b32, ARCH_RS_SAT, PART_P0);
     }
 
-#ifdef PTO_NPU_ARCH_KIRINDEV0000
+#ifdef PTO_NPU_ARCH_KIRIN9050
     // Hardware-packed store (PK4_B32): no vselr gather needed
     vsts(v_output_p0, dst, dstOffset, PK4_B32, preg_b32);
 #else
@@ -1266,7 +1266,7 @@ inline AICORE void castData_2D_NoPostUpdate(
  * Conversion: f32 -> bf16 #rnd #sat #part
  * Uses cast32to16 helper
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ bfloat16_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1362,7 +1362,7 @@ inline AICORE void castData_2D_NoPostUpdate(
  * Conversion: f32 -> e4m3 #rnd #sat #pp
  * Uses cast32to8 helper
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float8_e4m3_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1385,7 +1385,7 @@ inline AICORE void castData_2D_NoPostUpdate(
  * Conversion: f32 -> e5m2 #rnd #sat #pp
  * Uses cast32to8 helper
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float8_e5m2_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1408,7 +1408,7 @@ inline AICORE void castData_2D_NoPostUpdate(
  * Conversion: f32 -> h8 #rnd #sat #part
  * Note: H8 conversion requires ROUND_A mode
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ hifloat8_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1416,7 +1416,7 @@ inline AICORE void castData(
 {
     uint32_t len32 = ELE_CNT_B32;
     MaskReg preg_b32 = CreatePredicate<float>(len32);
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
     MaskReg preg_idx = pset_b8(PAT_ALL);
 
     // Create index vector for vselr (selecting every 4th byte)
@@ -1426,21 +1426,21 @@ inline AICORE void castData(
 #endif
 
     FOR_ROWS
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
     uint32_t preg_len_tail = (sreg % ELE_CNT_B32 == 0) ? ELE_CNT_B32 : (sreg % ELE_CNT_B32);
 #endif
 
     FOR_ELEMENTS(ELE_CNT_B32)
     vector_f32 v_input;
     vector_hif8 v_output_p0;
-#ifndef PTO_NPU_ARCH_KIRINDEV0000
+#ifndef PTO_NPU_ARCH_KIRIN9050
     uint32_t preg_len = (idx == repeatTimes - 1) ? preg_len_tail : ELE_CNT_B32;
     MaskReg preg_b8 = CreatePredicate<uint8_t>(preg_len);
 #endif
 
     vlds(v_input, src, srcOffset, NORM);
     vcvt(v_output_p0, v_input, preg_b32, ROUND_A, RS_DISABLE, PART_P0);
-#ifdef PTO_NPU_ARCH_KIRINDEV0000
+#ifdef PTO_NPU_ARCH_KIRIN9050
     // Hardware-packed store (PK4_B32): no vselr gather needed
     vsts((vector_u8&)v_output_p0, (__ubuf__ uint8_t*)dst, dstOffset, PK4_B32, preg_b32);
 #else
@@ -1576,7 +1576,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 }
 
 /** FP16 -> H8 #rnd #sat #part */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ hifloat8_t* dst, __ubuf__ half* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1616,7 +1616,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 //---------------------------------------------------------------------------------------------
 
 /** BF16 -> FP32 #part (type expansion) → vcvt(output, input, preg, PART_EVEN) */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float* dst, __ubuf__ bfloat16_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2307,7 +2307,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 //   - HIF8: Hardware-specific 8-bit float format
 
 /** E4M3 -> FP32 #part (type expansion) → vcvt(output, input, preg, PART_P0) */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float* dst, __ubuf__ float8_e4m3_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2412,7 +2412,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 }
 
 // Source: FP8_E4M3
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ float* dst, __ubuf__ float8_e4m3_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2515,7 +2515,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 // Note: FP16 -> FP8_E5M2 and FP16 -> FP8_E4M3 conversions are NOT supported
 // Only FP16 -> Hifloat8 (H8) conversion is supported
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ hifloat8_t* dst, __ubuf__ half* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2585,7 +2585,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 }
 #endif // PTO_NPU_ARCH_A5
 
-#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_KIRINDEV0000
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_KIRIN9050
 
 // Source: I16 (signed 16-bit integer)
 template <typename R>
@@ -2651,7 +2651,7 @@ inline AICORE void castData_1D_NoPostUpdate(
     cast32to16_1D_NoPostUpdate<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ bfloat16_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2695,7 +2695,7 @@ inline AICORE void castData_1D_NoPostUpdate(
     cast32toS64_1D_NoPostUpdate<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ float8_e4m3_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,

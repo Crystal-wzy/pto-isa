@@ -153,7 +153,7 @@ PTO_INST RecordEvent TMOV(DstTileData &dst, SrcTileData &src, TmpTileData &tmp, 
 - `reluMode` 取值为 `ReluPreMode::{NoRelu, NormalRelu}`。
 - `mode` 取值为 `AccToVecMode::{SingleModeVec0, SingleModeVec1, DualModeSplitM, DualModeSplitN}`。
 - fp `STPhase` 重载仅在存在对应后端实现的目标上暴露
-  （A2A3、A5、kirin9030、kirinX90、kirinDev0000 和 CPU 模拟器）。
+  （A2A3、A5、kirin9030、kirinX90、kirin9050 和 CPU 模拟器）。
 - 在 Ascend 950PR/Ascend 950DT 上，`STPhase` 同时作用于 Acc-to-Mat（L0C→L1）与 Acc-to-Vec 搬出路径；
   在 Atlas A2/A3 训练系列产品/Atlas A2/A3 推理系列产品上只作用于 Acc-to-Mat，该平台没有 Acc-to-Vec 搬出路径。
   两者写入 `TileType::Mat` 的 `TMOV<STPhase::Final>` 都会带上 unit flag，可与 `TMATMUL<AccPhase::Final>` 配对，
@@ -169,7 +169,7 @@ PTO_INST RecordEvent TMOV(DstTileData &dst, SrcTileData &src, TmpTileData &tmp, 
   把 `STPhase::Partial` 与 `AccPhase::Partial` 配对会让 fixpipe 等待一个不会到来的标志而挂死，
   该现象已在 Ascend 950PR 仿真器上复现。
 - 向量量化 `fp + AccToVecMode` 重载仅在存在对应后端实现的目标上暴露
-  （A5、kirin9030、kirinDev0000 和 CPU 模拟器）。
+  （A5、kirin9030、kirin9050 和 CPU 模拟器）。
 
 ### Atlas A2/A3 训练系列产品/Atlas A2/A3 推理系列产品实现检查
 

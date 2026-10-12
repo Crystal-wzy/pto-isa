@@ -16,7 +16,7 @@ __tf__ PTO_INTERNAL void storeRaw(__gm__ uint8_t* __out__ dst, typename TileData
 {
     constexpr int BLOCK_COUNT = TileData::Rows * TileData::Cols * sizeof(typename TileData::DType) / 32;
     if constexpr (TileData::Loc == TileType::Vec) {
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRINDEV0000)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
         pto_copy_ubuf_to_gm_align_v2(dst, (__ubuf__ uint8_t*)__cce_get_tile_ptr(src), 0, 1, BLOCK_COUNT * 32, 0, 0, 0);
 #else
         copy_ubuf_to_gm(dst, (__ubuf__ uint8_t*)__cce_get_tile_ptr(src), 0, 1, BLOCK_COUNT, 0, 0);

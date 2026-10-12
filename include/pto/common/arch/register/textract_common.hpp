@@ -10,7 +10,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 /**
  * @file textract_common.hpp
- * @brief Common TEXTRACT implementation for Kirin9030, KirinDev0000
+ * @brief Common TEXTRACT implementation for Kirin9030, Kirin9050
  *
  * This file contains only the parts shared by all consuming architectures.
  * Architecture-specific pieces are provided by each arch shell (e.g.
@@ -33,14 +33,14 @@ namespace pto {
 //---------------------------------------------------------------------------------------
 
 // Tile-level dispatcher. Kirin9030 routes Left/Acc/quant paths through L0A;
-// kirinDev0000 has no L0A and routes Mat/Acc through TMov paths instead.
+// kirin9050 has no L0A and routes Mat/Acc through TMov paths instead.
 // Declared here because TEXTRACT_IMPL below calls it with explicit template
 // arguments (no ADL).
 template <typename DstTile, typename SrcTile>
 PTO_INTERNAL void TEXTRACT_TILE_IMPL(DstTile& dst, SrcTile& src, uint16_t indexRow, uint16_t indexCol);
 
 // NZ-layout UB->CBUF copy for TExtractVecToMat. Kirin9030 uses a single
-// multi-burst copy_ubuf_to_cbuf call; kirinDev0000 hardware requires one
+// multi-burst copy_ubuf_to_cbuf call; kirin9050 hardware requires one
 // 32-byte-unit burst per block. Declared here because TExtractVecToMat below
 // calls it with explicit template arguments (no ADL).
 template <typename T>

@@ -10,7 +10,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 /**
  * @file tinsert_common.hpp
- * @brief Common TINSERT Vec→Vec helpers for A5, Kirin9030, KirinDev0000
+ * @brief Common TINSERT Vec→Vec helpers for A5, Kirin9030, Kirin9050
  *
  * The arch shell must include its own arch common.hpp / utils.hpp (for
  * MaskReg, CreatePredicate, etc.) before this file.
@@ -28,12 +28,12 @@ namespace pto {
 //---------------------------------------------------------------------------------------
 
 // GetDistVst is arch-utils-provided (defined in a5/utils.hpp, shared by the
-// kirin9030/kirinDev0000 utils chain). Declared here because the helpers below
+// kirin9030/kirin9050 utils chain). Declared here because the helpers below
 // call it with explicit template arguments (no ADL).
 template <typename T, DistVST dist>
 PTO_INTERNAL constexpr DistVST GetDistVst();
 
-// vlds+vstus path: strides or indexCol NOT 32B-aligned. KirinDev0000 unrolls
+// vlds+vstus path: strides or indexCol NOT 32B-aligned. Kirin9050 unrolls
 // the repeat loop with compile-time ValidCol; a5 uses the runtime parameter.
 // Declared here because TInsertVecToVecNDDispatch below calls it with explicit
 // template arguments (no ADL).

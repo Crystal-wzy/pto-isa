@@ -44,10 +44,10 @@ Registration depends on the backend selected by CMake:
 | A6 | 11 | 0 | 0 | 13 | 24 |
 | KirinX90 | 23 | 24 | 48 | 0 | 95 |
 | Kirin9030 | 23 | 24 | 0 | 0 | 47 |
-| KirinDev0000 | 11 | 0 | 0 | 0 | 11 |
+| Kirin9050 | 11 | 0 | 0 | 0 | 11 |
 
 These are registered case counts, not runtime pass counts. A2/A3, A5, KirinX90 and
-Kirin9030 share the base L1/UB and conversion suites. A6 and KirinDev0000 use only the
+Kirin9030 share the base L1/UB and conversion suites. A6 and Kirin9050 use only the
 UB subset because their L1 readback paths differ. A5 has 13 Mat and 13 Vec wide-stride
 cases plus one NC1HWC0 case; A6 has the 13 Vec cases. The single-row/single-column
 length suite is registered only for the A2/A3 and KirinX90 memory backends.

@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # --------------------------------------------------------------------------------
 
-if(SOC_VERSION STREQUAL "KirinDev0000" OR SOC_VERSION STREQUAL "dav_9201")
+if(SOC_VERSION STREQUAL "Kirin9050" OR SOC_VERSION STREQUAL "dav_9201")
     pto_vec_st(tload_large_stride)
     target_compile_definitions(tload_large_stride_kernel PRIVATE PTO_TLOAD_VEC_ONLY)
     if(SOC_VERSION STREQUAL "dav_9201")
