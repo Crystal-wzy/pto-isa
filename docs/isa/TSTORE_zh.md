@@ -57,7 +57,7 @@ PTO_INST RecordEvent TSTORE_FP(GlobalData& dst, TileData& src, FpTileData& fp, W
 该结果仅覆盖所选用例，不代表完整 A5 ST 测试集。
 
 向量量化 `STPhase` 形式仅在存在对应后端实现的目标上暴露
-（A2A3、A5、kirin9030、kirinDev0000 和 CPU 模拟器）。
+（A2A3、A5、kirin9030、kirin9050 和 CPU 模拟器）。
 
 ## L2 cache hint
 

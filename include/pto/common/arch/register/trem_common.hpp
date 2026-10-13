@@ -10,11 +10,11 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 /**
  * @file trem_common.hpp
- * @brief Common TREM float/half remainder helpers for Kirin9030, KirinDev0000
+ * @brief Common TREM float/half remainder helpers for Kirin9030, Kirin9050
  *
  * RemOpBase holds the arch-independent float/half remainder kernels and the
  * bit masks they use. The integer remainder kernel is arch-specific
- * (kirin9030 uses hardware integer vdiv; kirinDev0000 lacks it and falls back
+ * (kirin9030 uses hardware integer vdiv; kirin9050 lacks it and falls back
  * to a software division), so each arch shell derives its RemOp from this base
  * and provides RemInt and the BinInstr dispatch itself.
  *

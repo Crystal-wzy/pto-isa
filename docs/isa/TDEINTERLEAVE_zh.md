@@ -65,7 +65,7 @@ PTO_INST RecordEvent TDEINTERLEAVE(TileDataDst &dst1, TileDataDst &dst0, TileDat
     - Tile布局必须是行主序（`TileData::isRowMajor`）。
     - 所有Tile必须具有相同的 `DType`。
     - 双源形式：`src0`、`src1`、`dst0`、`dst1` 必须具有相同的有效形状， 且他们的validCols必须为偶数。
-    - 单源形式：`src`、`dst0`、`dst1` 必须具有相同的有效行数；`dst0`、`dst1` 的 `validCols` 必须为 `src` 的 `validCols` 的一半。
+    - 单源形式：`src`、`dst0`、`dst1` 必须具有相同的有效行数；`src` 的 `validCols` 必须为偶数，且 `dst0`、`dst1` 的 `validCols` 必须各为 `src` 的 `validCols` 的一半。
 - **有效区域**:
     - 双源形式：该操作使用 `dst0.GetValidRow()` / `dst0.GetValidCol()` 作为迭代域。`dst0/dst1` 每行持有 `validCols` 个元素。
     - 单源形式：`dst0/dst1` 每行持有 `src.GetValidCol() / 2` 个有效元素。每行中超出 `halfValidCols` 的元素是**未指定的**。
@@ -96,9 +96,10 @@ void example_auto_two_src() {
 using namespace pto;
 
 void example_auto_single_src() {
-    using TileT = Tile<TileType::Vec, float, 16, 128>;
-    TileT src(16, 128);
-    TileT dst0(16, 128), dst1(16, 128);
+    using SrcTileT = Tile<TileType::Vec, float, 16, 128>;
+    using DstTileT = Tile<TileType::Vec, float, 16, 64>;
+    SrcTileT src(16, 128);
+    DstTileT dst0(16, 64), dst1(16, 64);
 
     TDEINTERLEAVE(dst1, dst0, src);
 }
@@ -132,8 +133,10 @@ void example_manual_two_src() {
 using namespace pto;
 
 void example_manual_single_src() {
-    using TileT = Tile<TileType::Vec, half, 16, 256, BLayout::RowMajor, 16, 256>;
-    TileT src, dst0, dst1;
+    using SrcTileT = Tile<TileType::Vec, half, 16, 256, BLayout::RowMajor, 16, 256>;
+    using DstTileT = Tile<TileType::Vec, half, 16, 128, BLayout::RowMajor, 16, 128>;
+    SrcTileT src;
+    DstTileT dst0, dst1;
 
     TASSIGN(src,  0x1000);
     TASSIGN(dst0, 0x2000);

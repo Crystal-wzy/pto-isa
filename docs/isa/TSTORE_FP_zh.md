@@ -71,7 +71,7 @@ PTO_INST RecordEvent TSTORE_FP(GlobalData &dst, TileData &src, FpTileData &fp, W
     - 通过 `TSTORE_IMPL(dst, src, fp)` 实现，并由 `CheckStaticAcc<..., true>()` 验证累加器路径（支持 ND/NZ/NHWC/NCHW/NCDHW，源数据类型为 `int32_t`/`float`，行/列范围有限制）。
     - `FpTileData` 的合法性由所选后端实现检查。
     - `STPhase` fp 别名仅在存在对应后端实现的目标上暴露：
-      A2A3、A5、kirin9030、kirinDev0000 和 CPU 模拟器。
+      A2A3、A5、kirin9030、kirin9050 和 CPU 模拟器。
     - **在 A2A3 和 Ascend 950PR/Ascend 950DT 上**，`STPhase` 会作用到 per-channel 随路量化的搬出指令，
       因此量化与 unit flag 可以并行，配合 `TMATMUL<AccPhase::Final>` 使用时
       无需显式 `set_flag`/`wait_flag`。取值规则与 `TSTORE` 相同：

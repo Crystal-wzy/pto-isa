@@ -86,7 +86,7 @@ PTO_INST RecordEvent TMOV_FP(DstTileData &dst, SrcTileData &src, FpTileData &fp,
     - `FpTileData` legality is checked by the selected backend implementation.
     - Destination location is target-dependent (`Vec` or `Mat` are supported in the fp path).
     - The `STPhase` fp alias is exposed on targets with backend support: A2A3, A5, kirin9030, kirinX90,
-      kirinDev0000, and CPU simulator.
+      kirin9050, and CPU simulator.
     - On Ascend 950PR hardware with CANN 9.2.0, the vector-quantized `TMOV_FP<STPhase::Final>`
       cases `TMOVTest.case_nz2nd_fb_quant_uf_final_half` and
       `TMOVTest.case_nz2nd_fb_quant_uf_final_int8` in `tmov_acc2vec` both passed with max diff 0.

@@ -73,7 +73,7 @@ PTO_INST RecordEvent TMOV_FP(DstTileData &dst, SrcTileData &src, FpTileData &fp,
     - `FpTileData` 的合法性由所选后端实现检查。
     - 目标位置取决于目标（fp 路径支持 `Vec` 或 `Mat`）。
     - `STPhase` fp 别名仅在存在对应后端实现的目标上暴露：
-      A2A3、A5、kirin9030、kirinX90、kirinDev0000 和 CPU 模拟器。
+      A2A3、A5、kirin9030、kirinX90、kirin9050 和 CPU 模拟器。
     - 在 Ascend 950PR 板机、CANN 9.2.0 环境下，`tmov_acc2vec` 中向量量化的
       `TMOV_FP<STPhase::Final>` 用例 `TMOVTest.case_nz2nd_fb_quant_uf_final_half` 和
       `TMOVTest.case_nz2nd_fb_quant_uf_final_int8` 均已通过，max diff 均为 0。

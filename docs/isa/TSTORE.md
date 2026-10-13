@@ -59,7 +59,7 @@ Together with TEXTRACT, TINSERT, and TMOV, all 24 targeted move-out tests passed
 this result covers the selected cases, not the full A5 ST suite.
 
 The vector-quantized `STPhase` form is exposed only on targets with matching backend support
-(A2A3, A5, kirin9030, kirinDev0000, and CPU simulator).
+(A2A3, A5, kirin9030, kirin9050, and CPU simulator).
 
 
 ## L2 cache hint

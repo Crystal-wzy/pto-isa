@@ -26,6 +26,7 @@ PTO_COMMON_FILE="${CURR_PATH}/pto_common.sh"
 ARCH_INFO=$(uname -m)
 PTO_PLATFORM_DIR=pto_isa
 PTO_PLATFORM_UPPER=$(echo "${PTO_PLATFORM_DIR}" | tr '[:lower:]' '[:upper:]')
+PTO_ISA_INCLUDE_HINT="cann/${ARCH_INFO}-linux/include/pto"
 FILELIST_FILE="${CURR_PATH}/filelist.csv"
 COMMON_PARSER_FILE="${CURR_PATH}/install_common_parser.sh"
 TARGET_INSTALL_PATH=""
@@ -126,7 +127,7 @@ check_installed_type() {
 }
 
 unsetenv() {
-  logandprint "[INFO]: Unset the environment path [ export ASCEND_PTO_ISA_PATH=${relative_path_val}/${PTO_PLATFORM_DIR}]."
+  logandprint "[INFO]: Unset the environment path [ export ASCEND_PTO_ISA_PATH=${relative_path_val}/${PTO_ISA_INCLUDE_HINT}]."
   if [ "${IS_DOCKER_INSTALL}" = y ]; then
     UNINSTALL_OPTION="--docker-root=${DOCKER_ROOT}"
   else

@@ -206,7 +206,7 @@ The 3-argument `tmp` overloads exclude `TileType::Scaling`; a `Scaling` third op
 - `reluMode` is `ReluPreMode::{NoRelu, NormalRelu}`.
 - `mode` is `AccToVecMode::{SingleModeVec0, SingleModeVec1, DualModeSplitM, DualModeSplitN}`.
 - The fp `STPhase` overloads are exposed only on targets with backend support
-  (A2A3, A5, kirin9030, kirinX90, kirinDev0000, and CPU simulator).
+  (A2A3, A5, kirin9030, kirinX90, kirin9050, and CPU simulator).
 - On Ascend 950PR/Ascend 950DT, `STPhase` is applied to the Acc-to-Mat (L0C to L1) move-out as well as to
   Acc-to-Vec. On A2A3 it applies to Acc-to-Mat only; that target has no Acc-to-Vec move-out path. On both,
   a `TMOV<STPhase::Final>` into a `TileType::Mat` tile carries the unit flag and pairs with
@@ -223,7 +223,7 @@ The 3-argument `tmp` overloads exclude `TileType::Scaling`; a `Scaling` third op
   `AccPhase::Partial` makes the fixpipe wait on a flag that never arrives, which hangs; this was reproduced
   on the Ascend 950PR simulator.
 - The vector-quantized `fp + AccToVecMode` overloads are exposed only on targets with backend support
-  (A5, kirin9030, kirinDev0000, and CPU simulator).
+  (A5, kirin9030, kirin9050, and CPU simulator).
 
 ### A2A3 implementation checks
 

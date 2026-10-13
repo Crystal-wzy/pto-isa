@@ -164,7 +164,7 @@ On A5 all listed values are passed through to DMA. CPU / costmodel accept the te
 
 ### Stride and length boundaries
 
-For A2/A3, A5, A6, KirinX90, Kirin9030 and KirinDev0000, the affected TLOAD paths retain
+For A2/A3, A5, A6, KirinX90, Kirin9030 and Kirin9050, the affected TLOAD paths retain
 source strides as `int64_t`. For b8/b16/b32/b64 data, element-to-byte conversion uses 64-bit
 arithmetic. Construct large `Stride` expressions with 64-bit operands, provide GM storage covering
 all accessed addresses, and keep the destination within its physical capacity. Byte distances and
@@ -185,7 +185,7 @@ The following limits apply to different encoded fields:
 | KirinX90 ordinary GM-to-L1 | Check length and gap in the units of the selected block or byte-aligned instruction. If they do not fit, split bursts and lengths before encoding. |
 | A5/A6 ordinary GM-to-UB/L1 | Source stride is in bytes. Above `2^40 - 1`, issue one burst at a time. ND/DN Shape1/Shape2 loops also use explicit source addresses when their byte strides exceed this limit. |
 | A5 NC1HWC0 and five-dimensional FRACTAL_Z (`[C1, H, W, N, C0]`) | Both use `TLoad5HD`: source loop byte strides from `Stride0`/`Stride1` use software loops above `2^40 - 1`; the burst byte stride from `Stride2` uses the shared per-burst fallback. |
-| Kirin9030, KirinDev0000 ordinary DMA | Preserve 64-bit source strides and byte conversion; calls through the shared register DMA helpers use the same burst-stride fallback. |
+| Kirin9030, Kirin9050 ordinary DMA | Preserve 64-bit source strides and byte conversion; calls through the shared register DMA helpers use the same burst-stride fallback. |
 | KirinX90 b32 ND->NZ/DN->ZN | Check fields after conversion to b16 units; split the transfer when the converted values exceed 16 bits. The existing public within-matrix stride limit of 65535 elements remains unchanged. |
 
 The limits are inclusive: `UINT32_MAX` bytes, `UINT16_MAX` blocks and `2^40 - 1` bytes
@@ -232,7 +232,7 @@ also satisfy their target-specific limits.
 
 ### Runtime dispatch and scalar overhead
 
-The shared register DMA helper used by A5/A6 and the Kirin9030/KirinDev0000 callers has a direct
+The shared register DMA helper used by A5/A6 and the Kirin9030/Kirin9050 callers has a direct
 native path: when the source byte stride is at most `2^40 - 1`, it issues a multi-burst
 DMA and returns without entering the per-burst loop. Only an oversized stride enters that loop,
 which issues one burst per iteration with zero encoded source/destination strides and full-width

@@ -17,22 +17,36 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto {
 
-template <typename T>
+template <typename T, bool LowPrecision>
 struct DivOp {
+    // low precision but faster
     PTO_INTERNAL static void BinInstr(__ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, uint8_t repeats)
     {
-        vdiv(dst, src0, src1, repeats, 1, 1, 1, 8, 8, 8);
+        if constexpr (LowPrecision) {
+            // dst = src0 * vrec(src1). dst is the reciprocal buffer and must not alias src0.
+            vrec(dst, src1, repeats, 1, 1, 8, 8);
+            pipe_barrier(PIPE_V);
+            vmul(dst, src0, dst, repeats, 1, 1, 1, 8, 8, 8);
+        } else {
+            vdiv(dst, src0, src1, repeats, 1, 1, 1, 8, 8, 8);
+        }
     }
     PTO_INTERNAL static void BinInstr(
         __ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, uint8_t repeats, uint8_t dstRepeatStride,
         uint8_t src0RepeatStride, uint8_t src1RepeatStride)
     {
-        vdiv(dst, src0, src1, repeats, 1, 1, 1, dstRepeatStride, src0RepeatStride, src1RepeatStride);
+        if constexpr (LowPrecision) {
+            vrec(dst, src1, repeats, 1, 1, dstRepeatStride, src1RepeatStride);
+            pipe_barrier(PIPE_V);
+            vmul(dst, src0, dst, repeats, 1, 1, 1, dstRepeatStride, src0RepeatStride, dstRepeatStride);
+        } else {
+            vdiv(dst, src0, src1, repeats, 1, 1, 1, dstRepeatStride, src0RepeatStride, src1RepeatStride);
+        }
     }
 };
 
 template <
-    typename TileData, unsigned elementsPerRepeat, unsigned blockSizeElem, unsigned dstRowStride,
+    bool LowPrecision, typename TileData, unsigned elementsPerRepeat, unsigned blockSizeElem, unsigned dstRowStride,
     unsigned src0RowStride = dstRowStride, unsigned src1RowStride = dstRowStride>
 __tf__ PTO_INTERNAL void TDiv(
     typename TileData::TileDType __out__ dst, typename TileData::TileDType __in__ src0,
@@ -43,10 +57,11 @@ __tf__ PTO_INTERNAL void TDiv(
     __ubuf__ T* src0Ptr = (__ubuf__ T*)__cce_get_tile_ptr(src0);
     __ubuf__ T* src1Ptr = (__ubuf__ T*)__cce_get_tile_ptr(src1);
     if constexpr (dstRowStride == src0RowStride && dstRowStride == src1RowStride) {
-        BinaryInstr<DivOp<T>, T, TileData, elementsPerRepeat, blockSizeElem, dstRowStride>(
+        BinaryInstr<DivOp<T, LowPrecision>, T, TileData, elementsPerRepeat, blockSizeElem, dstRowStride>(
             dstPtr, src0Ptr, src1Ptr, validRows, validCols);
     } else {
-        BinaryInstr<DivOp<T>, T, elementsPerRepeat, blockSizeElem, dstRowStride, src0RowStride, src1RowStride>(
+        BinaryInstr<
+            DivOp<T, LowPrecision>, T, elementsPerRepeat, blockSizeElem, dstRowStride, src0RowStride, src1RowStride>(
             dstPtr, src0Ptr, src1Ptr, validRows, validCols);
     }
     return;
@@ -78,19 +93,20 @@ PTO_INTERNAL void TDIV_IMPL(TileDataDst& dst, TileDataSrc0& src0, TileDataSrc1& 
 {
     using T = typename TileDataDst::DType;
     TDivCheck<T, TileDataDst, TileDataSrc0, TileDataSrc1>(dst, src0, src1);
+    constexpr bool lowPrecision = false; // the lower precisoion is faster but precision is not good enough
     constexpr unsigned blockSizeElem = BLOCK_BYTE_SIZE / sizeof(T);
     constexpr unsigned elementsPerRepeat = REPEAT_BYTE / sizeof(T);
     // when tileshape of src0, src1 and dst are the same, validRows and validCols are also the same
     if constexpr (std::is_same_v<TileDataDst, TileDataSrc0> && std::is_same_v<TileDataDst, TileDataSrc1>) {
         constexpr unsigned dstRowStride = TileDataDst::RowStride;
-        TDiv<TileDataDst, elementsPerRepeat, blockSizeElem, dstRowStride>(
+        TDiv<lowPrecision, TileDataDst, elementsPerRepeat, blockSizeElem, dstRowStride>(
             dst.data(), src0.data(), src1.data(), dst.GetValidRow(), dst.GetValidCol());
     } else {
         // when tileshape of src0, src1 and dst are different, validRows and validCols are also the same
         constexpr unsigned dstRowStride = TileDataDst::RowStride;
         constexpr unsigned src0RowStride = TileDataSrc0::RowStride;
         constexpr unsigned src1RowStride = TileDataSrc1::RowStride;
-        TDiv<TileDataDst, elementsPerRepeat, blockSizeElem, dstRowStride, src0RowStride, src1RowStride>(
+        TDiv<lowPrecision, TileDataDst, elementsPerRepeat, blockSizeElem, dstRowStride, src0RowStride, src1RowStride>(
             dst.data(), src0.data(), src1.data(), dst.GetValidRow(), dst.GetValidCol());
     }
 }

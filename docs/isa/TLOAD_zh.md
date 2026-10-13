@@ -157,7 +157,7 @@ A5 上表内取值均透传给 DMA。CPU / costmodel 接受该模板并忽略。
 
 ### 步长与长度边界
 
-A2/A3、A5、A6、KirinX90、Kirin9030 和 KirinDev0000 的相关 TLOAD 路径保留 `int64_t` 源步长。
+A2/A3、A5、A6、KirinX90、Kirin9030 和 Kirin9050 的相关 TLOAD 路径保留 `int64_t` 源步长。
 对于 b8/b16/b32/b64 数据，元素数到字节数的转换使用 64 位计算。构造大 `Stride` 表达式时须使用
 64 位操作数，GM 存储须覆盖所有访问地址，目标存储须满足实际物理容量限制。字节间距及计算出的偏移
 必须在所用类型的可表示范围内；各路径还须满足下文列出的约束。
@@ -175,7 +175,7 @@ DN 为 `Stride4 * E`，NZ 为 `Stride1 * E`。memory 后端对应的字节 gap �
 | KirinX90 普通 GM 到 L1 | 按所选块搬运或字节对齐指令的单位检查长度和 gap，超出范围时先拆分 burst 和长度，再编码。 |
 | A5/A6 普通 GM 到 UB/L1 | 源 stride 单位为字节。超过 `2^40 - 1` 时逐 burst 搬运；ND/DN 的 Shape1/Shape2 循环字节步长超限时也改用显式源地址。 |
 | A5 NC1HWC0 和五维 FRACTAL_Z（`[C1, H, W, N, C0]`） | 二者均使用 `TLoad5HD`：由 `Stride0`/`Stride1` 换算出的源循环字节步长超过 `2^40 - 1` 时使用软件循环；由 `Stride2` 换算出的 burst 字节步长使用共享逐 burst 回退。 |
-| Kirin9030、KirinDev0000 普通 DMA | 源步长和字节数转换保留 64 位；通过共享 register DMA 封装的调用使用相同的 burst 步长回退。 |
+| Kirin9030、Kirin9050 普通 DMA | 源步长和字节数转换保留 64 位；通过共享 register DMA 封装的调用使用相同的 burst 步长回退。 |
 | KirinX90 b32 ND->NZ/DN->ZN | 转换为 b16 单位后再检查字段，转换值超过 16 位时拆分搬运；公开接口的矩阵内步长上限为 65535 个元素。 |
 
 上述上限均包含边界值：`UINT32_MAX` 字节、`UINT16_MAX` 个块及 `2^40 - 1` 字节仍可由对应字段编码；
@@ -212,7 +212,7 @@ burst 长度/数量、目标 stride，以及硬件循环次数/目标循环步�
 
 ### 运行时路径选择与标量开销
 
-A5/A6 及 Kirin9030/KirinDev0000 调用的共享 register DMA helper 提供直接原生路径：源字节 stride
+A5/A6 及 Kirin9030/Kirin9050 调用的共享 register DMA helper 提供直接原生路径：源字节 stride
 不超过 `2^40 - 1` 时，执行多 burst DMA 后直接返回，不进入逐 burst 循环。只有 stride 超限时
 才进入循环；每次循环搬运一个 burst，将指令内的源和目标 stride 置零，通过完整位宽的软件偏移
 计算地址。A5 上，当编译器能够确定 burst 数为常量且不超过 `8` 时，对回退循环进行有限展开以降低循环
