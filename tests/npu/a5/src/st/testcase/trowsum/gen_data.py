@@ -16,6 +16,17 @@ import numpy as np
 np.random.seed(42)
 
 
+def gen_half_fp32_acc_golden(input_arr, valid_row, valid_col):
+    output_arr = np.zeros((input_arr.shape[0]), dtype=np.float16)
+    output_arr[:valid_row] = input_arr[:valid_row, :valid_col].astype(np.float32).sum(axis=1).astype(np.float16)
+    return output_arr
+
+
+def gen_half_repeated_input(row, col, value):
+    input_arr = np.full((row, col), np.float16(value), dtype=np.float16)
+    return input_arr
+
+
 def gen_golden_data(param):
     data_type = param.data_type
     row = param.row
@@ -52,12 +63,23 @@ def gen_golden_data(param):
             input_arr = np.random.randint(low=0, high=1000, size=(row, col)).astype(data_type)
         else:
             input_arr = np.random.randint(low=-10, high=10, size=(row, col)).astype(data_type)
+    elif data_type == np.float16 and param.fp32_acc_guard:
+        # 0.1 is not exactly representable in fp16: a native fp16 accumulation
+        # loses the residual across hundreds of elements, while an fp32
+        # accumulation only rounds once at the end.
+        input_arr = gen_half_repeated_input(row, col, 0.1)
     else:
         input_arr = np.random.uniform(low=-1, high=1, size=(row, col)).astype(data_type)
 
     if data_type in (np.int64, np.uint64):
         output_arr = np.zeros(row, dtype=data_type)
         output_arr[:valid_row] = input_arr[:valid_row, :valid_col].sum(axis=1, dtype=data_type)
+        input_arr.tofile("input.bin")
+        output_arr.tofile("golden.bin")
+        return
+
+    if data_type == np.float16:
+        output_arr = gen_half_fp32_acc_golden(input_arr, valid_row, valid_col)
         input_arr.tofile("input.bin")
         output_arr.tofile("golden.bin")
         return
@@ -74,9 +96,12 @@ def gen_golden_data(param):
 
 
 class TRowSumParams:
-    def __init__(self, name, data_type, row, valid_row, col, valid_col, check_guard=False, dst_col=1):
+    def __init__(
+        self, name, data_type, row, valid_row, col, valid_col, check_guard=False, dst_col=1, fp32_acc_guard=False
+    ):
         self.check_guard = check_guard
         self.dst_col = dst_col
+        self.fp32_acc_guard = fp32_acc_guard
         self.name = name
         self.data_type = data_type
         self.row = row
@@ -150,6 +175,9 @@ if __name__ == "__main__":
         TRowSumParams("TROWSUMTest.case54", np.uint16, 32, 32, 128, 128),
         TRowSumParams("TROWSUMTest.case55", np.uint16, 16, 16, 192, 192),
         TRowSumParams("TROWSUMTest.case56", np.uint16, 8, 8, 448, 448),
+        # fp16 high-precision (fp32 accumulation) cases.
+        TRowSumParams("TROWSUMTest.case57", np.float16, 8, 8, 448, 447, fp32_acc_guard=True),
+        TRowSumParams("TROWSUMTest.case58", np.float16, 64, 64, 128, 128),
     ]
 
     for _, case in enumerate(case_params_list):

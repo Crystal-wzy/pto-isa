@@ -97,6 +97,30 @@ extern "C" __global__ AICORE void launchTCOLSUMCase16(__gm__ half* out, __gm__ h
 {
     runTColSum<half, 64, 64, 1, 128, 128>(out, src, true);
 }
+extern "C" __global__ AICORE void launchTCOLSUMCase61(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColSum<bfloat16_t, 1, 1, 1, 256, 255>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLSUMCase62(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColSum<bfloat16_t, 16, 16, 1, 128, 127>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLSUMCase63(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColSum<bfloat16_t, 16, 15, 1, 256, 255>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLSUMCase64(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColSum<bfloat16_t, 64, 63, 1, 128, 127>(out, src, true);
+}
+extern "C" __global__ AICORE void launchTCOLSUMCase65(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColSum<bfloat16_t, 64, 64, 1, 128, 128>(out, src, true);
+}
+extern "C" __global__ AICORE void launchTCOLSUMCase66(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColSum<bfloat16_t, 63, 63, 1, 256, 255>(out, src, true);
+}
 extern "C" __global__ AICORE void launchTCOLSUMCase21(__gm__ int8_t* out, __gm__ int8_t* src)
 {
     runTColSum<int8_t, 1, 1, 1, 256, 255>(out, src, false);
@@ -348,6 +372,54 @@ struct TColSumCaseLauncher<16> {
 };
 
 template <>
+struct TColSumCaseLauncher<61> {
+    static void Launch(void* out, void* src, aclrtStream stream)
+    {
+        launchTCOLSUMCase61<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+    }
+};
+
+template <>
+struct TColSumCaseLauncher<62> {
+    static void Launch(void* out, void* src, aclrtStream stream)
+    {
+        launchTCOLSUMCase62<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+    }
+};
+
+template <>
+struct TColSumCaseLauncher<63> {
+    static void Launch(void* out, void* src, aclrtStream stream)
+    {
+        launchTCOLSUMCase63<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+    }
+};
+
+template <>
+struct TColSumCaseLauncher<64> {
+    static void Launch(void* out, void* src, aclrtStream stream)
+    {
+        launchTCOLSUMCase64<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+    }
+};
+
+template <>
+struct TColSumCaseLauncher<65> {
+    static void Launch(void* out, void* src, aclrtStream stream)
+    {
+        launchTCOLSUMCase65<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+    }
+};
+
+template <>
+struct TColSumCaseLauncher<66> {
+    static void Launch(void* out, void* src, aclrtStream stream)
+    {
+        launchTCOLSUMCase66<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+    }
+};
+
+template <>
 struct TColSumCaseLauncher<21> {
     static void Launch(void* out, void* src, aclrtStream stream)
     {
@@ -548,6 +620,12 @@ template void launchTCOLSUMTestCase<13>(void* out, void* src, aclrtStream stream
 template void launchTCOLSUMTestCase<14>(void* out, void* src, aclrtStream stream);
 template void launchTCOLSUMTestCase<15>(void* out, void* src, aclrtStream stream);
 template void launchTCOLSUMTestCase<16>(void* out, void* src, aclrtStream stream);
+template void launchTCOLSUMTestCase<61>(void* out, void* src, aclrtStream stream);
+template void launchTCOLSUMTestCase<62>(void* out, void* src, aclrtStream stream);
+template void launchTCOLSUMTestCase<63>(void* out, void* src, aclrtStream stream);
+template void launchTCOLSUMTestCase<64>(void* out, void* src, aclrtStream stream);
+template void launchTCOLSUMTestCase<65>(void* out, void* src, aclrtStream stream);
+template void launchTCOLSUMTestCase<66>(void* out, void* src, aclrtStream stream);
 template void launchTCOLSUMTestCase<21>(void* out, void* src, aclrtStream stream);
 template void launchTCOLSUMTestCase<22>(void* out, void* src, aclrtStream stream);
 template void launchTCOLSUMTestCase<23>(void* out, void* src, aclrtStream stream);

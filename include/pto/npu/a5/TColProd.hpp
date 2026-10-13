@@ -24,6 +24,46 @@ struct TColProdOp {
     }
 };
 
+// High-precision column product for 16-bit float types: unpack each row to
+// fp32, multiply in fp32, then round back to the source type once.
+template <typename T, unsigned SrcStride>
+PTO_INTERNAL void TColProd_Fp32Acc(__ubuf__ T* dst, __ubuf__ T* src, unsigned validRow, unsigned validCol)
+{
+    constexpr unsigned elmPerRpt = CCE_VL / sizeof(float);
+    constexpr auto distValue =
+        std::integral_constant<::DistVST, static_cast<::DistVST>(GetDistVst<T, DistVST::DIST_NORM>())>();
+    uint16_t repeatTimes = CeilDivision(validCol, elmPerRpt);
+    uint16_t rows = validRow;
+    uint32_t sreg = validCol;
+
+    __VEC_SCOPE__
+    {
+        RegTensor<T> srcB16VReg;
+        RegTensor<T> dstB16VReg;
+        RegTensor<float> srcF32VReg;
+        RegTensor<float> dstF32VReg;
+        MaskReg pRegB32;
+        MaskReg pRegB16;
+
+        for (uint16_t i = 0; i < repeatTimes; ++i) {
+            uint16_t colOffset = i * elmPerRpt;
+            pRegB32 = CreatePredicate<float>(sreg);
+            vbr(dstF32VReg, 1.0f);
+
+            for (uint16_t j = 0; j < rows; ++j) {
+                vlds(srcB16VReg, src + j * SrcStride, colOffset, UNPK_B16);
+                vcvt(srcF32VReg, srcB16VReg, pRegB32, PART_EVEN);
+                vmul(dstF32VReg, dstF32VReg, srcF32VReg, pRegB32, MODE_ZEROING);
+            }
+
+            vcvt(dstB16VReg, dstF32VReg, pRegB32, ROUND_R, RS_DISABLE, PART_EVEN);
+            vpack((RegTensor<uint16_t>&)dstB16VReg, (RegTensor<uint32_t>&)dstB16VReg, LOWER);
+            ppack(pRegB16, pRegB32, LOWER);
+            vsts(dstB16VReg, dst, colOffset, distValue, pRegB16);
+        }
+    } // end VF
+}
+
 template <typename T, typename TileDataOut, typename TileDataIn>
 __tf__ PTO_INTERNAL void TColProd(
     typename TileDataOut::TileDType __out__ dstData, typename TileDataIn::TileDType __in__ srcData, unsigned validRow,
@@ -53,7 +93,12 @@ PTO_INTERNAL void TCOLPROD_IMPL(TileDataOut& dst, TileDataIn& src)
 
     TColReduceCheck<TileDataOut, TileDataIn>(validRow, validCol, dst.GetValidCol());
 
-    TColProd<T, TileDataOut, TileDataIn>(dst.data(), src.data(), validRow, validCol, VFImplKind::VFIMPL_DEFAULT);
+    if constexpr (std::is_same_v<T, half> || std::is_same_v<T, bfloat16_t>) {
+        // High-precision path: convert fp16/bf16 to fp32 and multiply in fp32.
+        TColProd_Fp32Acc<T, TileDataIn::Cols>(dst.data(), src.data(), validRow, validCol);
+    } else {
+        TColProd<T, TileDataOut, TileDataIn>(dst.data(), src.data(), validRow, validCol, VFImplKind::VFIMPL_DEFAULT);
+    }
 }
 } // namespace pto
 #endif

@@ -337,3 +337,15 @@ TEST_F(TROWSUMTest, case56)
     bool ret = TRowSumTestFramework<56, uint16_t, 8, 8, 448, 448, 1>();
     EXPECT_TRUE(ret);
 }
+
+TEST_F(TROWSUMTest, case57)
+{
+    bool ret = TRowSumTestFramework<57, aclFloat16, 8, 8, 448, 447, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case58)
+{
+    bool ret = TRowSumTestFramework<58, aclFloat16, 64, 64, 128, 128, 1>();
+    EXPECT_TRUE(ret);
+}

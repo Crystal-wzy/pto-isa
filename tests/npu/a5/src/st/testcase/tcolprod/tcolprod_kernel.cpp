@@ -108,6 +108,31 @@ extern "C" __global__ AICORE void launchTCOLPRODCase73(__gm__ uint32_t* out, __g
     runTColProd<uint32_t, 16, 15, 1, 256, 255>(out, src, false);
 }
 
+extern "C" __global__ AICORE void launchTCOLPRODCase81(__gm__ half* out, __gm__ half* src)
+{
+    runTColProd<half, 1, 1, 1, 256, 255>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLPRODCase82(__gm__ half* out, __gm__ half* src)
+{
+    runTColProd<half, 16, 16, 1, 128, 127>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLPRODCase83(__gm__ half* out, __gm__ half* src)
+{
+    runTColProd<half, 63, 63, 1, 128, 127>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLPRODCase91(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColProd<bfloat16_t, 1, 1, 1, 256, 255>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLPRODCase92(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColProd<bfloat16_t, 16, 16, 1, 128, 127>(out, src, false);
+}
+extern "C" __global__ AICORE void launchTCOLPRODCase93(__gm__ bfloat16_t* out, __gm__ bfloat16_t* src)
+{
+    runTColProd<bfloat16_t, 63, 63, 1, 128, 127>(out, src, false);
+}
+
 template <uint32_t caseId>
 void launchTCOLPRODTestCase(void* out, void* src, aclrtStream stream)
 {
@@ -172,6 +197,30 @@ void launchTCOLPRODTestCase(void* out, void* src, aclrtStream stream)
             launchTCOLPRODCase73<<<1, nullptr, stream>>>((uint32_t*)out, (uint32_t*)src);
             break;
         }
+        case 81: {
+            launchTCOLPRODCase81<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 82: {
+            launchTCOLPRODCase82<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 83: {
+            launchTCOLPRODCase83<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 91: {
+            launchTCOLPRODCase91<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+            break;
+        }
+        case 92: {
+            launchTCOLPRODCase92<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+            break;
+        }
+        case 93: {
+            launchTCOLPRODCase93<<<1, nullptr, stream>>>((bfloat16_t*)out, (bfloat16_t*)src);
+            break;
+        }
         default: {
         }
     }
@@ -192,3 +241,9 @@ template void launchTCOLPRODTestCase<63>(void* out, void* src, aclrtStream strea
 template void launchTCOLPRODTestCase<71>(void* out, void* src, aclrtStream stream);
 template void launchTCOLPRODTestCase<72>(void* out, void* src, aclrtStream stream);
 template void launchTCOLPRODTestCase<73>(void* out, void* src, aclrtStream stream);
+template void launchTCOLPRODTestCase<81>(void* out, void* src, aclrtStream stream);
+template void launchTCOLPRODTestCase<82>(void* out, void* src, aclrtStream stream);
+template void launchTCOLPRODTestCase<83>(void* out, void* src, aclrtStream stream);
+template void launchTCOLPRODTestCase<91>(void* out, void* src, aclrtStream stream);
+template void launchTCOLPRODTestCase<92>(void* out, void* src, aclrtStream stream);
+template void launchTCOLPRODTestCase<93>(void* out, void* src, aclrtStream stream);

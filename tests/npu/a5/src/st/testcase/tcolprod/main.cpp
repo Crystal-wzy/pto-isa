@@ -11,6 +11,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "test_common.h"
 #include <gtest/gtest.h>
 #include <acl/acl.h>
+#include <cstring>
 
 using namespace std;
 using namespace PtoTestCommon;
@@ -65,7 +66,35 @@ protected:
         return ResultCmp(golden, result, eps, 0, 1000, false, true);
     }
 
-    template <uint32_t caseId, typename T, int srcRow, int srcValidRow, int dstRow, int col, int validCol>
+    // Compares raw bf16 bit patterns by widening each element to fp32 first.
+    bool CompareGoldenBf16(size_t dstByteSize, bool printAllEn = false)
+    {
+        std::vector<uint16_t> goldenBits(dstByteSize / sizeof(uint16_t));
+        std::vector<uint16_t> resultBits(dstByteSize / sizeof(uint16_t));
+        ReadFile(GetGoldenDir() + "/golden.bin", dstByteSize, goldenBits.data(), dstByteSize);
+        ReadFile(GetGoldenDir() + "/output.bin", dstByteSize, resultBits.data(), dstByteSize);
+        std::vector<float> golden(goldenBits.size());
+        std::vector<float> result(resultBits.size());
+        for (size_t i = 0; i < goldenBits.size(); ++i) {
+            golden[i] = BitCastF32(static_cast<uint32_t>(goldenBits[i]) << 16);
+            result[i] = BitCastF32(static_cast<uint32_t>(resultBits[i]) << 16);
+        }
+        if (printAllEn) {
+            return ResultCmp(golden, result, 0.005f, 0, 1000, true);
+        }
+        return ResultCmp(golden, result, 0.005f, 0, 1000, false, true);
+    }
+
+    static float BitCastF32(uint32_t bits)
+    {
+        float value;
+        std::memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+
+    template <
+        uint32_t caseId, typename T, int srcRow, int srcValidRow, int dstRow, int col, int validCol,
+        bool isBf16 = false>
     bool TCOLPRODTestFramework()
     {
         size_t dstByteSize = dstRow * col * sizeof(T);
@@ -90,7 +119,11 @@ protected:
         aclrtFreeHost(dstHost);
         aclrtFreeHost(srcHost);
 
-        return CompareGolden<T>(dstByteSize);
+        if constexpr (isBf16) {
+            return CompareGoldenBf16(dstByteSize);
+        } else {
+            return CompareGolden<T>(dstByteSize);
+        }
     }
 };
 
@@ -167,5 +200,39 @@ TEST_F(TCOLPRODTest, case72)
 TEST_F(TCOLPRODTest, case73)
 {
     bool ret = TCOLPRODTestFramework<73, uint32_t, 16, 15, 1, 256, 255>();
+    EXPECT_TRUE(ret);
+}
+
+// fp16 high-precision (fp32 multiplication) cases.
+TEST_F(TCOLPRODTest, case81)
+{
+    bool ret = TCOLPRODTestFramework<81, aclFloat16, 1, 1, 1, 256, 255>();
+    EXPECT_TRUE(ret);
+}
+TEST_F(TCOLPRODTest, case82)
+{
+    bool ret = TCOLPRODTestFramework<82, aclFloat16, 16, 16, 1, 128, 127>();
+    EXPECT_TRUE(ret);
+}
+TEST_F(TCOLPRODTest, case83)
+{
+    bool ret = TCOLPRODTestFramework<83, aclFloat16, 63, 63, 1, 128, 127>();
+    EXPECT_TRUE(ret);
+}
+
+// bf16 high-precision (fp32 multiplication) cases.
+TEST_F(TCOLPRODTest, case91)
+{
+    bool ret = TCOLPRODTestFramework<91, uint16_t, 1, 1, 1, 256, 255, true>();
+    EXPECT_TRUE(ret);
+}
+TEST_F(TCOLPRODTest, case92)
+{
+    bool ret = TCOLPRODTestFramework<92, uint16_t, 16, 16, 1, 128, 127, true>();
+    EXPECT_TRUE(ret);
+}
+TEST_F(TCOLPRODTest, case93)
+{
+    bool ret = TCOLPRODTestFramework<93, uint16_t, 63, 63, 1, 128, 127, true>();
     EXPECT_TRUE(ret);
 }

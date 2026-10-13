@@ -11,6 +11,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "test_common.h"
 #include <gtest/gtest.h>
 #include <acl/acl.h>
+#include <cstring>
 
 using namespace std;
 using namespace PtoTestCommon;
@@ -67,9 +68,35 @@ protected:
         return ResultCmp(golden, result, eps, 0, 1000, false, true);
     }
 
+    // Compares raw bf16 bit patterns by widening each element to fp32 first.
+    bool CompareGoldenBf16(size_t dstByteSize, bool printAllEn = false)
+    {
+        std::vector<uint16_t> goldenBits(dstByteSize / sizeof(uint16_t));
+        std::vector<uint16_t> resultBits(dstByteSize / sizeof(uint16_t));
+        ReadFile(GetGoldenDir() + "/golden.bin", dstByteSize, goldenBits.data(), dstByteSize);
+        ReadFile(GetGoldenDir() + "/output.bin", dstByteSize, resultBits.data(), dstByteSize);
+        std::vector<float> golden(goldenBits.size());
+        std::vector<float> result(resultBits.size());
+        for (size_t i = 0; i < goldenBits.size(); ++i) {
+            golden[i] = BitCastF32(static_cast<uint32_t>(goldenBits[i]) << 16);
+            result[i] = BitCastF32(static_cast<uint32_t>(resultBits[i]) << 16);
+        }
+        if (printAllEn) {
+            return ResultCmp(golden, result, 0.005f, 0, 1000, true);
+        }
+        return ResultCmp(golden, result, 0.005f, 0, 1000, false, true);
+    }
+
+    static float BitCastF32(uint32_t bits)
+    {
+        float value;
+        std::memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+
     template <
         uint32_t caseId, typename T, int srcRow, int srcValidRow, int dstRow, int col, int validCol,
-        bool checkGuard = false>
+        bool checkGuard = false, bool isBf16 = false>
     bool TCOLSUMTestFramework()
     {
         size_t dstByteSize = (dstRow * col + (checkGuard ? 64 : 0)) * sizeof(T);
@@ -94,7 +121,11 @@ protected:
         aclrtFreeHost(dstHost);
         aclrtFreeHost(srcHost);
 
-        return CompareGolden<T>(dstByteSize);
+        if constexpr (isBf16) {
+            return CompareGoldenBf16(dstByteSize);
+        } else {
+            return CompareGolden<T>(dstByteSize);
+        }
     }
 };
 
@@ -245,3 +276,16 @@ TEST_F(TCOLSUMTest, case_uint64_2x68_valid65_guard)
 {
     EXPECT_TRUE((TCOLSUMTestFramework<107, uint64_t, 2, 2, 1, 68, 65, true>()));
 }
+
+// bf16 high-precision (fp32 accumulation) cases.
+TEST_F(TCOLSUMTest, case61) { EXPECT_TRUE((TCOLSUMTestFramework<61, uint16_t, 1, 1, 1, 256, 255, false, true>())); }
+
+TEST_F(TCOLSUMTest, case62) { EXPECT_TRUE((TCOLSUMTestFramework<62, uint16_t, 16, 16, 1, 128, 127, false, true>())); }
+
+TEST_F(TCOLSUMTest, case63) { EXPECT_TRUE((TCOLSUMTestFramework<63, uint16_t, 16, 15, 1, 256, 255, false, true>())); }
+
+TEST_F(TCOLSUMTest, case64) { EXPECT_TRUE((TCOLSUMTestFramework<64, uint16_t, 64, 63, 1, 128, 127, false, true>())); }
+
+TEST_F(TCOLSUMTest, case65) { EXPECT_TRUE((TCOLSUMTestFramework<65, uint16_t, 64, 64, 1, 128, 128, false, true>())); }
+
+TEST_F(TCOLSUMTest, case66) { EXPECT_TRUE((TCOLSUMTestFramework<66, uint16_t, 63, 63, 1, 256, 255, false, true>())); }
