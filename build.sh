@@ -52,6 +52,34 @@ check_pkg_type() {
   fi
 }
 
+# The .run wrapper is makeself 2.5.0 patched by cann-cmake to pass install flags
+# (--full/--run/--devel/...) through to the embedded install.sh. Two stale-cache
+# traps silently produce an unpatched wrapper (rejects those flags at install time):
+# 1. an unpatched makeself/ left in CANN_3RD_LIB_PATH (existence check only, no
+#    patch-state check in cann-cmake), and
+# 2. a 0-byte pkg/makeself-2.5.0.patch (failed download leaves an empty file that
+#    "patch" accepts without applying anything).
+check_makeself_patched() {
+  local makeself_dir="${CANN_3RD_LIB_PATH}/makeself"
+  local patch_file="${CANN_3RD_LIB_PATH}/pkg/makeself-2.5.0.patch"
+  local issues=""
+  if [ -f "${makeself_dir}/makeself-header.sh" ] && ! grep -q "Script_Args_Check" "${makeself_dir}/makeself-header.sh"; then
+    issues="unpatched makeself sources at ${makeself_dir}"
+  fi
+  if [ -f "${patch_file}" ] && [ ! -s "${patch_file}" ]; then
+    if [ -n "${issues}" ]; then
+      issues="${issues}; "
+    fi
+    issues="${issues}0-byte patch file at ${patch_file}"
+  fi
+  if [ -n "${issues}" ]; then
+    echo "[ERROR] ${issues}."
+    echo "        This would produce a .run that rejects install flags (--full/--run/--devel)."
+    echo "        Remove the cached files and rebuild: rm -rf ${makeself_dir} ${patch_file} && ./build.sh --pkg"
+    exit 1
+  fi
+}
+
 print_success() {
   echo
   echo $dotted_line
@@ -281,6 +309,11 @@ clean_build_out() {
 
 build_package() {
   echo "---------------package start-----------------"
+  case "${PACKAGE_TYPE:-run}" in
+    run | all)
+      check_makeself_patched
+      ;;
+  esac
   clean_build_out
   clean_build
   mkdir $BUILD_PATH

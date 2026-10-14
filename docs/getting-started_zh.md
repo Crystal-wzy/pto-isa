@@ -404,6 +404,36 @@ ulimit -n 65536
   ./build_out/cann-pto-isa_*.run --devel --install-path=/your/install/path --quiet
   ```
 
+  > **排障：安装报 `Unrecognized flag : --full`（Makeself version 2.5.0）**
+  >
+  > 该报错来自 `.run` 自解压壳（Makeself 2.5.0）而不是安装脚本，说明这个包在打包时使用的
+  > makeself 源码没有应用 CANN 补丁（补丁版外壳才会把 `--full/--run/--devel` 透传给内层安装脚本）。
+  > 两个已实测的成因都出在 `CANN_3RD_LIB_PATH`（默认 `third_party/`）的缓存上：
+  >
+  > 1. `CANN_3RD_LIB_PATH/makeself/` 里残留旧版未打补丁的 makeself：cann-cmake 只检查文件是否
+  >    存在、不校验补丁状态，会误判为"已打补丁"而直接复用；
+  > 2. `CANN_3RD_LIB_PATH/pkg/makeself-2.5.0.patch` 是 0 字节空文件（下载失败留下的占位文件）：
+  >    构建时 `patch` 会"应用"这个空补丁且退出码为 0，产物依然是未打补丁的外壳。
+  >
+  > 根治办法：删除这两处缓存后重新打包：
+  >
+  > ```bash
+  > rm -rf third_party/makeself third_party/pkg
+  > ./build.sh --pkg
+  > ```
+  >
+  > 重新生成的 `.run` 即可正常使用上述 `--full/--run/--devel` 参数。
+  >
+  > 临时应急（仅对未打补丁的旧包有效）：未打补丁的外壳不识别 `--full`，但内层 install.sh 会跳过
+  > 前两个 `--` 参数，可用两个占位参数把跳过额度耗掉，让真实参数从第 3 个起正常解析：
+  >
+  > ```bash
+  > ./cann-pto-isa_*.run --quiet --accept -- --1 --2 --full --install-path=/your/install/path
+  > ```
+  >
+  > 注意：该写法只适用于未打补丁的旧包；标准包（补丁版外壳）不接受 `--1` 这类占位参数，
+  > 请直接使用上文的 `--full` 命令。
+
   常用安装参数说明：
 
   | 参数 | 说明 |
