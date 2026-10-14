@@ -268,7 +268,121 @@ def _golden_nchw2c1hwn1n0c0(g_info):
     return input_ori, output_arr
 
 
+
+def _golden_valid(g_info):
+    """Valid shape 用例：raw 只表达每维 stride 与容量，valid 决定处理域。
+    写入范围 = dst valid 盒；盒内没有源对应的位置（C0 / N0 尾巴）补 0；盒外保持哨兵 -12345。"""
+    dt = g_info.data_type
+    kind = g_info.valid_kind
+    sr, sv = tuple(g_info.src_raw_shape), tuple(g_info.src_valid_shape)
+    dr, dv = tuple(g_info.dst_raw_shape), tuple(g_info.dst_valid_shape)
+    c0 = 32 // np.dtype(dt).itemsize
+    n0 = 16
+    sent = np.array(-12345, dtype=dt)
+    inp = np.random.randint(1, 5, size=sr).astype(dt)
+
+    if kind in ("NCHW2NC1HWC0",):
+        n, c, h, w = sr
+        vn, vc, vh, vw = sv
+        dvn, dvc1, dvh, dvw, dvc0 = dv
+        assert dvc0 == c0 and dvc1 == (vc + c0 - 1) // c0 and (dvn, dvh, dvw) == (vn, vh, vw)
+        box = inp[:vn, :vc, :vh, :vw]
+        pad = dvc1 * c0 - vc
+        if pad > 0:
+            box = np.pad(box, ((0, 0), (0, pad), (0, 0), (0, 0)), mode='constant')
+        conv = box.reshape(vn, dvc1, c0, vh, vw).transpose(0, 1, 3, 4, 2)
+    elif kind == "NC1HWC02NCHW":
+        vn, vc1, vh, vw, vc0 = sv
+        dvn, dvc, dvh, dvw = dv
+        assert vc0 == c0 and (dvn, dvc, dvh, dvw) == (vn, vc1 * vc0, vh, vw)
+        box = inp[:vn, :vc1, :vh, :vw, :vc0]
+        conv = box.transpose(0, 1, 4, 2, 3).reshape(vn, vc1 * vc0, vh, vw)
+    elif kind == "NC1HWC02C1HWN1N0C0":
+        vn, vc1, vh, vw, vc0 = sv
+        d0, dn1, dn0, dc0 = dv
+        assert dc0 == vc0 == c0 and dn0 == n0
+        dn1_ = (vn + dn0 - 1) // dn0
+        assert (d0, dn1, dn0, dc0) == (vc1 * vh * vw, dn1_, dn0, vc0)
+        box = inp[:vn, :vc1, :vh, :vw, :vc0]
+        pad = dn1_ * dn0 - vn
+        if pad > 0:
+            box = np.pad(box, ((0, pad), (0, 0), (0, 0), (0, 0), (0, 0)), mode='constant')
+        conv = box.reshape(dn1_, dn0, vc1, vh, vw, vc0).transpose(2, 3, 4, 0, 1, 5).reshape(
+            vc1 * vh * vw, dn1_, dn0, vc0
+        )
+    elif kind == "GNCHW2GNC1HWC0":
+        vg, vn, vc, vh, vw = sv
+        dgv, dnv, dc1v, dhv, dwv, dc0v = dv
+        assert dc0v == c0 and dc1v == (vc + c0 - 1) // c0
+        assert (dgv, dnv, dhv, dwv) == (vg, vn, vh, vw)
+        box = inp[:vg, :vn, :vc, :vh, :vw]
+        pad = dc1v * c0 - vc
+        if pad > 0:
+            box = np.pad(box, ((0, 0), (0, 0), (0, pad), (0, 0), (0, 0)), mode='constant')
+        conv = box.reshape(vg, vn, dc1v, c0, vh, vw).transpose(0, 1, 2, 4, 5, 3)
+    elif kind == "GNC1HWC02C1HWN1N0C0":
+        vg, vn, vc1, vh, vw, vc0 = sv
+        d0, dn1, dn0, dc0 = dv
+        assert dc0 == vc0 == c0 and dn0 == n0
+        dn1_ = (vn + dn0 - 1) // dn0
+        assert (d0, dn1, dn0, dc0) == (vg * vc1 * vh * vw, dn1_, dn0, vc0)
+        box = inp[:vg, :vn, :vc1, :vh, :vw, :vc0]
+        pad = dn1_ * dn0 - vn
+        if pad > 0:
+            box = np.pad(box, ((0, 0), (0, pad), (0, 0), (0, 0), (0, 0), (0, 0)), mode='constant')
+        conv = box.reshape(vg, dn1_, dn0, vc1, vh, vw, vc0).transpose(0, 3, 4, 5, 1, 2, 6).reshape(
+            vg * vc1 * vh * vw, dn1_, dn0, vc0
+        )
+    elif kind == "NCDHW2C1DHWN1N0C0":
+        vn, vc, vd, vh, vw = sv
+        d0, dn1, dn0, dc0 = dv
+        assert dc0 == c0 and dn0 == n0
+        vc1 = (vc + dc0 - 1) // dc0
+        dn1_ = (vn + dn0 - 1) // dn0
+        assert (d0, dn1, dn0, dc0) == (vd * vc1 * vh * vw, dn1_, dn0, dc0)
+        box = inp[:vn, :vc, :vd, :vh, :vw]
+        pad = vc1 * dc0 - vc
+        if pad > 0:
+            box = np.pad(box, ((0, 0), (0, pad), (0, 0), (0, 0), (0, 0)), mode='constant')
+        box = box.reshape(vn, vc1, dc0, vd, vh, vw)
+        pad = dn1_ * dn0 - vn
+        if pad > 0:
+            box = np.pad(box, ((0, pad), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)), mode='constant')
+        conv = box.reshape(dn1_, dn0, vc1, dc0, vd, vh, vw).transpose(4, 2, 5, 6, 0, 1, 3).reshape(
+            vd * vc1 * vh * vw, dn1_, dn0, dc0
+        )
+    elif kind in ("NCHW2C1HWN1N0C0", "NCHW2C1DHWN1N0C0"):
+        vn, vc, vh, vw = sv
+        d0, dn1, dn0, dc0 = dv
+        assert dc0 == c0 and dn0 == n0
+        vc1 = (vc + dc0 - 1) // dc0
+        dn1_ = (vn + dn0 - 1) // dn0
+        assert (d0, dn1, dn0, dc0) == (vc1 * vh * vw, dn1_, dn0, dc0)
+        box = inp[:vn, :vc, :vh, :vw]
+        pad = vc1 * dc0 - vc
+        if pad > 0:
+            box = np.pad(box, ((0, 0), (0, pad), (0, 0), (0, 0)), mode='constant')
+        box = box.reshape(vn, vc1, dc0, vh, vw)
+        pad = dn1_ * dn0 - vn
+        if pad > 0:
+            box = np.pad(box, ((0, pad), (0, 0), (0, 0), (0, 0), (0, 0)), mode='constant')
+        conv = box.reshape(dn1_, dn0, vc1, dc0, vh, vw).transpose(2, 4, 5, 0, 1, 3).reshape(
+            vc1 * vh * vw, dn1_, dn0, dc0
+        )
+    else:
+        raise ValueError(f"unknown valid kind: {kind}")
+
+    output_arr = np.full(dr, sent, dtype=dt)
+    output_arr[tuple(slice(0, v) for v in dv)] = conv
+    return inp, output_arr
+
+
 def gen_golden_data(g_info):
+    if getattr(g_info, "src_valid_shape", None) is not None:
+        input_arr, output_arr = _golden_valid(g_info)
+        input_arr.tofile("./input.bin")
+        output_arr.tofile("./golden.bin")
+        return
     shape1 = g_info.shape
     if shape1 == DataFormat["NCHW2NC1HWC0"].value:
         input_arr, output_arr = _golden_nchw2_nc1hwc0(g_info)
@@ -301,19 +415,24 @@ class TTRANSParams:
         case_name,
         data_type,
         shape,
-        g_shape0,
-        g_shape1,
-        g_shape2,
-        g_shape3,
-        g_shape4,
-        g_shape5,
-        g_whole_shape0,
-        g_whole_shape1,
-        g_whole_shape2,
-        g_whole_shape3,
-        g_whole_shape4,
+        g_shape0=1,
+        g_shape1=1,
+        g_shape2=1,
+        g_shape3=1,
+        g_shape4=1,
+        g_shape5=1,
+        g_whole_shape0=1,
+        g_whole_shape1=1,
+        g_whole_shape2=1,
+        g_whole_shape3=1,
+        g_whole_shape4=1,
         g_shape6=1,
         g_whole_shape5=1,
+        src_raw_shape=None,
+        dst_raw_shape=None,
+        src_valid_shape=None,
+        dst_valid_shape=None,
+        valid_kind=None,
     ):
         self.case_name = case_name
         self.data_type = data_type
@@ -331,6 +450,11 @@ class TTRANSParams:
         self.g_whole_shape3 = g_whole_shape3
         self.g_whole_shape4 = g_whole_shape4
         self.g_whole_shape5 = g_whole_shape5
+        self.src_raw_shape = src_raw_shape
+        self.dst_raw_shape = dst_raw_shape
+        self.src_valid_shape = src_valid_shape
+        self.dst_valid_shape = dst_valid_shape
+        self.valid_kind = valid_kind
 
 
 if __name__ == "__main__":
@@ -977,6 +1101,81 @@ if __name__ == "__main__":
             3,
             7,
             1,
+        ),
+
+        # --- Valid shape 用例：与 CPU 侧同参数同语义（两侧 raw 与 valid 每一维都不同）---
+        TTRANSParams(
+            "TTRANSConvTest.valid_NCHW2NC1HWC0_dst_all_shrunk", np.float32, 0,
+            src_raw_shape=(1, 16, 8, 16), dst_raw_shape=(2, 4, 8, 32, 16),
+            src_valid_shape=(1, 16, 4, 16), dst_valid_shape=(1, 2, 4, 16, 8),
+            valid_kind="NCHW2NC1HWC0",
+        ),        TTRANSParams(
+            "TTRANSConvTest.valid_NC1HWC02NCHW_all_dims_differ", np.float32, 0,
+            src_raw_shape=(3, 5, 7, 9, 16), dst_raw_shape=(3, 32, 7, 9),
+            src_valid_shape=(2, 3, 4, 5, 8), dst_valid_shape=(2, 24, 4, 5),
+            valid_kind="NC1HWC02NCHW",
+        ),        TTRANSParams(
+            "TTRANSConvTest.valid_NC1HWC02C1HWN1N0C0_all_dims_differ", np.float32, 0,
+            src_raw_shape=(6, 3, 4, 5, 16), dst_raw_shape=(16, 2, 24, 16),
+            src_valid_shape=(5, 2, 2, 3, 8), dst_valid_shape=(12, 1, 16, 8),
+            valid_kind="NC1HWC02C1HWN1N0C0",
+        ),        TTRANSParams(
+            "TTRANSConvTest.valid_GNCHW2GNC1HWC0_all_dims_differ", np.float32, 0,
+            src_raw_shape=(3, 4, 10, 5, 6), dst_raw_shape=(3, 4, 3, 5, 6, 16),
+            src_valid_shape=(2, 3, 8, 4, 5), dst_valid_shape=(2, 3, 1, 4, 5, 8),
+            valid_kind="GNCHW2GNC1HWC0",
+        ),        TTRANSParams(
+            "TTRANSConvTest.valid_GNC1HWC02C1HWN1N0C0_all_dims_differ", np.float32, 0,
+            src_raw_shape=(3, 4, 3, 4, 5, 16), dst_raw_shape=(28, 2, 24, 16),
+            src_valid_shape=(2, 3, 1, 3, 4, 8), dst_valid_shape=(24, 1, 16, 8),
+            valid_kind="GNC1HWC02C1HWN1N0C0",
+        ),        TTRANSParams(
+            "TTRANSConvTest.valid_NCDHW2C1DHWN1N0C0_all_dims_differ", np.float32, 0,
+            src_raw_shape=(3, 10, 3, 4, 5), dst_raw_shape=(32, 2, 24, 16),
+            src_valid_shape=(2, 8, 2, 3, 4), dst_valid_shape=(24, 1, 16, 8),
+            valid_kind="NCDHW2C1DHWN1N0C0",
+        ),        TTRANSParams(
+            "TTRANSConvTest.valid_NCHW2C1HWN1N0C0_all_dims_differ", np.float32, 0,
+            src_raw_shape=(8, 10, 4, 6), dst_raw_shape=(16, 2, 24, 16),
+            src_valid_shape=(6, 8, 3, 4), dst_valid_shape=(12, 1, 16, 8),
+            valid_kind="NCHW2C1HWN1N0C0",
+        ),        TTRANSParams(
+            "TTRANSConvTest.valid_NCHW2C1DHWN1N0C0_all_dims_differ", np.float32, 0,
+            src_raw_shape=(6, 18, 6, 5), dst_raw_shape=(32, 2, 24, 16),
+            src_valid_shape=(5, 16, 4, 3), dst_valid_shape=(24, 1, 16, 8),
+            valid_kind="NCHW2C1DHWN1N0C0",
+        ),
+
+        # --- 快路径基准用例：几何对 32B 块对齐，能走向量快路径（同时校验正确性）---
+        TTRANSParams(
+            "TTRANSConvTest.bench_NCHW2NC1HWC0", np.float32, 0,
+            src_raw_shape=(8, 16, 8, 16), dst_raw_shape=(8, 2, 8, 16, 8),
+            src_valid_shape=(8, 16, 6, 16), dst_valid_shape=(8, 2, 6, 16, 8),
+            valid_kind="NCHW2NC1HWC0",
+        ),
+        TTRANSParams(
+            "TTRANSConvTest.bench_NCHW2NC1HWC0_legacy", np.float32, 0,
+            src_raw_shape=(8, 16, 8, 16), dst_raw_shape=(8, 2, 8, 16, 8),
+            src_valid_shape=(8, 16, 8, 16), dst_valid_shape=(8, 2, 8, 16, 8),
+            valid_kind="NCHW2NC1HWC0",
+        ),
+        TTRANSParams(
+            "TTRANSConvTest.bench_NC1HWC02NCHW", np.float32, 0,
+            src_raw_shape=(8, 2, 8, 16, 8), dst_raw_shape=(8, 16, 8, 16),
+            src_valid_shape=(8, 2, 6, 16, 8), dst_valid_shape=(8, 16, 6, 16),
+            valid_kind="NC1HWC02NCHW",
+        ),
+        TTRANSParams(
+            "TTRANSConvTest.bench_NC1HWC02FZ", np.float32, 0,
+            src_raw_shape=(16, 2, 8, 10, 8), dst_raw_shape=(160, 1, 16, 8),
+            src_valid_shape=(13, 2, 6, 9, 8), dst_valid_shape=(108, 1, 16, 8),
+            valid_kind="NC1HWC02C1HWN1N0C0",
+        ),
+        TTRANSParams(
+            "TTRANSConvTest.bench_NCHW2FZ", np.float32, 0,
+            src_raw_shape=(16, 8, 8, 16), dst_raw_shape=(96, 1, 16, 8),
+            src_valid_shape=(13, 8, 6, 16), dst_valid_shape=(96, 1, 16, 8),
+            valid_kind="NCHW2C1HWN1N0C0",
         ),
     ]
 

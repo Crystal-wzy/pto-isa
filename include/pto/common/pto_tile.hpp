@@ -1150,6 +1150,19 @@ struct AssignDynamicDim {
         }
     }
 };
+// Static valid extents must not exceed the declared extents (dynamic dims are checked at runtime).
+template <typename DeclaredShape, typename ValidShape>
+constexpr bool StaticValidNotExceedDeclared()
+{
+    for (int i = 0; i < MAX_CONVTILE_DIM; ++i) {
+        const int64_t d = DeclaredShape::staticShape[i];
+        const int64_t v = ValidShape::staticShape[i];
+        if (v != DYNAMIC && d != DYNAMIC && v > d) {
+            return false;
+        }
+    }
+    return true;
+}
 } // namespace ConvTileDetail
 
 template <int... Shapes>
@@ -1250,11 +1263,17 @@ public:
 #endif
 };
 
-template <TileType Loc_, typename Element_, const int BufferSize_, Layout Layout_, typename Shape_>
+// ConvTile<...>: the declared Shape_ only describes memory (per-dim stride and capacity) and takes no part in
+// format conversion; the optional ValidShape_ describes the logical tensor that a conversion actually processes.
+// ValidShape_ defaults to Shape_, so tiles that do not opt in behave exactly as before.
+template <
+    TileType Loc_, typename Element_, const int BufferSize_, Layout Layout_, typename Shape_,
+    typename ValidShape_ = Shape_>
 struct ConvTile {
 public:
     using DType = Element_;
     using ShapeType = Shape_;
+    using ValidShapeType = ValidShape_;
     static constexpr TileType Loc = Loc_;
     static constexpr int bufferSize = BufferSize_;
     static constexpr Layout layout = Layout_;
@@ -1262,6 +1281,16 @@ public:
     static constexpr int totalDimCount = ShapeType::totalDimCount;
     static_assert(
         totalDimCount >= 1 && totalDimCount <= ConvTileDetail::MAX_CONVTILE_DIM, "ConvTile only support 1D~6D Shapes!");
+    static_assert(
+        ValidShapeType::totalDimCount == totalDimCount, "ConvTile valid shape must have the same dim count as shape!");
+    static_assert(
+        ConvTileDetail::StaticValidNotExceedDeclared<ShapeType, ValidShapeType>(),
+        "ConvTile static valid extents must not exceed the declared extents!");
+#ifdef __PTO_AUTO__
+    static_assert(
+        ValidShapeType::dynamicDimCount == 0,
+        "ConvTile runtime valid shape is not supported in auto mode (use a static ValidShape_).");
+#endif
     static constexpr int64_t staticShape[ConvTileDetail::MAX_CONVTILE_DIM] = {
         ShapeType::staticShape[0], ShapeType::staticShape[1], ShapeType::staticShape[2],
         ShapeType::staticShape[3], ShapeType::staticShape[4], ShapeType::staticShape[5]};
@@ -1271,6 +1300,76 @@ public:
         ShapeType::staticShape[2] == DYNAMIC, ShapeType::staticShape[3] == DYNAMIC,
         ShapeType::staticShape[4] == DYNAMIC, ShapeType::staticShape[5] == DYNAMIC};
     int64_t shape[ConvTileDetail::MAX_CONVTILE_DIM] = {1};
+
+    // ------------------------------------------------------------------
+    // Valid shape: the processing domain of a conversion. Static valid dims are compile-time constants;
+    // DYNAMIC (-1) valid dims are set at runtime by SetValidShape(). When a DYNAMIC valid dim was never set,
+    // GetValidShape() falls back to the declared extent ("valid == declared" by default).
+    // ------------------------------------------------------------------
+    static constexpr int validDynamicDimCount = ValidShapeType::dynamicDimCount;
+    static constexpr int64_t staticValidShape[ConvTileDetail::MAX_CONVTILE_DIM] = {
+        ValidShapeType::staticShape[0], ValidShapeType::staticShape[1], ValidShapeType::staticShape[2],
+        ValidShapeType::staticShape[3], ValidShapeType::staticShape[4], ValidShapeType::staticShape[5]};
+    static constexpr bool isValidDynamic[ConvTileDetail::MAX_CONVTILE_DIM] = {
+        ValidShapeType::staticShape[0] == DYNAMIC, ValidShapeType::staticShape[1] == DYNAMIC,
+        ValidShapeType::staticShape[2] == DYNAMIC, ValidShapeType::staticShape[3] == DYNAMIC,
+        ValidShapeType::staticShape[4] == DYNAMIC, ValidShapeType::staticShape[5] == DYNAMIC};
+#ifdef __PTO_AUTO__
+    // rule 2 of docs/auto_mode/Library_Developer_Rules_And_Limitations.md: no member initializers in auto mode
+    int64_t validShape[ConvTileDetail::MAX_CONVTILE_DIM];
+#else
+    int64_t validShape[ConvTileDetail::MAX_CONVTILE_DIM] = {isValidDynamic[0] ? staticShape[0] : staticValidShape[0],
+                                                            isValidDynamic[1] ? staticShape[1] : staticValidShape[1],
+                                                            isValidDynamic[2] ? staticShape[2] : staticValidShape[2],
+                                                            isValidDynamic[3] ? staticShape[3] : staticValidShape[3],
+                                                            isValidDynamic[4] ? staticShape[4] : staticValidShape[4],
+                                                            isValidDynamic[5] ? staticShape[5] : staticValidShape[5]};
+#endif
+
+    PTO_INTERNAL constexpr int64_t GetValidShape(int dim) const
+    {
+        if (dim < 0 || dim >= totalDimCount) {
+            return -1;
+        }
+
+#ifdef __PTO_AUTO__
+        // auto mode only supports static shapes (kept in step with GetShape)
+        return staticValidShape[dim];
+#else
+        if (!isValidDynamic[dim]) {
+            return staticValidShape[dim];
+        }
+        // not set yet (a DYNAMIC declared dim stores its sentinel) -> fall back to the declared extent
+        return (validShape[dim] > 0) ? validShape[dim] : GetShape(dim);
+#endif
+    }
+
+    // Runtime update of the valid extents. The argument count must equal the number of DYNAMIC dims of ValidShape_;
+    // static valid dims keep their compile-time value. Call this function need PIPE_S wait.
+    template <typename... Ints>
+    PTO_INTERNAL void SetValidShape(Ints... vals)
+    {
+#ifdef __PTO_AUTO__
+        static_assert(sizeof...(vals) == 0, "ConvTile runtime valid shape is not supported in auto mode!");
+#endif
+        static_assert(
+            sizeof...(vals) == ValidShapeType::dynamicDimCount,
+            "Number of valid values does not match dynamic dim count of the valid shape!");
+        static_assert((std::is_same_v<Ints, int64_t> && ...), "Valid shape values must be int64_t type!");
+
+        if constexpr (sizeof...(vals) > 0) {
+            int idx = 0;
+            const int64_t validVals[] = {vals...};
+            for (int i = 0; i < ConvTileDetail::MAX_CONVTILE_DIM; ++i) {
+                if (isValidDynamic[i]) {
+                    PTO_ASSERT(
+                        validVals[idx] > 0 && validVals[idx] <= GetShape(i),
+                        "valid extent must be in (0, declared extent].");
+                    validShape[i] = validVals[idx++];
+                }
+            }
+        }
+    }
 
     PTO_INTERNAL constexpr int64_t GetShape(int dim) const
     {
@@ -1859,8 +1958,9 @@ constexpr bool is_boxed_tile = is_tile<T>::value && (is_tile<T>::layout_enum != 
 
 template <typename T>
 struct is_conv_tile : std::false_type {};
-template <TileType Loc_, typename Element_, const int BufferSize_, Layout Layout_, typename Shape_>
-struct is_conv_tile<ConvTile<Loc_, Element_, BufferSize_, Layout_, Shape_>> : std::true_type {};
+template <
+    TileType Loc_, typename Element_, const int BufferSize_, Layout Layout_, typename Shape_, typename ValidShape_>
+struct is_conv_tile<ConvTile<Loc_, Element_, BufferSize_, Layout_, Shape_, ValidShape_>> : std::true_type {};
 
 template <typename tile_shape>
 struct is_Nz_layout {
