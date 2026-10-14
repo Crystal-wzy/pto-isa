@@ -8,7 +8,7 @@
 
 ## Introduction
 
-Interleave two source tiles (`src0` and `src1`) into two destination tiles (`dst0` and `dst1`). The operation combines elements from `src0` and `src1` in an alternating pattern: even-positioned elements of the interleaved stream are placed into `dst0`, and odd-positioned elements into `dst1`. Each destination tile holds half the interleaved stream, split at the midpoint.
+Interleave two source tiles (`src0` and `src1`) into two destination tiles (`dst0` and `dst1`). The operation combines elements from `src0` and `src1` in an alternating pattern to form an interleaved stream, then splits that stream at the midpoint: the first half is written to `dst0` and the second half to `dst1`. Each destination tile holds half of the interleaved stream.
 
 `TINTERLEAVE` is the inverse of `TDEINTERLEAVE`.
 

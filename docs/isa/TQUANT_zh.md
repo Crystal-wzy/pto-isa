@@ -32,9 +32,10 @@
 
 ### Integer INT8（仿射，5阶段类型转换）
 
-$$q_i = \mathrm{round}\!\left(\frac{x_i}{\mathrm{scale}}\right) + \mathrm{offset}, \qquad q_i \in [-128, 127]$$
+- **INT8_SYM：** $q_i = \mathrm{clip}(\mathrm{round}(x_i \cdot \mathrm{scale}), -128, 127)$。
+- **INT8_ASYM：** $q_i = \mathrm{clip}(\mathrm{round}(x_i \cdot \mathrm{scale}) + \mathrm{offset}, 0, 255)$。
 
-无分组结构；`scale`（和非对称 `offset`）为每Tile的FP32标量/向量。为避免二次舍入，Atlas A2/A3 训练系列产品/Atlas A2/A3 推理系列产品上的类型转换链为 `FP32 → S32 → FP32 → FP16 → INT8`（5阶段，通过 `tmp` Tile）；Ascend 950PR/Ascend 950DT使用原生广播 + 类型转换（无需 `tmp`）。输入必须为 **FP32**。
+无分组结构；`scale` 是每Tile的FP32乘数（通常为量化步长的倒数），非对称模式下的 `offset` 为每Tile的FP32标量/向量。为避免二次舍入，Atlas A2/A3 训练系列产品/Atlas A2/A3 推理系列产品上的类型转换链为 `FP32 → S32 → FP32 → FP16 → INT8`（5阶段，通过 `tmp` Tile）；Ascend 950PR/Ascend 950DT使用原生广播 + 类型转换（无需 `tmp`）。输入必须为 **FP32**。
 
 ## C++内建接口
 
