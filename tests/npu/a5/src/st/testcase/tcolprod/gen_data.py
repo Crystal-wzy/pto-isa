@@ -13,6 +13,13 @@
 import os
 import numpy as np
 
+try:
+    import ml_dtypes
+
+    bfloat16 = ml_dtypes.bfloat16
+except ModuleNotFoundError:
+    bfloat16 = object()
+
 np.random.seed(19)
 
 
@@ -26,11 +33,19 @@ def gen_golden_data(param):
     value_low, value_high = -9, 10
     if np.dtype(data_type).kind == "u":
         value_low, value_high = 1, 10
+    if data_type == np.float16 or data_type == bfloat16:
+        # Keep 16-bit float products inside the normal range.
+        value_low, value_high = 0.9, 1.1
 
     input_arr = np.random.uniform(low=value_low, high=value_high, size=(row, col)).astype(data_type)
 
-    output_arr = np.zeros(col, dtype=data_type)
-    output_arr[:valid_col] = input_arr[:valid_row, :valid_col].prod(axis=0)
+    if data_type == np.float16 or data_type == bfloat16:
+        # High-precision golden: multiply in fp32, round back once.
+        output_arr = np.zeros(col, dtype=data_type)
+        output_arr[:valid_col] = input_arr[:valid_row, :valid_col].astype(np.float32).prod(axis=0).astype(data_type)
+    else:
+        output_arr = np.zeros(col, dtype=data_type)
+        output_arr[:valid_col] = input_arr[:valid_row, :valid_col].prod(axis=0)
 
     input_arr.tofile("input.bin")
     output_arr.tofile("golden.bin")
@@ -63,6 +78,14 @@ if __name__ == "__main__":
         TColProdParams("TCOLPRODTest.case71", np.uint32, 1, 1, 256, 255),
         TColProdParams("TCOLPRODTest.case72", np.uint32, 16, 16, 128, 127),
         TColProdParams("TCOLPRODTest.case73", np.uint32, 16, 15, 256, 255),
+        # fp16 high-precision (fp32 multiplication) cases.
+        TColProdParams("TCOLPRODTest.case81", np.float16, 1, 1, 256, 255),
+        TColProdParams("TCOLPRODTest.case82", np.float16, 16, 16, 128, 127),
+        TColProdParams("TCOLPRODTest.case83", np.float16, 63, 63, 128, 127),
+        # bf16 high-precision (fp32 multiplication) cases.
+        TColProdParams("TCOLPRODTest.case91", bfloat16, 1, 1, 256, 255),
+        TColProdParams("TCOLPRODTest.case92", bfloat16, 16, 16, 128, 127),
+        TColProdParams("TCOLPRODTest.case93", bfloat16, 63, 63, 128, 127),
     ]
 
     for _, case in enumerate(case_params_list):

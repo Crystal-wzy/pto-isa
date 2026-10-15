@@ -202,3 +202,10 @@ TEST_F(TROWPRODTest, case18)
     bool ret = TRowProdTestFramework<18, int16_t, 31, 31, 128, 127, 1>();
     EXPECT_TRUE(ret);
 }
+
+// fp16 high-precision (fp32 multiplication) case.
+TEST_F(TROWPRODTest, case19)
+{
+    bool ret = TRowProdTestFramework<19, aclFloat16, 8, 8, 1024, 1023, 1>();
+    EXPECT_TRUE(ret);
+}

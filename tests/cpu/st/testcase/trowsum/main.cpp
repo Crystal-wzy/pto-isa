@@ -494,10 +494,3 @@ TEST_F(TROWSUMTest, case_a2a3_keeps_legacy_mixed_types)
     InvokeRowSumForValidation(srcInt, dstInt, pto::NPUArch::A2A3);
     EXPECT_EQ(dstInt.data()[0], 16);
 }
-
-TEST_F(TROWSUMTest, case_a2a3_rejects_a5_only_int64)
-{
-    pto::Tile<pto::TileType::Vec, int64_t, 8, 16> src;
-    pto::Tile<pto::TileType::Vec, int64_t, 8, 4> dst;
-    EXPECT_DEATH(InvokeRowSumForValidation(src, dst, pto::NPUArch::A2A3), "Not supported data type for A2A3");
-}

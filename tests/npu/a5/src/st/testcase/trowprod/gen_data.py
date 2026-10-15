@@ -16,6 +16,12 @@ import numpy as np
 np.random.seed(42)
 
 
+def gen_half_fp32_acc_golden(input_arr, valid_row, valid_col):
+    output_arr = np.ones((input_arr.shape[0]), dtype=np.float16)
+    output_arr[:valid_row] = input_arr[:valid_row, :valid_col].astype(np.float32).prod(axis=1).astype(np.float16)
+    return output_arr
+
+
 def gen_golden_data(param):
     data_type = param.data_type
     row = param.row
@@ -32,6 +38,12 @@ def gen_golden_data(param):
         for i in range(valid_row):
             output_arr[i] = np.prod(input_arr[i, :valid_col], dtype=np.int64)
         output_arr = output_arr.astype(data_type)
+    elif data_type == np.float16 and param.fp32_acc_guard:
+        # Values just below 1.0 keep the product inside the fp16 normal range
+        # while compounding one rounding per multiply: a native fp16 chain
+        # drifts by percent-level, an fp32 chain only rounds once at the end.
+        input_arr = np.random.uniform(low=0.995, high=1.0, size=(row, col)).astype(data_type)
+        output_arr = gen_half_fp32_acc_golden(input_arr, valid_row, valid_col)
     else:
         # For float types, use the original range
         input_arr = np.random.uniform(low=0.9, high=1.1, size=(row, col)).astype(data_type)
@@ -46,7 +58,8 @@ def gen_golden_data(param):
 
 
 class TRowProdParams:
-    def __init__(self, name, data_type, row, valid_row, col, valid_col):
+    def __init__(self, name, data_type, row, valid_row, col, valid_col, fp32_acc_guard=False):
+        self.fp32_acc_guard = fp32_acc_guard
         self.name = name
         self.data_type = data_type
         self.row = row
@@ -77,6 +90,8 @@ if __name__ == "__main__":
         TRowProdParams("TROWPRODTest.case16", np.int16, 256, 256, 16, 16 - 1),
         TRowProdParams("TROWPRODTest.case17", np.int16, 63, 63, 64, 64),
         TRowProdParams("TROWPRODTest.case18", np.int16, 31, 31, 64 * 2, 64 * 2 - 1),
+        # fp16 high-precision (fp32 multiplication) case.
+        TRowProdParams("TROWPRODTest.case19", np.float16, 8, 8, 1024, 1023, fp32_acc_guard=True),
     ]
 
     for _, case in enumerate(case_params_list):

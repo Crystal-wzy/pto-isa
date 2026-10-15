@@ -109,7 +109,9 @@ PTO_INTERNAL void CheckRSValid(NPUArch arch, uint32_t srcRows, uint32_t srcCols,
         (std::is_same_v<SrcType, float> && std::is_same_v<DstType, float>) ||           // f322f32
         (std::is_same_v<SrcType, int16_t> && std::is_same_v<DstType, int16_t>) ||       // i162i16
         (std::is_same_v<SrcType, int16_t> && std::is_same_v<DstType, int32_t>) ||       // i162i32
-        (std::is_same_v<SrcType, int32_t> && std::is_same_v<DstType, int32_t>);         // i322i32
+        (std::is_same_v<SrcType, int32_t> && std::is_same_v<DstType, int32_t>) ||       // i322i32
+        (std::is_same_v<SrcType, int64_t> && std::is_same_v<DstType, int64_t>) ||       // i642i64
+        (std::is_same_v<SrcType, u_int64_t> && std::is_same_v<DstType, u_int64_t>);     // u642u64
     constexpr bool a5Supported =
         std::is_same_v<SrcType, DstType> &&
         (std::is_same_v<SrcType, half> || std::is_same_v<SrcType, float> || std::is_same_v<SrcType, int16_t> ||

@@ -258,6 +258,7 @@ set(ALL_TESTCASES
     tpushpop_vc
     tpushpop_vc_nosplit
     tpushpop_dir_both
+    tfree
     tpushpop_subblock_dispatch
     texpands_mat
     tpushpop_subtile
@@ -285,6 +286,7 @@ if (AUTO_MODE)
     tpushpop_vc
     tpushpop_vc_nosplit
     tpushpop_dir_both
+    tfree
     tpushpop_subtile
     tpushpop_subblock_dispatch
   # the following case wait to be fix 

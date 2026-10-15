@@ -110,13 +110,66 @@ __tf__ PTO_INTERNAL OP_NAME(TROWPROD) OP_TYPE(reduce) void TRowProd(
     } // end VF
 }
 
+// High-precision row product for 16-bit float types: unpack to fp32, multiply
+// in fp32 (partial lanes keep their value via MODE_MERGING), reduce the 64 fp32
+// lanes with the interleave tree, then round back to the source type once.
+template <typename T, unsigned DstRowStride, unsigned SrcRowStride>
+PTO_INTERNAL void TRowProd_Fp32Acc(__ubuf__ T* dst, __ubuf__ T* src, unsigned validRows, unsigned validCols)
+{
+    constexpr unsigned elmPerRpt = CCE_VL / sizeof(float);
+    constexpr auto distValue =
+        std::integral_constant<::DistVST, static_cast<::DistVST>(GetDistVst<T, DistVST::DIST_ONEPT>())>();
+    uint16_t repeatTimes = CeilDivision(validCols, elmPerRpt);
+
+    __VEC_SCOPE__
+    {
+        RegTensor<T> srcB16VReg;
+        RegTensor<T> dstB16VReg;
+        RegTensor<float> srcF32VReg;
+        RegTensor<float> accF32VReg;
+        RegTensor<float> oneF32VReg;
+        RegTensor<float> intlvReg1;
+        RegTensor<float> intlvReg2;
+        vbr(oneF32VReg, 1.0f);
+        constexpr uint16_t prodLoop = TROW_PROD_LOOP_B32;
+        uint32_t reduceItems = elmPerRpt;
+        MaskReg reducePReg = CreatePredicate<float>(reduceItems);
+        MaskReg pRegOne = pset_b32(PAT_VL1);
+        uint32_t dstItems = 1;
+        MaskReg pRegDst = CreatePredicate<T>(dstItems);
+        for (uint16_t i = 0; i < (uint16_t)validRows; ++i) {
+            uint32_t sreg = validCols;
+            vbr(accF32VReg, 1.0f);
+            for (uint16_t j = 0; j < repeatTimes; ++j) {
+                MaskReg pRegB32 = CreatePredicate<float>(sreg);
+                vlds(srcB16VReg, src, i * SrcRowStride + j * elmPerRpt, UNPK_B16);
+                vcvt(srcF32VReg, srcB16VReg, pRegB32, PART_EVEN);
+                vmul(accF32VReg, accF32VReg, srcF32VReg, pRegB32, MODE_MERGING);
+            }
+            for (uint16_t k = 0; k < prodLoop; ++k) {
+                vintlv(intlvReg1, intlvReg2, accF32VReg, oneF32VReg);
+                vmul(accF32VReg, intlvReg1, intlvReg2, reducePReg, MODE_ZEROING);
+            }
+            vcvt(dstB16VReg, accF32VReg, pRegOne, ROUND_R, RS_DISABLE, PART_EVEN);
+            vsts(dstB16VReg, dst, i * DstRowStride, distValue, pRegDst);
+        }
+    } // end VF
+}
+
 template <typename TileDataOut, typename TileDataIn, typename TileDataTmp>
 PTO_INTERNAL void TROWPROD_IMPL(TileDataOut& dst, TileDataIn& src, TileDataTmp& tmp)
 {
     unsigned rows = src.GetValidRow();
     unsigned cols = src.GetValidCol();
     TRowProdCheck<TileDataOut, TileDataIn>(rows, cols, dst.GetValidRow());
-    TRowProd<TileDataOut, TileDataIn>(dst.data(), src.data(), rows, cols);
+    using T = typename TileDataIn::DType;
+    if constexpr (std::is_same_v<T, half>) {
+        // High-precision path: convert fp16 to fp32 and multiply in fp32.
+        TRowProd_Fp32Acc<half, TileDataOut::RowStride, TileDataIn::RowStride>(
+            (__ubuf__ half*)dst.data(), (__ubuf__ half*)src.data(), rows, cols);
+    } else {
+        TRowProd<TileDataOut, TileDataIn>(dst.data(), src.data(), rows, cols);
+    }
 }
 } // namespace pto
 

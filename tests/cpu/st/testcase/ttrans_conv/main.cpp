@@ -240,3 +240,172 @@ TEST_F(TTRANSConvTest, NCHW2C1HWN1N0C0_3) { test_ttrans<int8_t, 6, 4, 8, 3, 8, 1
 TEST_F(TTRANSConvTest, NCHW2C1DHWN1N0C0_1) { test_ttrans<float, 7, 15, 4, 3, 8, 1, 24, 1, 16, 8, 1>(); }
 
 TEST_F(TTRANSConvTest, NCHW2C1DHWN1N0C0_2) { test_ttrans<int32_t, 7, 11, 14, 3, 16, 1, 96, 2, 8, 8, 1>(); }
+
+/*=========================================================================================*/
+/* Valid shape 用例                                                                        */
+/*   raw shape 只表达每维 stride 与容量；转换域完全由两侧 valid shape 决定。                 */
+/*   golden 中：valid 之外 = 哨兵 -12345（必须原样保留），valid 盒内的格式补零 = 0。        */
+/*=========================================================================================*/
+
+void LaunchTTRANSConvValid_NCHW2NC1HWC0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+void LaunchTTRANSConvValid_NC1HWC02NCHW(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+void LaunchTTRANSConvValid_NC1HWC02C1HWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+void LaunchTTRANSConvValid_GNCHW2GNC1HWC0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+void LaunchTTRANSConvValid_GNC1HWC02C1HWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+void LaunchTTRANSConvValid_NCDHW2C1DHWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+void LaunchTTRANSConvValid_NCHW2C1HWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+void LaunchTTRANSConvValid_NCHW2C1DHWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid);
+
+// 分配 -> 启动 -> 回读 -> 与 golden 逐元素比对
+template <typename T, typename LaunchFn>
+void test_ttrans_valid_impl(size_t srcFileSize, size_t dstFileSize, LaunchFn launch)
+{
+    aclInit(nullptr);
+    aclrtSetDevice(0);
+    aclrtStream stream;
+    aclrtCreateStream(&stream);
+
+    T *dstHost, *srcHost;
+    T *dstDevice, *srcDevice;
+
+    aclrtMallocHost((void**)(&dstHost), dstFileSize);
+    aclrtMallocHost((void**)(&srcHost), srcFileSize);
+
+    aclrtMalloc((void**)&dstDevice, dstFileSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&srcDevice, srcFileSize, ACL_MEM_MALLOC_HUGE_FIRST);
+
+    ReadFile(GetGoldenDir() + "/input.bin", srcFileSize, srcHost, srcFileSize);
+
+    aclrtMemcpy(srcDevice, srcFileSize, srcHost, srcFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
+
+    launch(dstDevice, srcDevice, stream);
+
+    aclrtSynchronizeStream(stream);
+    aclrtMemcpy(dstHost, dstFileSize, dstDevice, dstFileSize, ACL_MEMCPY_DEVICE_TO_HOST);
+
+    WriteFile(GetGoldenDir() + "/output.bin", dstHost, dstFileSize);
+
+    aclrtFree(dstDevice);
+    aclrtFree(srcDevice);
+
+    aclrtFreeHost(dstHost);
+    aclrtFreeHost(srcHost);
+    aclrtDestroyStream(stream);
+    aclrtResetDevice(0);
+    aclFinalize();
+
+    std::vector<T> golden(dstFileSize / sizeof(T), 0);
+    std::vector<T> result(dstFileSize / sizeof(T), 0);
+    ReadFile(GetGoldenDir() + "/golden.bin", dstFileSize, golden.data(), dstFileSize);
+    ReadFile(GetGoldenDir() + "/output.bin", dstFileSize, result.data(), dstFileSize);
+
+    bool ret = ResultCmp<T>(golden, result, 0.001f);
+
+    EXPECT_TRUE(ret);
+}
+
+// 场景 NCHW2NC1HWC0：src raw (1, 16, 8, 16) valid (1, 16, 4, 16)；dst raw (2, 4, 8, 32, 16) valid (1, 2, 4, 16, 8)
+TEST_F(TTRANSConvTest, valid_NCHW2NC1HWC0_dst_all_shrunk)
+{
+    constexpr size_t srcFileSize = (size_t)1 * 16 * 8 * 16 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)2 * 4 * 8 * 32 * 16 * sizeof(float);
+    const int64_t srcValid[4] = {1, 16, 4, 16};
+    const int64_t dstValid[5] = {1, 2, 4, 16, 8};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_NCHW2NC1HWC0(dst, src, stream, srcValid, dstValid);
+    });
+}
+
+// 场景 NC1HWC02NCHW：src raw (3, 5, 7, 9, 16) valid (2, 3, 4, 5, 8)；dst raw (3, 32, 7, 9) valid (2, 24, 4, 5)
+TEST_F(TTRANSConvTest, valid_NC1HWC02NCHW_all_dims_differ)
+{
+    constexpr size_t srcFileSize = (size_t)3 * 5 * 7 * 9 * 16 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)3 * 32 * 7 * 9 * sizeof(float);
+    const int64_t srcValid[5] = {2, 3, 4, 5, 8};
+    const int64_t dstValid[4] = {2, 24, 4, 5};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_NC1HWC02NCHW(dst, src, stream, srcValid, dstValid);
+    });
+}
+
+// 场景 NC1HWC02C1HWN1N0C0：src raw (6, 3, 4, 5, 16) valid (5, 2, 2, 3, 8)；dst raw (16, 2, 24, 16) valid (12, 1, 16, 8)
+TEST_F(TTRANSConvTest, valid_NC1HWC02C1HWN1N0C0_all_dims_differ)
+{
+    constexpr size_t srcFileSize = (size_t)6 * 3 * 4 * 5 * 16 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)16 * 2 * 24 * 16 * sizeof(float);
+    const int64_t srcValid[5] = {5, 2, 2, 3, 8};
+    const int64_t dstValid[4] = {12, 1, 16, 8};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_NC1HWC02C1HWN1N0C0(dst, src, stream, srcValid, dstValid);
+    });
+}
+
+// 场景 GNCHW2GNC1HWC0：src raw (3, 4, 10, 5, 6) valid (2, 3, 8, 4, 5)；dst raw (3, 4, 3, 5, 6, 16) valid (2, 3, 1, 4,
+// 5, 8)
+TEST_F(TTRANSConvTest, valid_GNCHW2GNC1HWC0_all_dims_differ)
+{
+    constexpr size_t srcFileSize = (size_t)3 * 4 * 10 * 5 * 6 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)3 * 4 * 3 * 5 * 6 * 16 * sizeof(float);
+    const int64_t srcValid[5] = {2, 3, 8, 4, 5};
+    const int64_t dstValid[6] = {2, 3, 1, 4, 5, 8};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_GNCHW2GNC1HWC0(dst, src, stream, srcValid, dstValid);
+    });
+}
+
+// 场景 GNC1HWC02C1HWN1N0C0：src raw (3, 4, 3, 4, 5, 16) valid (2, 3, 1, 3, 4, 8)；dst raw (28, 2, 24, 16) valid (24, 1,
+// 16, 8)
+TEST_F(TTRANSConvTest, valid_GNC1HWC02C1HWN1N0C0_all_dims_differ)
+{
+    constexpr size_t srcFileSize = (size_t)3 * 4 * 3 * 4 * 5 * 16 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)28 * 2 * 24 * 16 * sizeof(float);
+    const int64_t srcValid[6] = {2, 3, 1, 3, 4, 8};
+    const int64_t dstValid[4] = {24, 1, 16, 8};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_GNC1HWC02C1HWN1N0C0(dst, src, stream, srcValid, dstValid);
+    });
+}
+
+// 场景 NCDHW2C1DHWN1N0C0：src raw (3, 10, 3, 4, 5) valid (2, 8, 2, 3, 4)；dst raw (32, 2, 24, 16) valid (24, 1, 16, 8)
+TEST_F(TTRANSConvTest, valid_NCDHW2C1DHWN1N0C0_all_dims_differ)
+{
+    constexpr size_t srcFileSize = (size_t)3 * 10 * 3 * 4 * 5 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)32 * 2 * 24 * 16 * sizeof(float);
+    const int64_t srcValid[5] = {2, 8, 2, 3, 4};
+    const int64_t dstValid[4] = {24, 1, 16, 8};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_NCDHW2C1DHWN1N0C0(dst, src, stream, srcValid, dstValid);
+    });
+}
+
+// 场景 NCHW2C1HWN1N0C0：src raw (8, 10, 4, 6) valid (6, 8, 3, 4)；dst raw (16, 2, 24, 16) valid (12, 1, 16, 8)
+TEST_F(TTRANSConvTest, valid_NCHW2C1HWN1N0C0_all_dims_differ)
+{
+    constexpr size_t srcFileSize = (size_t)8 * 10 * 4 * 6 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)16 * 2 * 24 * 16 * sizeof(float);
+    const int64_t srcValid[4] = {6, 8, 3, 4};
+    const int64_t dstValid[4] = {12, 1, 16, 8};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_NCHW2C1HWN1N0C0(dst, src, stream, srcValid, dstValid);
+    });
+}
+
+// 场景 NCHW2C1DHWN1N0C0：src raw (6, 18, 6, 5) valid (5, 16, 4, 3)；dst raw (32, 2, 24, 16) valid (24, 1, 16, 8)
+TEST_F(TTRANSConvTest, valid_NCHW2C1DHWN1N0C0_all_dims_differ)
+{
+    constexpr size_t srcFileSize = (size_t)6 * 18 * 6 * 5 * sizeof(float);
+    constexpr size_t dstFileSize = (size_t)32 * 2 * 24 * 16 * sizeof(float);
+    const int64_t srcValid[4] = {5, 16, 4, 3};
+    const int64_t dstValid[4] = {24, 1, 16, 8};
+    test_ttrans_valid_impl<float>(srcFileSize, dstFileSize, [&](float* dst, float* src, void* stream) {
+        LaunchTTRANSConvValid_NCHW2C1DHWN1N0C0(dst, src, stream, srcValid, dstValid);
+    });
+}

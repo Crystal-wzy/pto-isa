@@ -405,6 +405,39 @@ ulimit -n 65536
   ./build_out/cann-pto-isa_*.run --devel --install-path=/your/install/path --quiet
   ```
 
+  > **Troubleshooting: install fails with `Unrecognized flag : --full` (Makeself version 2.5.0)**
+  >
+  > This error comes from the `.run` self-extracting wrapper (Makeself 2.5.0), not from the installer
+  > script. It means the makeself sources used when packaging the `.run` were NOT patched (only the
+  > patched wrapper passes `--full/--run/--devel` through to the embedded installer). Two causes have
+  > been reproduced in the wild, both in the `CANN_3RD_LIB_PATH` cache (default `third_party/`):
+  >
+  > 1. A stale unpatched `makeself/` dir in `CANN_3RD_LIB_PATH`: cann-cmake only checks that files
+  >    exist and does not verify the patch state, so it reuses the old unpatched copy;
+  > 2. A 0-byte `CANN_3RD_LIB_PATH/pkg/makeself-2.5.0.patch` (a failed download leaves an empty
+  >    placeholder): `patch` "applies" the empty file with exit code 0, so the wrapper stays
+  >    unpatched.
+  >
+  > Fix (root cause): remove both cache entries and rebuild:
+  >
+  > ```bash
+  > rm -rf third_party/makeself third_party/pkg
+  > ./build.sh --pkg
+  > ```
+  >
+  > The regenerated `.run` accepts `--full/--run/--devel` as documented above.
+  >
+  > Emergency workaround (old unpatched packages only): the unpatched wrapper rejects `--full`, but
+  > the embedded install.sh skips the first two `--` arguments, so two placeholder arguments can
+  > absorb the skip and real options start parsing from the 3rd argument on:
+  >
+  > ```bash
+  > ./cann-pto-isa_*.run --quiet --accept -- --1 --2 --full --install-path=/your/install/path
+  > ```
+  >
+  > Note: this form works only for old unpatched packages; standard packages (patched wrapper) reject
+  > placeholder arguments like `--1` — use the `--full` command above instead.
+
   Common install options:
 
   | Option | Description |

@@ -32,9 +32,10 @@ For a tile $x \in \mathbb{R}^{M \times N}$ grouped along axis `grp_axis` (ND: ax
 
 ### Integer INT8 (affine, 5-stage cast)
 
-$$q_i = \mathrm{round}\!\left(\frac{x_i}{\mathrm{scale}}\right) + \mathrm{offset}, \qquad q_i \in [-128, 127]$$
+- **INT8_SYM:** $q_i = \mathrm{clip}(\mathrm{round}(x_i \cdot \mathrm{scale}), -128, 127)$.
+- **INT8_ASYM:** $q_i = \mathrm{clip}(\mathrm{round}(x_i \cdot \mathrm{scale}) + \mathrm{offset}, 0, 255)$.
 
-No group structure; `scale` (and asymmetric `offset`) are per-tile FP32 scalars/vectors. To avoid double-rounding on A2/A3, the cast chain is `FP32 → S32 → FP32 → FP16 → INT8` (5 stages, via a `tmp` tile = src size); A5 uses native broadcast + cast (no `tmp`). Input must be **FP32**.
+No group structure; `scale` is a per-tile FP32 multiplier (normally the reciprocal of the quantization step), and asymmetric `offset` is a per-tile FP32 scalar/vector. To avoid double-rounding on A2/A3, the cast chain is `FP32 → S32 → FP32 → FP16 → INT8` (5 stages, via a `tmp` tile = src size); A5 uses native broadcast + cast (no `tmp`). Input must be **FP32**.
 
 ## C++ Intrinsics
 

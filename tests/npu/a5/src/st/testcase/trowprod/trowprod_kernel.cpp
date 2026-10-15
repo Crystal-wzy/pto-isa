@@ -155,6 +155,11 @@ extern "C" __global__ AICORE void launchTROWPRODCase18(__gm__ int16_t* out, __gm
     runTRowProd<int16_t, 31, 31, 128, 127, 1>(out, src);
 }
 
+extern "C" __global__ AICORE void launchTROWPRODCase19(__gm__ half* out, __gm__ half* src)
+{
+    runTRowProd<half, 8, 8, 1024, 1023, 1>(out, src);
+}
+
 template <uint32_t caseId>
 void launchTROWPRODTestCase(void* out, void* src, aclrtStream stream)
 {
@@ -231,6 +236,10 @@ void launchTROWPRODTestCase(void* out, void* src, aclrtStream stream)
             launchTROWPRODCase18<<<1, nullptr, stream>>>((int16_t*)out, (int16_t*)src);
             break;
         }
+        case 19: {
+            launchTROWPRODCase19<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
         default: {
         }
     }
@@ -254,3 +263,4 @@ template void launchTROWPRODTestCase<15>(void* out, void* src, aclrtStream strea
 template void launchTROWPRODTestCase<16>(void* out, void* src, aclrtStream stream);
 template void launchTROWPRODTestCase<17>(void* out, void* src, aclrtStream stream);
 template void launchTROWPRODTestCase<18>(void* out, void* src, aclrtStream stream);
+template void launchTROWPRODTestCase<19>(void* out, void* src, aclrtStream stream);

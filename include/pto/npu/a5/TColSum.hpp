@@ -158,7 +158,7 @@ __tf__ PTO_INTERNAL OP_NAME(TCOLSUM) OP_TYPE(reduce) void TColSum(
 
     if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
         Int64ColReduce<Int64Op::Add, T, TileDataOut::Cols, TileDataIn::Cols>(dst, src, validRow, validCol);
-    } else if constexpr (std::is_same_v<T, half> || std::is_same_v<T, float16_t>) {
+    } else if constexpr (std::is_same_v<T, half> || std::is_same_v<T, bfloat16_t>) {
         TColSum_Fp32Acc<T, TileDataIn::Cols>(dst, src, validRow, validCol);
     } else if constexpr (isBinary) {
         __ubuf__ T* tmp = (__ubuf__ T*)__cce_get_tile_ptr(tmpData);
@@ -202,7 +202,7 @@ __tf__ PTO_INTERNAL void TColSum(
     __ubuf__ T* src = (__ubuf__ T*)__cce_get_tile_ptr(srcData);
     if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
         Int64ColReduce<Int64Op::Add, T, TileDataOut::Cols, TileDataIn::Cols>(dst, src, validRow, validCol);
-    } else if constexpr (std::is_same_v<T, half> || std::is_same_v<T, float16_t>) {
+    } else if constexpr (std::is_same_v<T, half> || std::is_same_v<T, bfloat16_t>) {
         TColSum_Fp32Acc<T, TileDataIn::Cols>(dst, src, validRow, validCol);
     } else {
         TColReduceInstr<TColSumOp<T>, T, TileDataIn>(dst, src, validRow, validCol, version);

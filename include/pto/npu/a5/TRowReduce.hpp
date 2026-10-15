@@ -651,10 +651,54 @@ PTO_INTERNAL void TROWMAX_IMPL(TileDataOut& dst, TileDataIn& src, TileDataTmp& t
     TROWREDUCE_IMPL_COMMON<ROWMAX, Int64Op::Max, false>(dst, src);
 }
 
+// High-precision row sum for 16-bit float types: unpack to fp32, accumulate in
+// fp32 (one cross-add per repeat plus a scalar accumulation across repeats),
+// then round back to the source type once.
+template <typename T, unsigned DstRowStride, unsigned SrcRowStride>
+PTO_INTERNAL void TRowSum_Fp32Acc(__ubuf__ T* dst, __ubuf__ T* src, unsigned validRows, unsigned validCols)
+{
+    constexpr unsigned elmPerRpt = CCE_VL / sizeof(float);
+    constexpr auto distValue =
+        std::integral_constant<::DistVST, static_cast<::DistVST>(GetDistVst<T, DistVST::DIST_ONEPT>())>();
+    uint16_t repeatTimes = CeilDivision(validCols, elmPerRpt);
+
+    __VEC_SCOPE__
+    {
+        RegTensor<T> srcB16VReg;
+        RegTensor<T> dstB16VReg;
+        RegTensor<float> srcF32VReg;
+        RegTensor<float> accF32VReg;
+        MaskReg pRegOne = pset_b32(PAT_VL1);
+        uint32_t dstItems = 1;
+        MaskReg pRegDst = CreatePredicate<T>(dstItems);
+        for (uint16_t i = 0; i < (uint16_t)validRows; ++i) {
+            uint32_t sreg = validCols;
+            vbr(accF32VReg, 0.0f);
+            for (uint16_t j = 0; j < repeatTimes; ++j) {
+                MaskReg pRegB32 = CreatePredicate<float>(sreg);
+                vlds(srcB16VReg, src, i * SrcRowStride + j * elmPerRpt, UNPK_B16);
+                vcvt(srcF32VReg, srcB16VReg, pRegB32, PART_EVEN);
+                vcadd(srcF32VReg, srcF32VReg, pRegB32, MODE_ZEROING);
+                vadd(accF32VReg, accF32VReg, srcF32VReg, pRegOne, MODE_ZEROING);
+            }
+            vcvt(dstB16VReg, accF32VReg, pRegOne, ROUND_R, RS_DISABLE, PART_EVEN);
+            vsts(dstB16VReg, dst, i * DstRowStride, distValue, pRegDst);
+        }
+    } // end VF
+}
+
 template <typename TileDataOut, typename TileDataIn, typename TileDataTmp>
 PTO_INTERNAL void TROWSUM_IMPL(TileDataOut& dst, TileDataIn& src, TileDataTmp& tmp)
 {
-    TROWREDUCE_IMPL_COMMON<ROWSUM, Int64Op::Add, true>(dst, src);
+    using T = typename TileDataIn::DType;
+    if constexpr (std::is_same_v<T, half>) {
+        // High-precision path: convert fp16 to fp32, accumulate in fp32, round back once.
+        TRowReduceCheck<TileDataOut, TileDataIn>(src.GetValidRow(), src.GetValidCol(), dst.GetValidRow());
+        TRowSum_Fp32Acc<half, TileDataOut::RowStride, TileDataIn::RowStride>(
+            (__ubuf__ half*)dst.data(), (__ubuf__ half*)src.data(), src.GetValidRow(), src.GetValidCol());
+    } else {
+        TROWREDUCE_IMPL_COMMON<ROWSUM, Int64Op::Add, true>(dst, src);
+    }
 }
 
 template <typename TileDataOut, typename TileDataIn, typename TileDataTmp>

@@ -13,7 +13,20 @@
 import os
 import numpy as np
 
+try:
+    import ml_dtypes
+
+    bfloat16 = ml_dtypes.bfloat16
+except ModuleNotFoundError:
+    bfloat16 = object()
+
 np.random.seed(19)
+
+
+def gen_bf16_fp32_acc_golden(input_arr, valid_row, valid_col):
+    output_arr = np.zeros((input_arr.shape[1]), dtype=bfloat16)
+    output_arr[:valid_col] = input_arr[:valid_row, :valid_col].astype(np.float32).sum(axis=0).astype(bfloat16)
+    return output_arr
 
 
 def gen_half_fp32_acc_golden(input_arr, valid_row, valid_col):
@@ -181,6 +194,8 @@ def gen_golden_data(param):
         output_arr[:valid_col] = input_arr[:valid_row, :valid_col].sum(axis=0, dtype=data_type)
     elif data_type == np.float16:
         output_arr = gen_half_fp32_acc_golden(input_arr, valid_row, valid_col)
+    elif data_type == bfloat16:
+        output_arr = gen_bf16_fp32_acc_golden(input_arr, valid_row, valid_col)
     else:
         output_arr = np.zeros((col))
         for i in range(valid_row):
@@ -244,6 +259,13 @@ if __name__ == "__main__":
         TColsumParams("TCOLSUMTest.case_uint64_2x4_valid4_guard", np.uint64, 2, 2, 4, 4, check_guard=True),
         TColsumParams("TCOLSUMTest.case_uint64_2x36_valid33_guard", np.uint64, 2, 2, 36, 33, check_guard=True),
         TColsumParams("TCOLSUMTest.case_uint64_2x68_valid65_guard", np.uint64, 2, 2, 68, 65, check_guard=True),
+        # bf16 high-precision (fp32 accumulation) cases.
+        TColsumParams("TCOLSUMTest.case61", bfloat16, 1, 1, 256, 255),
+        TColsumParams("TCOLSUMTest.case62", bfloat16, 16, 16, 128, 127),
+        TColsumParams("TCOLSUMTest.case63", bfloat16, 16, 15, 256, 255),
+        TColsumParams("TCOLSUMTest.case64", bfloat16, 64, 63, 128, 127, True),
+        TColsumParams("TCOLSUMTest.case65", bfloat16, 64, 64, 128, 128, True),
+        TColsumParams("TCOLSUMTest.case66", bfloat16, 63, 63, 256, 255, True),
     ]
 
     for _, case in enumerate(case_params_list):

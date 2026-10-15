@@ -9,6 +9,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 */
 
 #include <cstdlib>
+#include <utility>
 #include <pto/pto-inst.hpp>
 #include <pto/common/constants.hpp>
 #include <pto/common/debug.h>
@@ -559,3 +560,227 @@ template void LaunchTTRANSConv<int8_t, 6, 4, 8, 3, 8, 1, 24, 1, 32, 32, 1, 1, 1>
 template void LaunchTTRANSConv<float, 7, 15, 4, 3, 8, 1, 24, 1, 16, 8, 1, 1, 1>(float* out, float* src, void* stream);
 template void LaunchTTRANSConv<int32_t, 7, 11, 14, 3, 16, 1, 96, 2, 8, 8, 1, 1, 1>(
     int32_t* out, int32_t* src, void* stream);
+
+/*=========================================================================================*/
+/* Valid shape 用例                                                                          */
+/*                                                                                          */
+/* raw shape（声明的 ConvTileShape）只表达每维 stride 与容量，与格式转换无关；                */
+/* 转换的全部尺寸由两侧各自的 valid shape 决定（valid 域本身即一个同格式的小张量）。           */
+/* 每个场景的 src 与 dst，raw shape 与 valid shape 的每一维都不同。                           */
+/*=========================================================================================*/
+
+// valid 之外必须原样保留的哨兵值
+constexpr int kValidSentinel = -12345;
+
+// 把 valid 取值数组展开成 SetValidShape 的实参（参数个数 = tile 的动态维个数，编译期已知）
+template <typename TileT, std::size_t... Is>
+AICORE void SetValidShapeFromArray(TileT& tile, const int64_t* vals, std::index_sequence<Is...>)
+{
+    tile.SetValidShape(vals[Is]...);
+}
+
+// 通用实现：raw/valid 形状全部写在 ConvTile 类型里（raw 管 buffer 与地址，valid 管处理域）；
+// dst 整块预填哨兵，TTRANS 只允许写 dst valid 盒（盒内按格式补零），盒外必须原样保留。
+template <typename SrcConvTile, typename DstConvTile, typename T>
+AICORE void TTRANSConvValidImpl(
+    __gm__ T __out__* out, __gm__ T __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    constexpr size_t srcElemNum = SrcConvTile::bufferSize / sizeof(T);
+    constexpr size_t dstElemNum = DstConvTile::bufferSize / sizeof(T);
+
+    using SrcShapeDim5 = Shape<1, 1, 1, 1, srcElemNum>;
+    using SrcStrideDim5 = pto::Stride<srcElemNum, srcElemNum, srcElemNum, srcElemNum, 1>;
+    using SrcGlobalData = GlobalTensor<T, SrcShapeDim5, SrcStrideDim5>;
+
+    using DstShapeDim5 = Shape<1, 1, 1, 1, dstElemNum>;
+    using DstStrideDim5 = pto::Stride<dstElemNum, dstElemNum, dstElemNum, dstElemNum, 1>;
+    using DstGlobalData = GlobalTensor<T, DstShapeDim5, DstStrideDim5>;
+
+    using SrcTileData = Tile<TileType::Vec, T, 1, srcElemNum, BLayout::RowMajor, 1, srcElemNum>;
+    using DstTileData = Tile<TileType::Vec, T, 1, dstElemNum, BLayout::RowMajor, 1, dstElemNum>;
+
+    SrcTileData src0Tile;
+    DstTileData dst0Tile;
+
+    TASSIGN(src0Tile, 0x0);
+    TASSIGN(dst0Tile, 0x0 + SrcConvTile::bufferSize);
+
+    SrcConvTile srcTile;
+    DstConvTile dstTile;
+
+    srcTile.data() = src0Tile.data();
+    dstTile.data() = dst0Tile.data();
+
+    SetValidShapeFromArray(srcTile, srcValid, std::make_index_sequence<SrcConvTile::validDynamicDimCount>{});
+    SetValidShapeFromArray(dstTile, dstValid, std::make_index_sequence<DstConvTile::validDynamicDimCount>{});
+
+    std::fill((T*)dstTile.data(), (T*)dstTile.data() + dstElemNum, static_cast<T>(kValidSentinel));
+
+    // Not used internally, just for placeholder
+    using TmpTileData = Tile<TileType::Vec, T, 1, 32, BLayout::RowMajor, 1, 32>;
+    TmpTileData tmpTile;
+    TASSIGN(tmpTile, 0x0 + SrcConvTile::bufferSize + DstConvTile::bufferSize);
+
+    SrcGlobalData srcGlobal(src);
+    DstGlobalData dstGlobal(out);
+
+    TLOAD(src0Tile, srcGlobal);
+    TTRANS(dstTile, srcTile, tmpTile);
+    TSTORE(dstGlobal, dst0Tile);
+}
+
+/*--------------------------- 各场景 kernel（一个场景一个） ---------------------------*/
+
+// 场景 1：NCHW -> NC1HWC0；src raw (1,16,8,16) valid (1,16,4,16)；dst raw (2,4,8,32,16) valid (1,2,4,16,8)
+__global__ AICORE void runTTRANSConvValid_NCHW2NC1HWC0(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile =
+        ConvTile<TileType::Vec, float, 1 * 16 * 8 * 16 * 4, Layout::NCHW, ConvTileShape<1, 16, 8, 16>, SrcValid>;
+    using DstConvTile = ConvTile<
+        TileType::Vec, float, 2 * 4 * 8 * 32 * 16 * 4, Layout::NC1HWC0, ConvTileShape<2, 4, 8, 32, 16>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+// 场景 2：NC1HWC0 -> NCHW；src raw (3,5,7,9,16) valid (2,3,4,5,8)；dst raw (3,32,7,9) valid (2,24,4,5)
+__global__ AICORE void runTTRANSConvValid_NC1HWC02NCHW(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile = ConvTile<
+        TileType::Vec, float, 3 * 5 * 7 * 9 * 16 * 4, Layout::NC1HWC0, ConvTileShape<3, 5, 7, 9, 16>, SrcValid>;
+    using DstConvTile =
+        ConvTile<TileType::Vec, float, 3 * 32 * 7 * 9 * 4, Layout::NCHW, ConvTileShape<3, 32, 7, 9>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+// 场景 3：NC1HWC0 -> FRACTAL_Z；src raw (6,3,4,5,16) valid (5,2,2,3,8)；dst raw (16,2,24,16) valid (12,1,16,8)
+__global__ AICORE void runTTRANSConvValid_NC1HWC02C1HWN1N0C0(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile = ConvTile<
+        TileType::Vec, float, 6 * 3 * 4 * 5 * 16 * 4, Layout::NC1HWC0, ConvTileShape<6, 3, 4, 5, 16>, SrcValid>;
+    using DstConvTile =
+        ConvTile<TileType::Vec, float, 16 * 2 * 24 * 16 * 4, Layout::FRACTAL_Z, ConvTileShape<16, 2, 24, 16>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+// 场景 4：GNCHW -> GNC1HWC0；src raw (3,4,10,5,6) valid (2,3,8,4,5)；dst raw (3,4,3,5,6,16) valid (2,3,1,4,5,8)
+__global__ AICORE void runTTRANSConvValid_GNCHW2GNC1HWC0(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile =
+        ConvTile<TileType::Vec, float, 3 * 4 * 10 * 5 * 6 * 4, Layout::GNCHW, ConvTileShape<3, 4, 10, 5, 6>, SrcValid>;
+    using DstConvTile = ConvTile<
+        TileType::Vec, float, 3 * 4 * 3 * 5 * 6 * 16 * 4, Layout::GNC1HWC0, ConvTileShape<3, 4, 3, 5, 6, 16>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+// 场景 5：GNC1HWC0 -> FRACTAL_Z；src raw (3,4,3,4,5,16) valid (2,3,1,3,4,8)；dst raw (28,2,24,16) valid (24,1,16,8)
+__global__ AICORE void runTTRANSConvValid_GNC1HWC02C1HWN1N0C0(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile = ConvTile<
+        TileType::Vec, float, 3 * 4 * 3 * 4 * 5 * 16 * 4, Layout::GNC1HWC0, ConvTileShape<3, 4, 3, 4, 5, 16>, SrcValid>;
+    using DstConvTile =
+        ConvTile<TileType::Vec, float, 28 * 2 * 24 * 16 * 4, Layout::FRACTAL_Z, ConvTileShape<28, 2, 24, 16>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+// 场景 6：NCDHW -> FRACTAL_Z_3D；src raw (3,10,3,4,5) valid (2,8,2,3,4)；dst raw (32,2,24,16) valid (24,1,16,8)
+__global__ AICORE void runTTRANSConvValid_NCDHW2C1DHWN1N0C0(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile =
+        ConvTile<TileType::Vec, float, 3 * 10 * 3 * 4 * 5 * 4, Layout::NCDHW, ConvTileShape<3, 10, 3, 4, 5>, SrcValid>;
+    using DstConvTile = ConvTile<
+        TileType::Vec, float, 32 * 2 * 24 * 16 * 4, Layout::FRACTAL_Z_3D, ConvTileShape<32, 2, 24, 16>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+// 场景 7：NCHW -> FRACTAL_Z；src raw (8,10,4,6) valid (6,8,3,4)；dst raw (16,2,24,16) valid (12,1,16,8)
+__global__ AICORE void runTTRANSConvValid_NCHW2C1HWN1N0C0(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile =
+        ConvTile<TileType::Vec, float, 8 * 10 * 4 * 6 * 4, Layout::NCHW, ConvTileShape<8, 10, 4, 6>, SrcValid>;
+    using DstConvTile =
+        ConvTile<TileType::Vec, float, 16 * 2 * 24 * 16 * 4, Layout::FRACTAL_Z, ConvTileShape<16, 2, 24, 16>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+// 场景 8：NCHW -> FRACTAL_Z_3D；src raw (6,18,6,5) valid (5,16,4,3)；dst raw (32,2,24,16) valid (24,1,16,8)
+__global__ AICORE void runTTRANSConvValid_NCHW2C1DHWN1N0C0(
+    __gm__ float __out__* out, __gm__ float __in__* src, const int64_t* srcValid, const int64_t* dstValid)
+{
+    using SrcValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using DstValid = ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>;
+    using SrcConvTile =
+        ConvTile<TileType::Vec, float, 6 * 18 * 6 * 5 * 4, Layout::NCHW, ConvTileShape<6, 18, 6, 5>, SrcValid>;
+    using DstConvTile = ConvTile<
+        TileType::Vec, float, 32 * 2 * 24 * 16 * 4, Layout::FRACTAL_Z_3D, ConvTileShape<32, 2, 24, 16>, DstValid>;
+    TTRANSConvValidImpl<SrcConvTile, DstConvTile, float>(out, src, srcValid, dstValid);
+}
+
+/*--------------------------- 启动器 ---------------------------*/
+
+void LaunchTTRANSConvValid_NCHW2NC1HWC0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_NCHW2NC1HWC0(out, src, srcValid, dstValid);
+}
+
+void LaunchTTRANSConvValid_NC1HWC02NCHW(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_NC1HWC02NCHW(out, src, srcValid, dstValid);
+}
+
+void LaunchTTRANSConvValid_NC1HWC02C1HWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_NC1HWC02C1HWN1N0C0(out, src, srcValid, dstValid);
+}
+
+void LaunchTTRANSConvValid_GNCHW2GNC1HWC0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_GNCHW2GNC1HWC0(out, src, srcValid, dstValid);
+}
+
+void LaunchTTRANSConvValid_GNC1HWC02C1HWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_GNC1HWC02C1HWN1N0C0(out, src, srcValid, dstValid);
+}
+
+void LaunchTTRANSConvValid_NCDHW2C1DHWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_NCDHW2C1DHWN1N0C0(out, src, srcValid, dstValid);
+}
+
+void LaunchTTRANSConvValid_NCHW2C1HWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_NCHW2C1HWN1N0C0(out, src, srcValid, dstValid);
+}
+
+void LaunchTTRANSConvValid_NCHW2C1DHWN1N0C0(
+    float* out, float* src, void* stream, const int64_t* srcValid, const int64_t* dstValid)
+{
+    runTTRANSConvValid_NCHW2C1DHWN1N0C0(out, src, srcValid, dstValid);
+}
