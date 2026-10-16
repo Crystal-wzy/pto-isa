@@ -129,3 +129,5 @@ TEST_F(TROWPRODTest, case16) { TRowProdTestFramework<16, int16_t, 16, 1, 1, 16, 
 TEST_F(TROWPRODTest, case17) { TRowProdTestFramework<17, int16_t, 32, 26, 19, 32, 32>(); }
 
 TEST_F(TROWPRODTest, case18) { TRowProdTestFramework<18, int16_t, 16, 1, 1, 16, 16>(); }
+
+TEST_F(TROWPRODTest, case19) { TRowProdTestFramework<19, float, 40, 40, 40, 400, 400>(); }
