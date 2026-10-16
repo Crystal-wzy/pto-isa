@@ -240,42 +240,42 @@ TEST_F(TROWSUMTest, case_uint64_32x145_dndst)
 
 TEST_F(TROWSUMTest, case_int64_64x16_nddst4_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<100, int64_t, 64, 64, 16, 16, 4, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<102, int64_t, 64, 64, 16, 16, 4, true>()));
 }
 
 TEST_F(TROWSUMTest, case_int64_8x16_dndst_valid5_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<101, int64_t, 8, 5, 16, 16, 1, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<103, int64_t, 8, 5, 16, 16, 1, true>()));
 }
 
 TEST_F(TROWSUMTest, case_int64_8x16_dndst_valid6_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<102, int64_t, 8, 6, 16, 16, 1, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<104, int64_t, 8, 6, 16, 16, 1, true>()));
 }
 
 TEST_F(TROWSUMTest, case_int64_8x16_dndst_valid7_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<103, int64_t, 8, 7, 16, 16, 1, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<105, int64_t, 8, 7, 16, 16, 1, true>()));
 }
 
 TEST_F(TROWSUMTest, case_uint64_64x16_nddst4_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<104, uint64_t, 64, 64, 16, 16, 4, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<106, uint64_t, 64, 64, 16, 16, 4, true>()));
 }
 
 TEST_F(TROWSUMTest, case_uint64_8x16_dndst_valid5_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<105, uint64_t, 8, 5, 16, 16, 1, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<107, uint64_t, 8, 5, 16, 16, 1, true>()));
 }
 
 TEST_F(TROWSUMTest, case_uint64_8x16_dndst_valid6_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<106, uint64_t, 8, 6, 16, 16, 1, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<108, uint64_t, 8, 6, 16, 16, 1, true>()));
 }
 
 TEST_F(TROWSUMTest, case_uint64_8x16_dndst_valid7_guard)
 {
-    EXPECT_TRUE((TRowSumTestFramework<107, uint64_t, 8, 7, 16, 16, 1, true>()));
+    EXPECT_TRUE((TRowSumTestFramework<109, uint64_t, 8, 7, 16, 16, 1, true>()));
 }
 
 TEST_F(TROWSUMTest, case47)
@@ -337,7 +337,6 @@ TEST_F(TROWSUMTest, case56)
     bool ret = TRowSumTestFramework<56, uint16_t, 8, 8, 448, 448, 1>();
     EXPECT_TRUE(ret);
 }
-
 TEST_F(TROWSUMTest, case57)
 {
     bool ret = TRowSumTestFramework<57, aclFloat16, 8, 8, 448, 447, 1>();
@@ -347,5 +346,137 @@ TEST_F(TROWSUMTest, case57)
 TEST_F(TROWSUMTest, case58)
 {
     bool ret = TRowSumTestFramework<58, aclFloat16, 64, 64, 128, 128, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_1x1)
+{
+    bool ret = TRowSumTestFramework<59, float, 8, 8, 8, 1, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_1x8192)
+{
+    bool ret = TRowSumTestFramework<60, float, 1, 1, 8192, 8192, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_512x64)
+{
+    bool ret = TRowSumTestFramework<61, float, 256, 256, 64, 64, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_16x2048)
+{
+    bool ret = TRowSumTestFramework<62, float, 8, 8, 2048, 2048, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_64x64_vc1)
+{
+    bool ret = TRowSumTestFramework<63, float, 64, 64, 64, 1, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_63x65)
+{
+    bool ret = TRowSumTestFramework<64, float, 63, 63, 72, 65, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_33x129_v127)
+{
+    bool ret = TRowSumTestFramework<65, float, 33, 33, 136, 129, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_238x320)
+{
+    bool ret = TRowSumTestFramework<66, float, 238, 237, 80, 79, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f16_64x128)
+{
+    bool ret = TRowSumTestFramework<67, aclFloat16, 64, 64, 128, 128, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f16_32x256_v255)
+{
+    bool ret = TRowSumTestFramework<68, aclFloat16, 32, 32, 256, 255, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f16_16x512)
+{
+    bool ret = TRowSumTestFramework<69, aclFloat16, 16, 16, 512, 512, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f16_8x1024)
+{
+    bool ret = TRowSumTestFramework<70, aclFloat16, 8, 8, 1024, 1024, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f16_30x216_v24)
+{
+    bool ret = TRowSumTestFramework<71, aclFloat16, 30, 30, 224, 24, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_u32_31x128_v127)
+{
+    bool ret = TRowSumTestFramework<80, uint32_t, 31, 31, 128, 127, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_u16_32x128_v127)
+{
+    bool ret = TRowSumTestFramework<81, uint16_t, 32, 32, 128, 127, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_ubcap_106x192)
+{
+    bool ret = TRowSumTestFramework<82, float, 106, 105, 192, 191, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_1x16384)
+{
+    bool ret = TRowSumTestFramework<83, float, 1, 1, 16384, 16384, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_vrow11_30x216)
+{
+    bool ret = TRowSumTestFramework<84, float, 30, 11, 216, 216, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_vrow1_64x64)
+{
+    bool ret = TRowSumTestFramework<85, float, 64, 1, 64, 64, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f32_prime_251x128)
+{
+    bool ret = TRowSumTestFramework<86, float, 251, 250, 96, 95, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_f16_ubcap_128x320)
+{
+    bool ret = TRowSumTestFramework<87, aclFloat16, 128, 127, 320, 319, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case_s16_ubcap_200x208)
+{
+    bool ret = TRowSumTestFramework<88, int16_t, 200, 199, 208, 207, 1>();
     EXPECT_TRUE(ret);
 }

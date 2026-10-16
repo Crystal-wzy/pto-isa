@@ -90,6 +90,24 @@ if __name__ == "__main__":
         TRowMaxParams("TROWMAXTest.case26", np.int16, 32, 32, 128, 128),
         TRowMaxParams("TROWMAXTest.case27", np.int16, 16, 16, 192, 192),
         TRowMaxParams("TROWMAXTest.case28", np.int16, 8, 8, 448, 448),
+        # traversal-optimization cases (issue #1)
+        TRowMaxParams("TROWMAXTest.case29", np.float32, 4, 4, 6144, 6144),
+        TRowMaxParams("TROWMAXTest.case30", np.float32, 16, 16, 2032, 2032),
+        TRowMaxParams("TROWMAXTest.case31", np.float32, 12, 12, 2048, 2048),
+        TRowMaxParams("TROWMAXTest.case32", np.float32, 8, 8, 2560, 2560),
+        TRowMaxParams("TROWMAXTest.case33", np.float16, 3, 3, 16384, 16384),
+        TRowMaxParams("TROWMAXTest.case34", np.float16, 1, 1, 32768, 32768),
+        TRowMaxParams("TROWMAXTest.case35", np.float32, 2, 2, 12288, 12288),
+        TRowMaxParams("TROWMAXTest.case36", np.float32, 48, 48, 512, 512),
+        TRowMaxParams("TROWMAXTest.case37", np.float16, 3, 3, 8192, 8189),
+        TRowMaxParams("TROWMAXTest.case38", np.float32, 4, 4, 6144, 6141),
+        TRowMaxParams("TROWMAXTest.case39", np.float32, 32, 32, 256, 256),
+        TRowMaxParams("TROWMAXTest.case40", np.float32, 12, 12, 1024, 1024),
+        TRowMaxParams("TROWMAXTest.case41", np.float32, 16, 16, 1024, 1024),
+        TRowMaxParams("TROWMAXTest.case42", np.float16, 8, 8, 2048, 2048),
+        TRowMaxParams("TROWMAXTest.case43", np.float32, 6, 6, 4096, 4096),
+        TRowMaxParams("TROWMAXTest.case44", np.float16, 2, 2, 8192, 8192),
+        TRowMaxParams("TROWMAXTest.case45", np.float16, 8, 8, 4096, 4096),
     ]
 
     for _, case in enumerate(case_params_list):

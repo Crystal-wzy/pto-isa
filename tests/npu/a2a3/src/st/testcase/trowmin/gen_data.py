@@ -88,6 +88,11 @@ if __name__ == "__main__":
         TRowMinParams("TROWMINTest.case26", np.int16, 32, 32, 128, 128),
         TRowMinParams("TROWMINTest.case27", np.int16, 16, 16, 192, 192),
         TRowMinParams("TROWMINTest.case28", np.int16, 8, 8, 448, 448),
+        # traversal-optimization cases (issue #1)
+        TRowMinParams("TROWMINTest.case29", np.float32, 4, 4, 6144, 6144),
+        TRowMinParams("TROWMINTest.case30", np.float32, 16, 16, 2032, 2032),
+        TRowMinParams("TROWMINTest.case31", np.float32, 12, 12, 2048, 2048),
+        TRowMinParams("TROWMINTest.case32", np.float32, 48, 48, 512, 512),
     ]
 
     for _, case in enumerate(case_params_list):

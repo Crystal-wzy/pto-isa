@@ -212,3 +212,15 @@ TEST_F(TROWSUMTest, case20)
     bool ret = TRowSumTestFramework<20, int16_t, 8, 8, 448, 448, 1>();
     EXPECT_TRUE(ret);
 }
+
+TEST_F(TROWSUMTest, case21)
+{
+    bool ret = TRowSumTestFramework<21, float, 4, 4, 6144, 6144, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWSUMTest, case22)
+{
+    bool ret = TRowSumTestFramework<22, float, 12, 12, 2048, 2048, 1>();
+    EXPECT_TRUE(ret);
+}

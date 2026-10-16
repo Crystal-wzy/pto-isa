@@ -88,6 +88,42 @@ PTO_INTERNAL void runTRowSumDNDst(__gm__ T* out, __gm__ T* src)
     TSTORE(dstGlobal, dstTileND);
 }
 
+// Narrowed-tmp variant: tmp = half row width (the pairwise-tree working set),
+// for wide rows where src + full-pitch tmp exceeds UB
+template <typename T, int row, int validRow, int srcCol, int srcValidCol, int dstCol, int tmpCol>
+PTO_INTERNAL void runTRowSumNarrowTmp(__gm__ T* out, __gm__ T* src)
+{
+    using DynDim2Shape = Shape<1, 1, 1, -1, -1>;
+    using DynDim2StrideSrc = pto::Stride<1, 1, -1, -1, 1>;
+    using DynDim2StrideDst = pto::Stride<1, 1, 1, -1, -1>;
+
+    using GlobalDataSrc = GlobalTensor<T, DynDim2Shape, DynDim2StrideSrc>;
+    using GlobalDataDst = GlobalTensor<T, DynDim2Shape, DynDim2StrideDst>;
+    GlobalDataSrc srcGlobal(src, DynDim2Shape(validRow, srcValidCol), DynDim2StrideSrc(row, srcCol));
+    GlobalDataDst dstGlobal(out, DynDim2Shape(validRow, dstCol), DynDim2StrideDst(dstCol, row));
+    using srcTileData = Tile<TileType::Vec, T, row, srcCol, BLayout::RowMajor, -1, -1>;
+    using dstTileData = Tile<TileType::Vec, T, row, 16, BLayout::RowMajor, -1, -1>;
+    using tmpTileData = Tile<TileType::Vec, T, row, tmpCol, BLayout::RowMajor, -1, -1>;
+    srcTileData srcTile(validRow, srcValidCol);
+    tmpTileData tmpTile(validRow, tmpCol);
+    dstTileData dstTile(validRow, dstCol);
+    TASSIGN<0x0>(srcTile);
+    TASSIGN<row * srcCol * sizeof(T)>(tmpTile);
+    TASSIGN<(row * srcCol + row * tmpCol) * sizeof(T)>(dstTile);
+
+    TLOAD(srcTile, srcGlobal);
+#ifndef __PTO_AUTO__
+    set_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
+    wait_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
+#endif
+    TROWSUM(dstTile, srcTile, tmpTile);
+#ifndef __PTO_AUTO__
+    set_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
+    wait_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
+#endif
+    TSTORE(dstGlobal, dstTile);
+}
+
 extern "C" __global__ AICORE void launchTROWSUMCase1(__gm__ float* out, __gm__ float* src)
 {
     runTRowSum<float, 127, 127, 64, 63, 1>(out, src);
@@ -171,6 +207,16 @@ extern "C" __global__ AICORE void launchTROWSUMCase19(__gm__ int16_t* out, __gm_
 extern "C" __global__ AICORE void launchTROWSUMCase20(__gm__ int16_t* out, __gm__ int16_t* src)
 {
     runTRowSum<int16_t, 8, 8, 448, 448, 1>(out, src);
+}
+
+// traversal-control cases (issue #1): sum keeps its pairwise tree, only the narrowed tmp footprint
+extern "C" __global__ AICORE void launchTROWSUMCase21(__gm__ float* out, __gm__ float* src)
+{
+    runTRowSumNarrowTmp<float, 4, 4, 6144, 6144, 1, 3072>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWSUMCase22(__gm__ float* out, __gm__ float* src)
+{
+    runTRowSumNarrowTmp<float, 12, 12, 2048, 2048, 1, 1024>(out, src);
 }
 
 template <uint32_t caseId>
@@ -257,6 +303,14 @@ void launchTROWSUMTestCase(void* out, void* src, aclrtStream stream)
             launchTROWSUMCase20<<<1, nullptr, stream>>>((int16_t*)out, (int16_t*)src);
             break;
         }
+        case 21: {
+            launchTROWSUMCase21<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 22: {
+            launchTROWSUMCase22<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
         default: {
         }
     }
@@ -282,3 +336,5 @@ template void launchTROWSUMTestCase<17>(void* out, void* src, aclrtStream stream
 template void launchTROWSUMTestCase<18>(void* out, void* src, aclrtStream stream);
 template void launchTROWSUMTestCase<19>(void* out, void* src, aclrtStream stream);
 template void launchTROWSUMTestCase<20>(void* out, void* src, aclrtStream stream);
+template void launchTROWSUMTestCase<21>(void* out, void* src, aclrtStream stream);
+template void launchTROWSUMTestCase<22>(void* out, void* src, aclrtStream stream);

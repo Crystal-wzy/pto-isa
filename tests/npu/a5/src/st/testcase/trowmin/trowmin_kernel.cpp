@@ -395,6 +395,136 @@ extern "C" __global__ AICORE void launchTROWMINCase56(__gm__ uint16_t* out, __gm
     runTRowMin<uint16_t, 8, 8, 448, 448, 1>(out, src);
 }
 
+extern "C" __global__ AICORE void launchTROWMINCase57(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 8, 8, 8, 1, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase58(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 1, 1, 8192, 8192, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase59(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 256, 256, 64, 64, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase60(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 8, 8, 2048, 2048, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase61(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 64, 64, 64, 1, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase62(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 63, 63, 72, 65, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase63(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 33, 33, 136, 129, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase64(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 238, 237, 80, 79, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase65(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMin<half, 64, 64, 128, 128, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase66(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMin<half, 32, 32, 256, 255, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase67(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMin<half, 16, 16, 512, 512, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase68(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMin<half, 8, 8, 1024, 1024, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase69(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMin<half, 30, 30, 224, 24, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase70(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMin<int8_t, 128, 128, 256, 256, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase71(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMin<int8_t, 64, 64, 256, 255, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase72(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMin<int8_t, 32, 32, 256, 256, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase73(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMin<int8_t, 16, 16, 256, 255, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase74(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMin<int8_t, 8, 8, 512, 512, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase75(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMin<uint8_t, 128, 128, 256, 256, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase76(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMin<uint8_t, 8, 8, 512, 511, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase77(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMin<uint8_t, 2, 2, 2048, 2048, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase78(__gm__ uint32_t* out, __gm__ uint32_t* src)
+{
+    runTRowMin<uint32_t, 31, 31, 128, 127, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase79(__gm__ uint16_t* out, __gm__ uint16_t* src)
+{
+    runTRowMin<uint16_t, 32, 32, 128, 127, 1>(out, src);
+}
+
+extern "C" __global__ AICORE void launchTROWMINCase80(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 106, 105, 192, 191, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase81(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 1, 1, 16384, 16384, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase82(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 30, 11, 216, 216, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase83(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 64, 1, 64, 64, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase84(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMin<float, 251, 250, 96, 95, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase85(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMin<half, 128, 127, 320, 319, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase86(__gm__ int16_t* out, __gm__ int16_t* src)
+{
+    runTRowMin<int16_t, 200, 199, 208, 207, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase87(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMin<int8_t, 88, 87, 896, 887, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase88(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMin<uint8_t, 88, 87, 896, 887, 1, 32>(out, src);
+}
+
 template <uint32_t caseId>
 void launchTROWMINTestCase(void* out, void* src, aclrtStream stream)
 {
@@ -623,6 +753,134 @@ void launchTROWMINTestCase(void* out, void* src, aclrtStream stream)
             launchTROWMINCase56<<<1, nullptr, stream>>>((uint16_t*)out, (uint16_t*)src);
             break;
         }
+        case 57: {
+            launchTROWMINCase57<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 58: {
+            launchTROWMINCase58<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 59: {
+            launchTROWMINCase59<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 60: {
+            launchTROWMINCase60<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 61: {
+            launchTROWMINCase61<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 62: {
+            launchTROWMINCase62<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 63: {
+            launchTROWMINCase63<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 64: {
+            launchTROWMINCase64<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 65: {
+            launchTROWMINCase65<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 66: {
+            launchTROWMINCase66<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 67: {
+            launchTROWMINCase67<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 68: {
+            launchTROWMINCase68<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 69: {
+            launchTROWMINCase69<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 70: {
+            launchTROWMINCase70<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 71: {
+            launchTROWMINCase71<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 72: {
+            launchTROWMINCase72<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 73: {
+            launchTROWMINCase73<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 74: {
+            launchTROWMINCase74<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 75: {
+            launchTROWMINCase75<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
+        case 76: {
+            launchTROWMINCase76<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
+        case 77: {
+            launchTROWMINCase77<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
+        case 78: {
+            launchTROWMINCase78<<<1, nullptr, stream>>>((uint32_t*)out, (uint32_t*)src);
+            break;
+        }
+        case 79: {
+            launchTROWMINCase79<<<1, nullptr, stream>>>((uint16_t*)out, (uint16_t*)src);
+            break;
+        }
+        case 80: {
+            launchTROWMINCase80<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 81: {
+            launchTROWMINCase81<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 82: {
+            launchTROWMINCase82<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 83: {
+            launchTROWMINCase83<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 84: {
+            launchTROWMINCase84<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 85: {
+            launchTROWMINCase85<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 86: {
+            launchTROWMINCase86<<<1, nullptr, stream>>>((int16_t*)out, (int16_t*)src);
+            break;
+        }
+        case 87: {
+            launchTROWMINCase87<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 88: {
+            launchTROWMINCase88<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
         default: {
         }
     }
@@ -684,3 +942,35 @@ template void launchTROWMINTestCase<53>(void* out, void* src, aclrtStream stream
 template void launchTROWMINTestCase<54>(void* out, void* src, aclrtStream stream);
 template void launchTROWMINTestCase<55>(void* out, void* src, aclrtStream stream);
 template void launchTROWMINTestCase<56>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<57>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<58>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<59>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<60>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<61>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<62>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<63>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<64>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<65>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<66>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<67>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<68>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<69>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<70>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<71>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<72>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<73>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<74>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<75>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<76>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<77>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<78>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<79>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<80>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<81>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<82>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<83>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<84>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<85>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<86>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<87>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<88>(void* out, void* src, aclrtStream stream);

@@ -18,8 +18,39 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #endif
 
 namespace pto {
+// Traversal direction for strided binary instructions on a [rows, cols] tile
+// (gitcode.com/bynshard/pto-isa issue #1). With E = elements per repeat,
+// Q = cols/E complete segments, H = tail flag and M = REPEAT_MAX:
+//   across-rows: one instruction covers up to M rows of one column segment
+//                -> (Q + H) * ceilDiv(rows, M) instructions; a row pitch over
+//                the stride encoding limit (>255 32B blocks) degrades each to
+//                repeat=1 per row -> (Q + H) * rows
+//   within-row:  one instruction folds up to M consecutive segments of one row
+//                into a fixed 256B accumulator (dst/src0 rptStride 0, src1
+//                rptStride 8); repeats chain in order; per-row cost ceilDiv(Q, M) + H
+enum class BinTraversal {
+    AcrossRows,
+    WithinRow,
+};
+
+template <unsigned elemsPerRpt>
+PTO_INTERNAL constexpr BinTraversal ChooseBinTraversal(
+    unsigned validRow, unsigned validCol, unsigned withinPerRow, bool pitchOverLimit = false)
+{
+    const unsigned completeSegs = validCol / elemsPerRpt;
+    const unsigned hasTail = (validCol % elemsPerRpt) != 0 ? 1u : 0u;
+    const unsigned rowChunks = (validRow + REPEAT_MAX - 1) / REPEAT_MAX;
+    const unsigned acrossIssues = (completeSegs + hasTail) * (pitchOverLimit ? validRow : rowChunks);
+    const unsigned withinIssues = validRow * withinPerRow;
+    return (withinIssues < acrossIssues) ? BinTraversal::WithinRow : BinTraversal::AcrossRows;
+}
+
 template <typename T, typename InstrOp>
 struct TRowReduceOp {
+    // Ops whose binary fold is commutative+associative (vmax/vmin) may reassociate
+    // the per-row segment order; order-sensitive ops (vadd/vmul) keep the fixed tree.
+    static constexpr bool IsFoldOrderInsensitive = false;
+
     PTO_INTERNAL static void BinInstr(
         __ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, uint8_t rptTimes, uint16_t dstRptStride,
         uint16_t src0RptStride, uint16_t src1RptStride)
@@ -268,6 +299,53 @@ PTO_INTERNAL bool TryOptimizeFP32Reduce(__ubuf__ T* dst, __ubuf__ T* src, __ubuf
     return false;
 }
 
+template <typename InstrOp, typename T, uint32_t DstCols, uint32_t SrcCols, uint32_t TmpCols, uint8_t elemPerRpt>
+PTO_INTERNAL void TRowReduceWithinRowFold(__ubuf__ T* dst, __ubuf__ T* src, __ubuf__ T* tmp, int validCol, int validRow)
+{
+    constexpr uint32_t elemPerBlock = BLOCK_BYTE_SIZE / sizeof(T);
+    constexpr uint32_t srcRptStride = SrcCols / elemPerBlock;
+    constexpr uint32_t tmpRptStride = TmpCols / elemPerBlock;
+    constexpr uint16_t segRptStride = REPEAT_BYTE / BLOCK_BYTE_SIZE; // one segment per repeat
+    int q = validCol / elemPerRpt;
+    int remain = validCol % elemPerRpt;
+    __ubuf__ T* tmpBase = tmp; // row loop advances tmp; the final reduce needs the tile base
+
+    // init: segment 0 of every row -> per-row accumulator (single pitched copy)
+    pto_copy_ubuf_to_ubuf(
+        tmp, src, validRow, BLOCK_MAX_PER_REPEAT, srcRptStride - BLOCK_MAX_PER_REPEAT,
+        tmpRptStride - BLOCK_MAX_PER_REPEAT);
+    pipe_barrier(PIPE_V);
+
+    // fold segments 1..q-1 per row: dst/src0 pinned (rptStride 0), src1 +1
+    // segment per repeat; repeats chain in order (read-before-write), so the
+    // pinned 256B window is a running accumulator.
+    for (int row = 0; row < validRow; ++row, src += SrcCols, tmp += TmpCols) {
+        __ubuf__ T* seg = src + elemPerRpt;
+        int segs = q - 1;
+        while (segs > 0) {
+            int chunk = segs > REPEAT_MAX ? REPEAT_MAX : segs;
+            InstrOp::BinInstr(tmp, tmp, seg, chunk, 0, 0, segRptStride);
+            pipe_barrier(PIPE_V);
+            seg += chunk * elemPerRpt;
+            segs -= chunk;
+        }
+    }
+    if (remain > 0) { // single masked tail pass over all rows (mask set once)
+        pipe_barrier(PIPE_V);
+        SetContinuousMask(remain);
+        __ubuf__ T* srcP = src - (uint32_t)validRow * SrcCols + (uint32_t)q * elemPerRpt;
+        __ubuf__ T* tmpP = tmp - (uint32_t)validRow * TmpCols;
+        for (int row = 0; row < validRow; ++row, srcP += SrcCols, tmpP += TmpCols) {
+            InstrOp::BinInstr(tmpP, tmpP, srcP, 1, 0, 0, 0);
+        }
+        set_vector_mask(-1, -1);
+        pipe_barrier(PIPE_V);
+    }
+
+    InstrOp::template ReduceInstrByMode<true, TmpCols, DstCols, tmpRptStride, elemPerRpt>(dst, tmpBase, validRow);
+    pipe_barrier(PIPE_V);
+}
+
 template <typename InstrOp, typename T, typename TileDataOut, typename TileDataIn, typename TileDataTmp>
 PTO_INTERNAL void TRowReduceInstr(__ubuf__ T* dst, __ubuf__ T* src, __ubuf__ T* tmp, int validCol, int validRow)
 {
@@ -300,6 +378,20 @@ PTO_INTERNAL void TRowReduceInstr(__ubuf__ T* dst, __ubuf__ T* src, __ubuf__ T* 
             tmp, src, validRow, BLOCK_MAX_PER_REPEAT, srcRptStride - BLOCK_MAX_PER_REPEAT,
             tmpRptStride - BLOCK_MAX_PER_REPEAT);
         pipe_barrier(PIPE_V);
+    }
+
+    // issue #1: fold per row with a stride-0 running accumulator when the
+    // issue-count model wins; needs one 256B tmp segment per row.
+    if constexpr (InstrOp::IsFoldOrderInsensitive && (TileDataTmp::Cols >= elemPerRpt)) {
+        const bool pitchOverLimit = (srcRptStride > REPEAT_MAX) || (tmpRptStride > REPEAT_MAX);
+        const unsigned hasTail = (remain > 0) ? 1u : 0u;
+        const unsigned withinPerRow = (srcRptPerRow + REPEAT_MAX - 1) / REPEAT_MAX + hasTail;
+        if (ChooseBinTraversal<elemPerRpt>(validRow, validCol, withinPerRow, pitchOverLimit) ==
+            BinTraversal::WithinRow) {
+            TRowReduceWithinRowFold<InstrOp, T, TileDataOut::Cols, TileDataIn::Cols, TileDataTmp::Cols, elemPerRpt>(
+                dst, src, tmp, validCol, validRow);
+            return;
+        }
     }
 
     InstrOp::template FillTmp<TileDataTmp::Cols, TileDataIn::Cols, tmpRptStride, srcRptStride, elemPerRpt>(

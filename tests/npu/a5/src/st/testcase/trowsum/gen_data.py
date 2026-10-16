@@ -27,6 +27,7 @@ def gen_half_repeated_input(row, col, value):
     return input_arr
 
 
+
 def gen_golden_data(param):
     data_type = param.data_type
     row = param.row
@@ -178,7 +179,29 @@ if __name__ == "__main__":
         # fp16 high-precision (fp32 accumulation) cases.
         TRowSumParams("TROWSUMTest.case57", np.float16, 8, 8, 448, 447, fp32_acc_guard=True),
         TRowSumParams("TROWSUMTest.case58", np.float16, 64, 64, 128, 128),
-    ]
+            TRowSumParams("TROWSUMTest.case_f32_1x1", np.float32, 8, 8, 8, 1),
+        TRowSumParams("TROWSUMTest.case_f32_1x8192", np.float32, 1, 1, 8192, 8192),
+        TRowSumParams("TROWSUMTest.case_f32_512x64", np.float32, 256, 256, 64, 64),
+        TRowSumParams("TROWSUMTest.case_f32_16x2048", np.float32, 8, 8, 2048, 2048),
+        TRowSumParams("TROWSUMTest.case_f32_64x64_vc1", np.float32, 64, 64, 64, 1),
+        TRowSumParams("TROWSUMTest.case_f32_63x65", np.float32, 63, 63, 72, 65),
+        TRowSumParams("TROWSUMTest.case_f32_33x129_v127", np.float32, 33, 33, 136, 129),
+        TRowSumParams("TROWSUMTest.case_f32_238x320", np.float32, 238, 237, 80, 79),
+        TRowSumParams("TROWSUMTest.case_f16_64x128", np.float16, 64, 64, 128, 128),
+        TRowSumParams("TROWSUMTest.case_f16_32x256_v255", np.float16, 32, 32, 256, 255),
+        TRowSumParams("TROWSUMTest.case_f16_16x512", np.float16, 16, 16, 512, 512),
+        TRowSumParams("TROWSUMTest.case_f16_8x1024", np.float16, 8, 8, 1024, 1024),
+        TRowSumParams("TROWSUMTest.case_f16_30x216_v24", np.float16, 30, 30, 224, 24),
+        TRowSumParams("TROWSUMTest.case_u32_31x128_v127", np.uint32, 31, 31, 128, 127),
+        TRowSumParams("TROWSUMTest.case_u16_32x128_v127", np.uint16, 32, 32, 128, 127),
+        TRowSumParams("TROWSUMTest.case_f32_ubcap_106x192", np.float32, 106, 105, 192, 191),
+        TRowSumParams("TROWSUMTest.case_f32_1x16384", np.float32, 1, 1, 16384, 16384),
+        TRowSumParams("TROWSUMTest.case_f32_vrow11_30x216", np.float32, 30, 11, 216, 216),
+        TRowSumParams("TROWSUMTest.case_f32_vrow1_64x64", np.float32, 64, 1, 64, 64),
+        TRowSumParams("TROWSUMTest.case_f32_prime_251x128", np.float32, 251, 250, 96, 95),
+        TRowSumParams("TROWSUMTest.case_f16_ubcap_128x320", np.float16, 128, 127, 320, 319),
+        TRowSumParams("TROWSUMTest.case_s16_ubcap_200x208", np.int16, 200, 199, 208, 207),
+]
 
     for _, case in enumerate(case_params_list):
         if not os.path.exists(case.name):
