@@ -7,7 +7,7 @@
 
 ## Introduction
 
-Gather elements using byte offsets.
+Gather data from the source tile by byte offset. Each element of `offset` is a `uint32_t` byte offset from the start of `src`, and each offset copies 32 bytes from that address into `dst`. The valid region of `dst` is split into 32-byte blocks, one offset per block. Element size is 1, 2, or 4 bytes. The hardware instruction is `vgatherb`.
 
 ## Math Interpretation
 

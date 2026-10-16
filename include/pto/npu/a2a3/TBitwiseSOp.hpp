@@ -34,7 +34,7 @@ PTO_INTERNAL void TShiftCheck(const TileDataDst& dst, const TileDataSrc& src)
     PTO_ASSERT((dstValidRow != 0 && dstValidCol != 0), "Number of cols of dst must be non-zero.");
     PTO_ASSERT((srcValidRow != 0 && srcValidCol != 0), "Number of cols of src must be non-zero.");
     PTO_ASSERT(dstValidCol == srcValidCol, "Number of cols of src and dst must be the same.");
-    PTO_ASSERT(dstValidRow == srcValidCol, "Number of rows of src and dst must be the same.");
+    PTO_ASSERT(dstValidRow == srcValidRow, "Number of rows of src and dst must be the same.");
 }
 
 template <typename Op, typename TileDataDst, typename TileDataSrc>
