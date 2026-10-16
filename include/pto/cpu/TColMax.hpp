@@ -63,6 +63,10 @@ PTO_INTERNAL void TCOLMAX_IMPL(TileDst& dstTile, TileSrc& srcTile)
     unsigned m = srcTile.GetValidRow();
     unsigned n = srcTile.GetValidCol();
 
+    if (m == 0 || n == 0) {
+        return;
+    }
+
     TColMax<TileDst, TileSrc>(dstTile.data(), srcTile.data(), m, n);
 }
 } // namespace pto
