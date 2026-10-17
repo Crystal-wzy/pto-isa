@@ -547,7 +547,18 @@ PTO_INTERNAL void TRowReduceProc(
                     } else {
                         vlds(vreg0, srcPtr, i * TileDataIn::RowStride + fullTimes * elementsPerRepeat, NORM);
                     }
-                    ReduceOp::Reduce(vreg1, vreg0, preg, pregdst);
+                    if constexpr (sizeof(TIN) == 1) {
+                        // 8-bit tails go through the widened even/odd path, where
+                        // predicated vcvt zero-fills the inactive lanes and the
+                        // column reduce then fabricates a 0. Fill them with the
+                        // op identity instead and reduce full-width.
+                        RegTensor<TIN> vregId;
+                        vbr(vregId, (TIN)ReduceOp::InitVal);
+                        vsel(vreg0, vreg0, vregId, preg);
+                        ReduceOp::Reduce(vreg1, vreg0, pregFull, pregdst);
+                    } else {
+                        ReduceOp::Reduce(vreg1, vreg0, preg, pregdst);
+                    }
                     ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
                 }
                 ReduceOp::Accumulate(vregdst, vregdst, vregdst2, pregdst);
@@ -589,7 +600,18 @@ PTO_INTERNAL void TRowReduceProc(
                     } else {
                         vlds(vreg0, srcPtr, i * TileDataIn::RowStride + fullTimes * elementsPerRepeat, NORM);
                     }
-                    ReduceOp::Reduce(vreg1, vreg0, preg, pregdst);
+                    if constexpr (sizeof(TIN) == 1) {
+                        // 8-bit tails go through the widened even/odd path, where
+                        // predicated vcvt zero-fills the inactive lanes and the
+                        // column reduce then fabricates a 0. Fill them with the
+                        // op identity instead and reduce full-width.
+                        RegTensor<TIN> vregId;
+                        vbr(vregId, (TIN)ReduceOp::InitVal);
+                        vsel(vreg0, vreg0, vregId, preg);
+                        ReduceOp::Reduce(vreg1, vreg0, pregFull, pregdst);
+                    } else {
+                        ReduceOp::Reduce(vreg1, vreg0, preg, pregdst);
+                    }
                     ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
                 }
                 if constexpr (!std::is_same_v<TOUT, TDST>) {
