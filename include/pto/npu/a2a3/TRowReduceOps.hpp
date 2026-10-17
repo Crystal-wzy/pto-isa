@@ -316,15 +316,16 @@ PTO_INTERNAL void TRowReduceWithinRowFold(__ubuf__ T* dst, __ubuf__ T* src, __ub
         tmpRptStride - BLOCK_MAX_PER_REPEAT);
     pipe_barrier(PIPE_V);
 
-    // fold segments 1..q-1 per row: dst/src0 pinned (rptStride 0), src1 +1
-    // segment per repeat; repeats chain in order (read-before-write), so the
-    // pinned 256B window is a running accumulator.
+    // fold segments 1..q-1 per row into the running accumulator. The
+    // accumulator must be passed as dst AND src1 with rptStride 0, the
+    // segment stream as src0 with rptStride 8 (issue #1 construction);
+    // repeats chain through the dst/src1 window.
     for (int row = 0; row < validRow; ++row, src += SrcCols, tmp += TmpCols) {
         __ubuf__ T* seg = src + elemPerRpt;
         int segs = q - 1;
         while (segs > 0) {
             int chunk = segs > REPEAT_MAX ? REPEAT_MAX : segs;
-            InstrOp::BinInstr(tmp, tmp, seg, chunk, 0, 0, segRptStride);
+            InstrOp::BinInstr(tmp, seg, tmp, chunk, 0, segRptStride, 0);
             pipe_barrier(PIPE_V);
             seg += chunk * elemPerRpt;
             segs -= chunk;
@@ -336,7 +337,7 @@ PTO_INTERNAL void TRowReduceWithinRowFold(__ubuf__ T* dst, __ubuf__ T* src, __ub
         __ubuf__ T* srcP = src - (uint32_t)validRow * SrcCols + (uint32_t)q * elemPerRpt;
         __ubuf__ T* tmpP = tmp - (uint32_t)validRow * TmpCols;
         for (int row = 0; row < validRow; ++row, srcP += SrcCols, tmpP += TmpCols) {
-            InstrOp::BinInstr(tmpP, tmpP, srcP, 1, 0, 0, 0);
+            InstrOp::BinInstr(tmpP, srcP, tmpP, 1, 0, 0, 0);
         }
         set_vector_mask(-1, -1);
         pipe_barrier(PIPE_V);
