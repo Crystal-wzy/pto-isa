@@ -110,15 +110,15 @@ TSTORE(GlobalTensor(out + i), tile_result);
 
 #### Method 1: Using Script (Recommended)
 
+The script accepts only the run mode (`-r/--run-mode`) and SoC version
+(`-v/--soc-version`) options; it has no dedicated clean/debug options.
+
 ```bash
 # CPU simulation mode (development/debugging)
-./run.sh --sim --clean
+./run.sh -r sim -v Ascend910B1
 
 # NPU mode (performance testing)
-./run.sh --npu --soc Ascend910B1
-
-# Debug mode
-./run.sh --sim --debug
+./run.sh -r npu -v Ascend910B1
 ```
 
 #### Method 2: Manual Build
