@@ -101,14 +101,20 @@ using RowMaxValidSrc = pto::Tile<pto::TileType::Vec, float, 16, 16, pto::BLayout
 using RowMaxValidDst = pto::Tile<pto::TileType::Vec, float, 8, 8, pto::BLayout::RowMajor, -1, 1>;
 
 template <typename Src, typename Dst>
-void InvokeTROWMAXForValidation(Src& src, Dst& dst)
+void PrepareTROWMAXForValidation(Src& src, Dst& dst, Src& tmp)
 {
-    Src tmp;
     pto::TASSIGN(src, 0);
     pto::TASSIGN(tmp, Src::GetSizeInBytes());
     pto::TASSIGN(dst, Src::GetSizeInBytes() * 2);
     std::fill_n(src.data(), Src::Numel, static_cast<typename Src::DType>(1));
     std::fill_n(dst.data(), Dst::Numel, static_cast<typename Dst::DType>(123));
+}
+
+template <typename Src, typename Dst>
+void InvokeTROWMAXForValidation(Src& src, Dst& dst)
+{
+    Src tmp;
+    PrepareTROWMAXForValidation(src, dst, tmp);
     pto::TROWMAX(dst, src, tmp);
 }
 
@@ -137,9 +143,13 @@ TEST_F(TROWMAXTest, case_accepts_non_empty_input)
 {
     RowMaxValidSrc src(2, 16);
     RowMaxValidDst dst(2);
+    RowMaxValidSrc tmp;
+    PrepareTROWMAXForValidation(src, dst, tmp);
     src.data()[0] = 5.0f;
     src.data()[1] = 9.0f;
     src.data()[2] = 3.0f;
-    InvokeTROWMAXForValidation(src, dst);
+    pto::TROWMAX(dst, src, tmp);
     EXPECT_EQ(dst.data()[0], 9.0f);
+    EXPECT_EQ(dst.data()[RowMaxValidDst::Cols], 1.0f);
+    EXPECT_EQ(dst.data()[2 * RowMaxValidDst::Cols], 123.0f);
 }
