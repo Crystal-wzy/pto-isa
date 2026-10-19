@@ -39,6 +39,35 @@ AICORE void runTCmps(__gm__ uint8_t __out__* out, __gm__ T __in__* src0, __gm__ 
     out = dstGlobal.data();
 }
 
+template <
+    typename T, int kGRows_, int kGCols_, int kTRows_, int kTCols_, int kValidRows_, int kValidCols_, CmpMode cmpMode>
+AICORE void runTCmpsValid(__gm__ uint8_t __out__* out, __gm__ T __in__* src0, __gm__ T __in__* src1)
+{
+    constexpr int kMaskCols = (kValidCols_ + 7) / 8;
+    using DynShapeDim5 = Shape<1, 1, 1, kGRows_, kGCols_>;
+    using DynStridDim5 = pto::Stride<1, 1, 1, kGCols_, 1>;
+    using DynShapeMask = Shape<1, 1, 1, kValidRows_, kMaskCols>;
+    using DynStrideMask = pto::Stride<1, 1, 1, kMaskCols, 1>;
+    using GlobalData_src0 = GlobalTensor<T, DynShapeDim5, DynStridDim5>;
+    using GlobalData_dst = GlobalTensor<uint8_t, DynShapeMask, DynStrideMask>;
+    using TileData_src0 = Tile<TileType::Vec, T, kTRows_, kTCols_, BLayout::RowMajor, -1, -1>;
+    using TileData_dst = Tile<TileType::Vec, uint8_t, kTRows_, kTCols_, BLayout::RowMajor, -1, -1>;
+    TileData_src0 src0Tile(kValidRows_, kValidCols_);
+    TileData_dst dstTile(kValidRows_, kMaskCols);
+    TASSIGN(src0Tile, 0x0);
+    TASSIGN(dstTile, 0x20000);
+
+    GlobalData_src0 src0Global(src0);
+    GlobalData_dst dstGlobal(out);
+
+    TASSIGN(src0Tile, 0);
+    TASSIGN(dstTile, kValidRows_ * kMaskCols * sizeof(typename TileData_src0::DType));
+
+    TLOAD(src0Tile, src0Global);
+    TCMPS(dstTile, src0Tile, src1[0], cmpMode);
+    TSTORE(dstGlobal, dstTile);
+}
+
 template <typename T, int kGRows_, int kGCols_, int kTRows_, int kTCols_, int cmpMode>
 void LaunchTCmps(uint8_t* out, T* src0, T* src1, void* stream)
 {
@@ -47,6 +76,17 @@ void LaunchTCmps(uint8_t* out, T* src0, T* src1, void* stream)
         runTCmps<half, kGRows_, kGCols_, kTRows_, kTCols_, modeValue>((out), (half*)(src0), (half*)(src1));
     else
         runTCmps<T, kGRows_, kGCols_, kTRows_, kTCols_, modeValue>(out, src0, src1);
+}
+
+template <typename T, int kGRows_, int kGCols_, int kTRows_, int kTCols_, int kValidRows_, int kValidCols_, int cmpMode>
+void LaunchTCmpsValid(uint8_t* out, T* src0, T* src1, void* stream)
+{
+    constexpr CmpMode modeValue = static_cast<CmpMode>(cmpMode);
+    if constexpr (std::is_same_v<T, aclFloat16>)
+        runTCmpsValid<half, kGRows_, kGCols_, kTRows_, kTCols_, kValidRows_, kValidCols_, modeValue>(
+            (out), (half*)(src0), (half*)(src1));
+    else
+        runTCmpsValid<T, kGRows_, kGCols_, kTRows_, kTCols_, kValidRows_, kValidCols_, modeValue>(out, src0, src1);
 }
 
 template void LaunchTCmps<aclFloat16, 32, 32, 32, 32, 5>(
@@ -73,6 +113,7 @@ template void LaunchTCmps<int32_t, 77, 96, 77, 96, 4>(uint8_t* out, int32_t* src
 template void LaunchTCmps<int32_t, 32, 32, 32, 32, 5>(uint8_t* out, int32_t* src0, int32_t* src1, void* stream);
 template void LaunchTCmps<uint32_t, 32, 32, 32, 32, 1>(uint8_t* out, uint32_t* src0, uint32_t* src1, void* stream);
 template void LaunchTCmps<uint32_t, 16, 32, 16, 32, 3>(uint8_t* out, uint32_t* src0, uint32_t* src1, void* stream);
+template void LaunchTCmpsValid<float, 2, 16, 2, 32, 2, 16, 4>(uint8_t* out, float* src0, float* src1, void* stream);
 #ifdef CPU_SIM_BFLOAT_ENABLED
 template void LaunchTCmps<bfloat16_t, 32, 32, 32, 32, 5>(
     uint8_t* out, bfloat16_t* src0, bfloat16_t* src1, void* stream);

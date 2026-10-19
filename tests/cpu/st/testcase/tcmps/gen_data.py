@@ -19,7 +19,7 @@ np.random.seed(19)
 def gen_golden_data_tcmps(case_name, param):
     dtype = param.dtype
 
-    H, W = [param.tile_row, param.tile_col]
+    H, W = [param.global_row, param.global_col]
     h_valid, w_valid = [param.valid_row, param.valid_col]
 
     # Generate random input arrays
@@ -54,10 +54,10 @@ def gen_golden_data_tcmps(case_name, param):
                                      for i, bit in enumerate(np.uint8(bits)))
     out_uint8 = []
     golden = golden.astype(np.uint8)
-    bits_per_row = W // 8
-    for row in golden:
+    bits_per_row = (w_valid + 7) // 8
+    for h in range(h_valid):
         for i in range(bits_per_row):
-            out_uint8.append(func_binar(row[i*8:i*8+8]))
+            out_uint8.append(func_binar(golden[h, i*8:i*8+8]))
 
     # Save the input and golden data to binary files
     NumExt.write_array("input1.bin", input1, dtype)
@@ -117,7 +117,8 @@ if __name__ == "__main__":
         tcmpsParams(np.int32, 77, 96, 77, 96, 77, 96, "CmpMode::GT"),
         tcmpsParams(np.int32, 32, 32, 32, 32, 32, 32, "CmpMode::GE"),
         tcmpsParams(np.uint32, 32, 32, 32, 32, 32, 32, "CmpMode::NE"),
-        tcmpsParams(np.uint32, 16, 32, 16, 32, 16, 32, "CmpMode::LE")
+        tcmpsParams(np.uint32, 16, 32, 16, 32, 16, 32, "CmpMode::LE"),
+        tcmpsParams(np.float32, 2, 16, 2, 32, 2, 16, "CmpMode::GT")
     ]
     if os.getenv("PTO_CPU_SIM_ENABLE_BF16") == "1":
         case_params_list.append(tcmpsParams(
