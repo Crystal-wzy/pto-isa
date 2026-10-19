@@ -61,9 +61,9 @@ __tf__ PTO_INTERNAL void TRowProd(
         }
 
         unsigned reduceRepeat = repeatsNum / 2;
-        while (reduceRepeat > 0) {
-            vmul(tmpPtr, tmpPtr, tmpPtr + elemsPerRepeat, reduceRepeat / 2, 1, 1, 1, 8, 16, 16);
-            reduceRepeat /= 2;
+        while (reduceRepeat > 1) {
+            reduceRepeat = (reduceRepeat + 1) / 2;
+            vmul(tmpPtr, tmpPtr, tmpPtr + elemsPerRepeat, reduceRepeat, 1, 1, 1, 8, 16, 16);
             pipe_barrier(PIPE_V);
         }
 

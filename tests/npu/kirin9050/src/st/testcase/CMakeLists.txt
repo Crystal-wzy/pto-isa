@@ -145,6 +145,7 @@ set(ALL_TESTCASES
     ttrans
     ttrans_conv
     tstore
+    tstore_mat2gm
     textract
     textract_compact
     trowsum

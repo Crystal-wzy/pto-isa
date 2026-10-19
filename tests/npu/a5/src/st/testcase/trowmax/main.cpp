@@ -391,3 +391,194 @@ TEST_F(TROWMAXTest, case56)
     bool ret = TRowMaxTestFramework<56, uint16_t, 8, 8, 448, 448, 1>();
     EXPECT_TRUE(ret);
 }
+TEST_F(TROWMAXTest, case_f32_1x1)
+{
+    bool ret = TRowMaxTestFramework<57, float, 8, 8, 8, 1, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_1x8192)
+{
+    bool ret = TRowMaxTestFramework<58, float, 1, 1, 8192, 8192, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_512x64)
+{
+    bool ret = TRowMaxTestFramework<59, float, 256, 256, 64, 64, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_16x2048)
+{
+    bool ret = TRowMaxTestFramework<60, float, 8, 8, 2048, 2048, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_64x64_vc1)
+{
+    bool ret = TRowMaxTestFramework<61, float, 64, 64, 64, 1, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_63x65)
+{
+    bool ret = TRowMaxTestFramework<62, float, 63, 63, 72, 65, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_33x129_v127)
+{
+    bool ret = TRowMaxTestFramework<63, float, 33, 33, 136, 129, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_238x320)
+{
+    bool ret = TRowMaxTestFramework<64, float, 238, 237, 80, 79, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f16_64x128)
+{
+    bool ret = TRowMaxTestFramework<65, aclFloat16, 64, 64, 128, 128, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f16_32x256_v255)
+{
+    bool ret = TRowMaxTestFramework<66, aclFloat16, 32, 32, 256, 255, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f16_16x512)
+{
+    bool ret = TRowMaxTestFramework<67, aclFloat16, 16, 16, 512, 512, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f16_8x1024)
+{
+    bool ret = TRowMaxTestFramework<68, aclFloat16, 8, 8, 1024, 1024, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f16_30x216_v24)
+{
+    bool ret = TRowMaxTestFramework<69, aclFloat16, 30, 30, 224, 24, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_i8_128x64)
+{
+    bool ret = TRowMaxTestFramework<70, int8_t, 128, 128, 256, 256, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_i8_64x64_v63)
+{
+    bool ret = TRowMaxTestFramework<71, int8_t, 64, 64, 256, 255, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_i8_32x128)
+{
+    bool ret = TRowMaxTestFramework<72, int8_t, 32, 32, 256, 256, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_i8_16x192_v191)
+{
+    bool ret = TRowMaxTestFramework<73, int8_t, 16, 16, 256, 255, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_i8_8x448)
+{
+    bool ret = TRowMaxTestFramework<74, int8_t, 8, 8, 512, 512, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_u8_128x64)
+{
+    bool ret = TRowMaxTestFramework<75, uint8_t, 128, 128, 256, 256, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_u8_8x448_v447)
+{
+    bool ret = TRowMaxTestFramework<76, uint8_t, 8, 8, 512, 511, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_u8_2x2048)
+{
+    bool ret = TRowMaxTestFramework<77, uint8_t, 2, 2, 2048, 2048, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_u32_31x128_v127)
+{
+    bool ret = TRowMaxTestFramework<78, uint32_t, 31, 31, 128, 127, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_u16_32x128_v127)
+{
+    bool ret = TRowMaxTestFramework<79, uint16_t, 32, 32, 128, 127, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_ubcap_106x192)
+{
+    bool ret = TRowMaxTestFramework<80, float, 106, 105, 192, 191, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_1x16384)
+{
+    bool ret = TRowMaxTestFramework<81, float, 1, 1, 16384, 16384, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_vrow11_30x216)
+{
+    bool ret = TRowMaxTestFramework<82, float, 30, 11, 216, 216, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_vrow1_64x64)
+{
+    bool ret = TRowMaxTestFramework<83, float, 64, 1, 64, 64, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f32_prime_251x128)
+{
+    bool ret = TRowMaxTestFramework<84, float, 251, 250, 96, 95, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_f16_ubcap_128x320)
+{
+    bool ret = TRowMaxTestFramework<85, aclFloat16, 128, 127, 320, 319, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_s16_ubcap_200x208)
+{
+    bool ret = TRowMaxTestFramework<86, int16_t, 200, 199, 208, 207, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_i8_ubcap_88x896)
+{
+    bool ret = TRowMaxTestFramework<87, int8_t, 88, 87, 896, 887, 1>();
+    EXPECT_TRUE(ret);
+}
+
+TEST_F(TROWMAXTest, case_u8_ubcap_88x896)
+{
+    bool ret = TRowMaxTestFramework<88, uint8_t, 88, 87, 896, 887, 1>();
+    EXPECT_TRUE(ret);
+}

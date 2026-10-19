@@ -81,6 +81,9 @@ if __name__ == "__main__":
         TRowSumParams("TROWSUMTest.case18", np.int16, 32, 32, 128, 128),
         TRowSumParams("TROWSUMTest.case19", np.int16, 16, 16, 192, 192),
         TRowSumParams("TROWSUMTest.case20", np.int16, 8, 8, 448, 448),
+        # traversal controls (issue #1): order-sensitive op keeps the pairwise tree
+        TRowSumParams("TROWSUMTest.case21", np.float32, 4, 4, 6144, 6144),
+        TRowSumParams("TROWSUMTest.case22", np.float32, 12, 12, 2048, 2048),
     ]
 
     for _, case in enumerate(case_params_list):

@@ -11,17 +11,18 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #ifndef TCOLMAX_HPP
 #define TCOLMAX_HPP
 
+#include <stdint.h>
+#include <stddef.h>
 #include <pto/common/pto_tile.hpp>
-#include <cmath>
 
 namespace pto {
 template <typename TileDst, typename TileSrc>
-void TColMax(typename TileDst::TileDType dst, typename TileSrc::TileDType src, uint16_t M, uint16_t N)
+void TColMax(typename TileDst::TileDType dst, typename TileSrc::TileDType src, uint32_t M, uint32_t N)
 {
-    for (uint16_t j = 0; j < N; j++) {
+    for (uint32_t j = 0; j < N; j++) {
         typename TileDst::DType max = src[GetTileElementOffset<TileSrc>(0, j)];
 
-        for (uint16_t i = 1; i < M; i++) {
+        for (uint32_t i = 1; i < M; i++) {
             size_t idx = GetTileElementOffset<TileSrc>(i, j);
             if (src[idx] > max) {
                 max = src[idx];
@@ -62,6 +63,10 @@ PTO_INTERNAL void TCOLMAX_IMPL(TileDst& dstTile, TileSrc& srcTile)
 
     unsigned m = srcTile.GetValidRow();
     unsigned n = srcTile.GetValidCol();
+
+    if (m == 0 || n == 0) {
+        return;
+    }
 
     TColMax<TileDst, TileSrc>(dstTile.data(), srcTile.data(), m, n);
 }

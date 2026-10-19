@@ -10,6 +10,8 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #ifndef TABS_HPP
 #define TABS_HPP
 
+#include <limits>
+#include <type_traits>
 #include <pto/common/pto_tile.hpp>
 #include "pto/cpu/tile_offsets.hpp"
 
@@ -21,7 +23,16 @@ void TAbs_Impl(TileDst& dst, TileSrc& src, unsigned validRow, unsigned validCol)
     for (size_t c = 0; c < validCol; c++) {
         for (size_t r = 0; r < validRow; r++) {
             const auto val = src.GetElement(r, c);
-            dst.SetElement(r, c, val < 0 ? -val : val);
+            if constexpr (std::is_integral_v<decltype(val)>) {
+                // INT_MIN has no positive representable counterpart; preserve it.
+                if (val == std::numeric_limits<decltype(val)>::min()) {
+                    dst.SetElement(r, c, val);
+                } else {
+                    dst.SetElement(r, c, val < 0 ? -val : val);
+                }
+            } else {
+                dst.SetElement(r, c, val < 0 ? -val : val);
+            }
         }
     }
 }

@@ -356,6 +356,8 @@ PTO_INTERNAL void Int64RowMinMax(__ubuf__ T* dst, __ubuf__ T* src, unsigned vali
 
 template <typename T>
 struct ROWSUM {
+    // Floating-point accumulation order affects rounding; integer sums do not.
+    static constexpr bool IsOrderSensitive = !std::is_integral_v<T>;
     using TIN = T;
     using TOUT = std::conditional_t<
         std::is_same_v<T, int16_t>, int32_t, std::conditional_t<std::is_same_v<T, uint16_t>, uint32_t, T>>;
@@ -382,6 +384,7 @@ struct ROWSUM {
 
 template <typename T>
 struct ROWMAX {
+    static constexpr bool IsOrderSensitive = false;
     static constexpr typename Padding<T>::Type InitVal = Padding<T>::Min;
     using TIN = T;
     using TOUT = T;
@@ -418,6 +421,7 @@ struct ROWMAX {
 
 template <typename T>
 struct ROWMIN {
+    static constexpr bool IsOrderSensitive = false;
     static constexpr typename Padding<T>::Type InitVal = Padding<T>::Max;
     using TIN = T;
     using TOUT = T;
@@ -480,43 +484,153 @@ PTO_INTERNAL void TRowReduceProc(
     using TDST = typename TileDataOut::DType;
     __VEC_SCOPE__
     {
+        // Per 256B chunk the fold lowers to vlds + Reduce (vcmax/vcmin/vcadd:
+        // lane-reduce of one chunk) + Accumulate (vmax/vmin/vadd into the
+        // running row scalar). All-lane predicate hoisted for full chunks;
+        // only the tail keeps a dynamic predicate.
+        uint32_t fullItems = elementsPerRepeat;
+        MaskReg pregFull = CreatePredicate<TIN>(fullItems);
+        uint32_t destItems = 1;
+        MaskReg pregdst = CreatePredicate<TIN>(destItems);
+        constexpr auto distValue =
+            std::integral_constant<::DistVST, static_cast<::DistVST>(GetDistVst<TDST, DistVST::DIST_ONEPT>())>();
+        const uint16_t fullTimes = static_cast<uint16_t>(cols / elementsPerRepeat);
+        const uint32_t tailItems = cols - fullTimes * elementsPerRepeat;
+        const uint16_t tailChunks = tailItems != 0 ? 1u : 0u;
+        // Algorithm per row size, dispatched once per call (R1: balanced fold
+        // tree): two independent accumulators from two full chunks upward for
+        // order-insensitive ops; sequential single chain for float sums. The
+        // leftover/tail chunks use per-row if guards: the zero-or-one-trip
+        // loop form segfaults the cce frontend together with the f16
+        // fp32-accumulate TROWSUM path.
+        constexpr bool kDualAccum = !ReduceOp::IsOrderSensitive;
         RegTensor<TIN> vreg0;
         RegTensor<TOUT> vreg1;
         RegTensor<TOUT> vregdst;
         RegTensor<TDST> vreg_result;
-        constexpr auto distValue =
-            std::integral_constant<::DistVST, static_cast<::DistVST>(GetDistVst<TDST, DistVST::DIST_ONEPT>())>();
-        uint32_t destItems = 1;
-        MaskReg pregdst = CreatePredicate<TIN>(destItems);
-        for (uint16_t i = 0; i < (uint16_t)rows; ++i) {
-            vbr((RegTensor<typename Padding<TOUT>::Type>&)vregdst, ReduceOp::InitVal);
-            uint32_t sreg = cols;
-            for (uint16_t j = 0; j < (uint16_t)repeatTimes; j++) {
-                MaskReg preg = CreatePredicate<TIN>(sreg);
-                if constexpr (postUpdate) {
-                    vlds(vreg0, srcPtr, elementsPerRepeat, NORM, POST_UPDATE);
-                } else {
-                    vlds(vreg0, srcPtr, i * TileDataIn::RowStride + j * elementsPerRepeat, NORM);
+        if (kDualAccum && fullTimes >= 2) {
+            RegTensor<TIN> vreg0b;
+            RegTensor<TOUT> vreg1b;
+            RegTensor<TOUT> vregdst2;
+            const uint16_t pairTimes = fullTimes / 2u;
+            const uint16_t oddChunk = fullTimes & 1u;
+            for (uint16_t i = 0; i < (uint16_t)rows; ++i) {
+                vbr((RegTensor<typename Padding<TOUT>::Type>&)vregdst, ReduceOp::InitVal);
+                vbr((RegTensor<typename Padding<TOUT>::Type>&)vregdst2, ReduceOp::InitVal);
+                for (uint16_t pp = 0; pp < pairTimes; ++pp) {
+                    if constexpr (postUpdate) {
+                        vlds(vreg0, srcPtr, elementsPerRepeat, NORM, POST_UPDATE);
+                        vlds(vreg0b, srcPtr, elementsPerRepeat, NORM, POST_UPDATE);
+                    } else {
+                        vlds(vreg0, srcPtr, i * TileDataIn::RowStride + (2u * pp) * elementsPerRepeat, NORM);
+                        vlds(vreg0b, srcPtr, i * TileDataIn::RowStride + (2u * pp + 1u) * elementsPerRepeat, NORM);
+                    }
+                    ReduceOp::Reduce(vreg1, vreg0, pregFull, pregdst);
+                    ReduceOp::Reduce(vreg1b, vreg0b, pregFull, pregdst);
+                    ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
+                    ReduceOp::Accumulate(vregdst2, vregdst2, vreg1b, pregdst);
                 }
-                ReduceOp::Reduce(vreg1, vreg0, preg, pregdst);
-                ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
+                if (oddChunk > 0) {
+                    if constexpr (postUpdate) {
+                        vlds(vreg0, srcPtr, elementsPerRepeat, NORM, POST_UPDATE);
+                    } else {
+                        vlds(vreg0, srcPtr, i * TileDataIn::RowStride + (fullTimes - 1u) * elementsPerRepeat, NORM);
+                    }
+                    ReduceOp::Reduce(vreg1, vreg0, pregFull, pregdst);
+                    ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
+                }
+                if (tailChunks > 0) {
+                    uint32_t sreg = tailItems; // re-armed per row: the plt owns the countdown
+                    MaskReg preg = CreatePredicate<TIN>(sreg);
+                    if constexpr (postUpdate) {
+                        vlds(vreg0, srcPtr, elementsPerRepeat, NORM, POST_UPDATE);
+                    } else {
+                        vlds(vreg0, srcPtr, i * TileDataIn::RowStride + fullTimes * elementsPerRepeat, NORM);
+                    }
+                    if constexpr (sizeof(TIN) == 1) {
+                        // 8-bit tails go through the widened even/odd path, where
+                        // predicated vcvt zero-fills the inactive lanes and the
+                        // column reduce then fabricates a 0. Fill them with the
+                        // op identity instead and reduce full-width.
+                        RegTensor<TIN> vregId;
+                        vbr(vregId, (TIN)ReduceOp::InitVal);
+                        vsel(vreg0, vreg0, vregId, preg);
+                        ReduceOp::Reduce(vreg1, vreg0, pregFull, pregdst);
+                    } else {
+                        ReduceOp::Reduce(vreg1, vreg0, preg, pregdst);
+                    }
+                    ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
+                }
+                ReduceOp::Accumulate(vregdst, vregdst, vregdst2, pregdst);
+                if constexpr (!std::is_same_v<TOUT, TDST>) {
+                    vcvt(vreg_result, vregdst, pregdst, RS_DISABLE, PART_EVEN);
+                    if constexpr (postUpdate) {
+                        vsts(vreg_result, dstPtr, TileDataOut::RowStride, distValue, pregdst, POST_UPDATE);
+                    } else {
+                        vsts(vreg_result, dstPtr, i * TileDataOut::RowStride, distValue, pregdst);
+                    }
+                } else {
+                    if constexpr (postUpdate) {
+                        vsts(vregdst, dstPtr, TileDataOut::RowStride, distValue, pregdst, POST_UPDATE);
+                    } else {
+                        vsts(vregdst, dstPtr, i * TileDataOut::RowStride, distValue, pregdst);
+                    }
+                }
+                if constexpr (postUpdate) {
+                    srcPtr += srcRowAdjust;
+                }
             }
-            if constexpr (!std::is_same_v<TOUT, TDST>) {
-                vcvt(vreg_result, vregdst, pregdst, RS_DISABLE, PART_EVEN);
-                if constexpr (postUpdate) {
-                    vsts(vreg_result, dstPtr, TileDataOut::RowStride, distValue, pregdst, POST_UPDATE);
-                } else {
-                    vsts(vreg_result, dstPtr, i * TileDataOut::RowStride, distValue, pregdst);
+        } else {
+            for (uint16_t i = 0; i < (uint16_t)rows; ++i) {
+                vbr((RegTensor<typename Padding<TOUT>::Type>&)vregdst, ReduceOp::InitVal);
+                for (uint16_t j = 0; j < fullTimes; ++j) {
+                    if constexpr (postUpdate) {
+                        vlds(vreg0, srcPtr, elementsPerRepeat, NORM, POST_UPDATE);
+                    } else {
+                        vlds(vreg0, srcPtr, i * TileDataIn::RowStride + j * elementsPerRepeat, NORM);
+                    }
+                    ReduceOp::Reduce(vreg1, vreg0, pregFull, pregdst);
+                    ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
                 }
-            } else {
-                if constexpr (postUpdate) {
-                    vsts(vregdst, dstPtr, TileDataOut::RowStride, distValue, pregdst, POST_UPDATE);
-                } else {
-                    vsts(vregdst, dstPtr, i * TileDataOut::RowStride, distValue, pregdst);
+                if (tailChunks > 0) {
+                    uint32_t sreg = tailItems; // re-armed per row: the plt owns the countdown
+                    MaskReg preg = CreatePredicate<TIN>(sreg);
+                    if constexpr (postUpdate) {
+                        vlds(vreg0, srcPtr, elementsPerRepeat, NORM, POST_UPDATE);
+                    } else {
+                        vlds(vreg0, srcPtr, i * TileDataIn::RowStride + fullTimes * elementsPerRepeat, NORM);
+                    }
+                    if constexpr (sizeof(TIN) == 1) {
+                        // 8-bit tails go through the widened even/odd path, where
+                        // predicated vcvt zero-fills the inactive lanes and the
+                        // column reduce then fabricates a 0. Fill them with the
+                        // op identity instead and reduce full-width.
+                        RegTensor<TIN> vregId;
+                        vbr(vregId, (TIN)ReduceOp::InitVal);
+                        vsel(vreg0, vreg0, vregId, preg);
+                        ReduceOp::Reduce(vreg1, vreg0, pregFull, pregdst);
+                    } else {
+                        ReduceOp::Reduce(vreg1, vreg0, preg, pregdst);
+                    }
+                    ReduceOp::Accumulate(vregdst, vregdst, vreg1, pregdst);
                 }
-            }
-            if constexpr (postUpdate) {
-                srcPtr += srcRowAdjust;
+                if constexpr (!std::is_same_v<TOUT, TDST>) {
+                    vcvt(vreg_result, vregdst, pregdst, RS_DISABLE, PART_EVEN);
+                    if constexpr (postUpdate) {
+                        vsts(vreg_result, dstPtr, TileDataOut::RowStride, distValue, pregdst, POST_UPDATE);
+                    } else {
+                        vsts(vreg_result, dstPtr, i * TileDataOut::RowStride, distValue, pregdst);
+                    }
+                } else {
+                    if constexpr (postUpdate) {
+                        vsts(vregdst, dstPtr, TileDataOut::RowStride, distValue, pregdst, POST_UPDATE);
+                    } else {
+                        vsts(vregdst, dstPtr, i * TileDataOut::RowStride, distValue, pregdst);
+                    }
+                }
+                if constexpr (postUpdate) {
+                    srcPtr += srcRowAdjust;
+                }
             }
         }
     }
@@ -651,9 +765,6 @@ PTO_INTERNAL void TROWMAX_IMPL(TileDataOut& dst, TileDataIn& src, TileDataTmp& t
     TROWREDUCE_IMPL_COMMON<ROWMAX, Int64Op::Max, false>(dst, src);
 }
 
-// High-precision row sum for 16-bit float types: unpack to fp32, accumulate in
-// fp32 (one cross-add per repeat plus a scalar accumulation across repeats),
-// then round back to the source type once.
 template <typename T, unsigned DstRowStride, unsigned SrcRowStride>
 PTO_INTERNAL void TRowSum_Fp32Acc(__ubuf__ T* dst, __ubuf__ T* src, unsigned validRows, unsigned validCols)
 {

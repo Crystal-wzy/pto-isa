@@ -151,6 +151,9 @@ PTO_INTERNAL void TMATMUL_ACC_IMPL(TileRes& cOutMatrix, TileRes& cInMatrix, Tile
 {
     // cmatrixInitVal Indicates the initial matrix, 1: the number in C matrix is 0, 0：use the real number in C matrix
     CheckMadValid<TileRes, TileLeft, TileRight, TileLeft::ValidRow>();
+    PTO_ASSERT(
+        cOutMatrix.data() == cInMatrix.data(),
+        "TMATMUL_ACC: cOutMatrix and cInMatrix must reference the same accumulator tile.");
 
     uint16_t m = aMatrix.GetValidRow();
     uint16_t k = aMatrix.GetValidCol();

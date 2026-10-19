@@ -88,6 +88,41 @@ PTO_INTERNAL void runTRowMinDNDst(__gm__ T* out, __gm__ T* src)
     TSTORE(dstGlobal, dstTileND);
 }
 
+// Packed-tmp variant for wide-row traversal cases (issue #1)
+template <typename T, int row, int validRow, int srcCol, int srcValidCol, int dstCol, int tmpCol>
+PTO_INTERNAL void runTRowMinPackedTmp(__gm__ T* out, __gm__ T* src)
+{
+    using DynDim2Shape = Shape<1, 1, 1, -1, -1>;
+    using DynDim2StrideSrc = pto::Stride<1, 1, -1, -1, 1>;
+    using DynDim2StrideDst = pto::Stride<1, 1, 1, -1, -1>;
+
+    using GlobalDataSrc = GlobalTensor<T, DynDim2Shape, DynDim2StrideSrc>;
+    using GlobalDataDst = GlobalTensor<T, DynDim2Shape, DynDim2StrideDst>;
+    GlobalDataSrc srcGlobal(src, DynDim2Shape(validRow, srcValidCol), DynDim2StrideSrc(row, srcCol));
+    GlobalDataDst dstGlobal(out, DynDim2Shape(validRow, dstCol), DynDim2StrideDst(dstCol, row));
+    using srcTileData = Tile<TileType::Vec, T, row, srcCol, BLayout::RowMajor, -1, -1>;
+    using dstTileData = Tile<TileType::Vec, T, row, 16, BLayout::RowMajor, -1, -1>;
+    using tmpTileData = Tile<TileType::Vec, T, row, tmpCol, BLayout::RowMajor, -1, -1>;
+    srcTileData srcTile(validRow, srcValidCol);
+    tmpTileData tmpTile(validRow, tmpCol);
+    dstTileData dstTile(validRow, dstCol);
+    TASSIGN<0x0>(srcTile);
+    TASSIGN<row * srcCol * sizeof(T)>(tmpTile);
+    TASSIGN<(row * srcCol + row * tmpCol) * sizeof(T)>(dstTile);
+
+    TLOAD(srcTile, srcGlobal);
+#ifndef __PTO_AUTO__
+    set_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
+    wait_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
+#endif
+    TROWMIN(dstTile, srcTile, tmpTile);
+#ifndef __PTO_AUTO__
+    set_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
+    wait_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
+#endif
+    TSTORE(dstGlobal, dstTile);
+}
+
 extern "C" __global__ AICORE void launchTROWMINCase1(__gm__ float* out, __gm__ float* src)
 {
     runTRowMin<float, 127, 127, 64, 63, 1>(out, src);
@@ -203,6 +238,24 @@ extern "C" __global__ AICORE void launchTROWMINCase27(__gm__ int16_t* out, __gm_
 extern "C" __global__ AICORE void launchTROWMINCase28(__gm__ int16_t* out, __gm__ int16_t* src)
 {
     runTRowMin<int16_t, 8, 8, 448, 448, 1>(out, src);
+}
+
+// traversal-optimization cases (issue #1)
+extern "C" __global__ AICORE void launchTROWMINCase29(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMinPackedTmp<float, 4, 4, 6144, 6144, 1, 3072>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase30(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMinPackedTmp<float, 16, 16, 2032, 2032, 1, 1016>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase31(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMinPackedTmp<float, 12, 12, 2048, 2048, 1, 1024>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMINCase32(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMinPackedTmp<float, 48, 48, 512, 512, 1, 256>(out, src);
 }
 
 template <uint32_t caseId>
@@ -321,6 +374,22 @@ void launchTROWMINTestCase(void* out, void* src, aclrtStream stream)
             launchTROWMINCase28<<<1, nullptr, stream>>>((int16_t*)out, (int16_t*)src);
             break;
         }
+        case 29: {
+            launchTROWMINCase29<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 30: {
+            launchTROWMINCase30<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 31: {
+            launchTROWMINCase31<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 32: {
+            launchTROWMINCase32<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
         default: {
         }
     }
@@ -354,3 +423,7 @@ template void launchTROWMINTestCase<25>(void* out, void* src, aclrtStream stream
 template void launchTROWMINTestCase<26>(void* out, void* src, aclrtStream stream);
 template void launchTROWMINTestCase<27>(void* out, void* src, aclrtStream stream);
 template void launchTROWMINTestCase<28>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<29>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<30>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<31>(void* out, void* src, aclrtStream stream);
+template void launchTROWMINTestCase<32>(void* out, void* src, aclrtStream stream);

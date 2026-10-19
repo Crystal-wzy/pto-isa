@@ -57,6 +57,9 @@ template <AccPhase Phase = AccPhase::Unspecified, typename TileRes, typename Til
 PTO_INTERNAL void TGEMV_ACC_IMPL(TileRes& cOutMatrix, TileRes& cInMatrix, TileLeft& aMatrix, TileRight& bMatrix)
 {
     CheckMadValid<TileRes, TileLeft, TileRight, 1>();
+    PTO_ASSERT(
+        cOutMatrix.data() == cInMatrix.data(),
+        "TGEMV_ACC: cOutMatrix and cInMatrix must reference the same accumulator tile.");
     uint16_t k = bMatrix.GetValidRow();
     uint16_t n = bMatrix.GetValidCol();
     PTO_ASSERT(k >= 1 && k <= MMAD_MAX_SUPPORT_LENGTH, "ERROR: The range of valid aMatrixCol is [1, 4095].");
@@ -106,6 +109,9 @@ PTO_INTERNAL void TMATMUL_MX_IMPL(
     TileRes& cOutMatrix, TileRes& cInMatrix, TileLeft& aMatrix, TileLeftScale& aScaleMatrix, TileRight& bMatrix,
     TileRightScale& bScaleMatrix)
 {
+    PTO_ASSERT(
+        cOutMatrix.data() == cInMatrix.data(),
+        "TMATMUL_MX: cOutMatrix and cInMatrix must reference the same accumulator tile.");
     uint16_t m = aMatrix.GetValidRow();
     uint16_t k = aMatrix.GetValidCol();
     uint16_t n = bMatrix.GetValidCol();

@@ -11,6 +11,7 @@ Matrix multiply (GEMM) with additional scaling tiles for mixed-precision / quant
 
 This instruction is currently implemented on A5 and A6 (see
 `include/pto/npu/a5/TMatmul.hpp` and `include/pto/npu/a6/TMatmul.hpp`).
+The accumulator overload with `cInMatrix` accumulates in place: `cOutMatrix` and `cInMatrix` must reference the same accumulator tile, and the result is written back to that tile.
 
 ## Math Interpretation
 
@@ -23,6 +24,10 @@ Let:
 Conceptually, the result corresponds to a matrix multiply over the effective matmul domain (`0 <= i < M`, `0 <= j < N`), with the scaling tiles `aScaleMatrix` / `bScaleMatrix` configuring implementation-defined mixed-precision behavior:
 
 $$ \mathrm{C}_{i,j} = \sum_{k=0}^{K-1} \mathrm{A}_{i,k} \cdot \mathrm{B}_{k,j} $$
+
+For the accumulator overload:
+
+$$ \mathrm{C}_{i,j} \gets \mathrm{C}_{i,j} + \sum_{k=0}^{K-1} \mathrm{A}_{i,k} \cdot \mathrm{B}_{k,j} $$
 
 The exact role of `aScaleMatrix` / `bScaleMatrix` (and any dequant/quant semantics) is target-defined.
 
@@ -56,6 +61,8 @@ template <AccPhase Phase, typename TileRes, typename TileLeft, typename TileLeft
 PTO_INST RecordEvent TMATMUL_MX(TileRes &cMatrix, TileLeft &aMatrix, TileLeftScale &aScaleMatrix, TileRight &bMatrix, TileRightScale &bScaleMatrix, TileBias &biasData, WaitEvents &... events);
 ```
 
+The accumulator overload with `cInMatrix` requires `cOutMatrix.data() == cInMatrix.data()`; the underlying instruction takes a single C-matrix address, so accumulator input and output must use the same tile or the same address alias.
+
 ## Constraints
 
 - **Implementation checks (A5)**:
@@ -66,6 +73,8 @@ PTO_INST RecordEvent TMATMUL_MX(TileRes &cMatrix, TileLeft &aMatrix, TileLeftSca
         - FP4: `(float, float4_e1m2x2_t, float4_e1m2x2_t)`, `(float, float4_e1m2x2_t, float4_e2m1x2_t)`, `(float, float4_e2m1x2_t, float4_e2m1x2_t)`, `(float, float4_e2m1x2_t, float4_e1m2x2_t)`.
 - **Bias form**:
     - `TileBias::DType` must be `float` and `TileBias::Loc == TileType::Bias` with `TileBias::Rows == 1` (A5 checks via `static_assert`).
+- **Accumulator form**:
+    - `cOutMatrix.data() == cInMatrix.data()`; accumulator input and output must use the same tile or the same address alias.
 
 ## Examples
 
@@ -100,6 +109,8 @@ void example_auto() {
 
 using namespace pto;
 
+constexpr int kTileNum = 4;
+
 void example_manual() {
   using A = TileLeft<float8_e5m2_t, 16, 64>;
   using B = TileRight<float8_e5m2_t, 64, 32>;
@@ -119,6 +130,12 @@ void example_manual() {
   TASSIGN(scaleB, GetScaleAddr(b.data()));
   TASSIGN(bias, 0x3000);
   TASSIGN(c, 0x4000);
-  TMATMUL_MX(c, a, scaleA, b, scaleB, bias);
+  for (int i = 0; i < kTileNum; ++i) {
+    if (i == 0) {
+      TMATMUL_MX(c, a, scaleA, b, scaleB, bias);
+    } else {
+      TMATMUL_MX(c, c, a, scaleA, b, scaleB);
+    }
+  }
 }
 ```

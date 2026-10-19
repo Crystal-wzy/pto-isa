@@ -150,6 +150,9 @@ template <AccPhase Phase = AccPhase::Unspecified, typename TileRes, typename Til
 PTO_INTERNAL void TGEMV_ACC_IMPL(TileRes& cOutMatrix, TileRes& cInMatrix, TileLeft& aMatrix, TileRight& bMatrix)
 {
     CheckStaticMad<TileRes, TileLeft, TileRight, 1>();
+    PTO_ASSERT(
+        cOutMatrix.data() == cInMatrix.data(),
+        "TGEMV_ACC: cOutMatrix and cInMatrix must reference the same accumulator tile.");
     uint16_t k = bMatrix.GetValidRow();
     uint16_t n = bMatrix.GetValidCol();
     bool kDirectionAlign = GetKDirectionAlign(aMatrix, bMatrix);
@@ -196,6 +199,9 @@ template <AccPhase Phase = AccPhase::Unspecified, typename TileRes, typename Til
 PTO_INTERNAL void TMATMUL_ACC_IMPL(TileRes& cOutMatrix, TileRes& cInMatrix, TileLeft& aMatrix, TileRight& bMatrix)
 {
     CheckStaticMad<TileRes, TileLeft, TileRight, TileLeft::ValidRow>();
+    PTO_ASSERT(
+        cOutMatrix.data() == cInMatrix.data(),
+        "TMATMUL_ACC: cOutMatrix and cInMatrix must reference the same accumulator tile.");
     uint16_t m = aMatrix.GetValidRow();
     uint16_t k = aMatrix.GetValidCol();
     uint16_t n = bMatrix.GetValidCol();

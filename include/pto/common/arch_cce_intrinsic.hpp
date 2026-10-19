@@ -342,7 +342,8 @@ PTO_INTERNAL void pto_copy_ubuf_to_gm_align_v2(
 }
 #endif
 
-#if defined(PTO_NPU_ARCH_KIRIN9030)
+#if defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRIN9050)
+// Byte-based L1->GM move, 8/16/32-bit.
 template <typename T>
 PTO_INTERNAL void pto_copy_cbuf_to_gm_align_v2(
     __gm__ T* dst, __cbuf__ T* src, uint8_t sid, uint32_t nBurst, uint32_t lenBurst, uint64_t burstDstStride,

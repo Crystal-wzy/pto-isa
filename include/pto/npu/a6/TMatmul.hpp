@@ -316,6 +316,9 @@ PTO_INTERNAL void TMATMUL_IMPL(TileRes& cMatrix, TileLeft& aMatrix, TileRight& b
 template <AccPhase Phase = AccPhase::Unspecified, typename TileRes, typename TileLeft, typename TileRight>
 PTO_INTERNAL void TMATMUL_ACC_IMPL(TileRes& cOutMatrix, TileRes& cInMatrix, TileLeft& aMatrix, TileRight& bMatrix)
 {
+    PTO_ASSERT(
+        cOutMatrix.data() == cInMatrix.data(),
+        "TMATMUL_ACC: cOutMatrix and cInMatrix must reference the same accumulator tile.");
     (void)cInMatrix;
     RunA6Matmul<false, Phase>(cOutMatrix, aMatrix, bMatrix);
 }

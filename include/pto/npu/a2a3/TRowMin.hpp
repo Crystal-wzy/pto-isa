@@ -17,6 +17,8 @@ namespace pto {
 // Float/Half operation traits (for vcmin-based implementation)
 template <typename T>
 struct TRowMinOp : TRowReduceOp<T, TRowMinOp<T>> {
+    static constexpr bool IsFoldOrderInsensitive = true; // vmin is commutative + associative
+
     PTO_INTERNAL static void BinInstrImpl(
         __ubuf__ T* dst, __ubuf__ T* src0, __ubuf__ T* src1, uint8_t rptTimes, uint16_t dstRptStride,
         uint16_t src0RptStride, uint16_t src1RptStride, uint8_t dstBlockStride = 1, uint8_t src0BlockStride = 1,

@@ -69,7 +69,7 @@ AICORE void TCmps(
     }
 
     std::vector<uint8_t> out_uint8;
-    size_t bits_per_row = W / 8;
+    size_t bits_per_row = (srcValidCol + 7) / 8;
 
     for (size_t h = 0; h < H; ++h) {
         for (size_t i = 0; i < bits_per_row; ++i) {
@@ -97,8 +97,8 @@ AICORE void TCmps(
     }
 }
 
-template <typename TileDataDst, typename TileDataSrc, typename T>
-PTO_INTERNAL void TCMPS_IMPL(TileDataDst& dst, TileDataSrc& src0, T src1, CmpMode cmpMode)
+template <typename TileDataDst, typename TileDataSrc>
+PTO_INTERNAL void TCMPS_IMPL(TileDataDst& dst, TileDataSrc& src0, typename TileDataSrc::DType src1, CmpMode cmpMode)
 {
     unsigned dstValidRow = dst.GetValidRow();
     unsigned dstValidCol = dst.GetValidCol();
@@ -109,7 +109,7 @@ PTO_INTERNAL void TCMPS_IMPL(TileDataDst& dst, TileDataSrc& src0, T src1, CmpMod
     unsigned dstStride = TileDataDst::RowStride;
     unsigned srcStride = TileDataSrc::RowStride;
 
-    TCmps<TileDataDst, TileDataSrc, T>(
+    TCmps<TileDataDst, TileDataSrc, typename TileDataSrc::DType>(
         dst.data(), src0.data(), src1, cmpMode, srcValidRow, srcValidCol, dstValidRow, dstValidCol, dstStride,
         srcStride);
 }
@@ -147,7 +147,7 @@ PTO_INTERNAL void TCMPS_IMPL(TileDataDst& dst, TileDataSrc0& src0, TileDataSrc1&
     }
 
     std::vector<uint8_t> out_uint8;
-    size_t bits_per_row = W / 8;
+    size_t bits_per_row = (srcValidCol + 7) / 8;
 
     for (size_t h = 0; h < H; ++h) {
         for (size_t i = 0; i < bits_per_row; ++i) {

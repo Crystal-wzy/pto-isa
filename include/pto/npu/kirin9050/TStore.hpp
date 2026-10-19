@@ -17,66 +17,105 @@ See LICENSE in the root of the software repository for the full text of the Lice
 namespace pto {
 
 template <typename GlobalData, typename TileData>
-PTO_INTERNAL void TStoreMatViaUb(
-    typename GlobalData::DType* dstAddr, __cbuf__ typename TileData::DType* srcAddr,
-    __ubuf__ typename TileData::DType* ubAddr, int gShape0, int gShape1, int gShape2, int gShape3, int gShape4,
-    int gStride0, int gStride1, int gStride2, int gStride3, int gStride4, int validRow, int validCol)
+PTO_INTERNAL void TStoreMatNz2Nz(
+    typename GlobalData::DType* dstAddr, __cbuf__ typename TileData::DType* srcAddr, int gShape0, int gShape1,
+    int gShape2, int gShape3, int gShape4, int gStride0, int gStride1, int gStride2, int gStride3, int gStride4,
+    int validRow, int validCol)
 {
     static_assert(
         GlobalData::staticShape[3] == FRACTAL_NZ_ROW &&
             GlobalData::staticShape[4] == BLOCK_BYTE_SIZE / sizeof(typename TileData::DType),
         "When TileData is NZ format, the last 2 dim must be static and satisfy [16, 32 / sizeof(DataType)]");
+    static_assert(
+        sizeof(typename TileData::DType) == 1 || sizeof(typename TileData::DType) == 2 ||
+            sizeof(typename TileData::DType) == 4,
+        "TStoreMatNz2Nz supports 8/16/32-bit payloads.");
     PTO_ASSERT(gShape1 < 4096, "The gshape1 (which equals nBurst) must be less than 4096");
     PTO_ASSERT(validRow == gShape2 * gShape3, "The validRow of TileData must be equal to Shape2 * Shape3 of NZ shape!");
     PTO_ASSERT(
         validCol == gShape0 * gShape1 * gShape4,
         "The validCol of TileData must be equal to Shape0 * Shape1 * Shape4 of NZ shape!");
 
-    uint32_t totalBytes = TileData::Rows * TileData::Cols * sizeof(typename TileData::DType);
-    uint32_t burstLen = totalBytes / BLOCK_BYTE_SIZE;
-    uint64_t fixpNzPara =
-        static_cast<uint64_t>(1) | (static_cast<uint64_t>(burstLen) << 16) | (static_cast<uint64_t>(1) << 32);
-    set_fixp_nz_para(fixpNzPara);
-    pto_copy_cbuf_to_ubuf((__ubuf__ void*)ubAddr, (__cbuf__ void*)srcAddr, 0, 1, burstLen, 0, 0);
-    set_fixp_nz_para(0);
-    pipe_barrier(PIPE_ALL);
-
-    uint16_t nBurst = gShape1;
-    uint32_t lenBurstBytes = validRow * sizeof(typename TileData::DType);
-    uint32_t srcGap = (TileData::Rows - validRow) * sizeof(typename TileData::DType) / BLOCK_BYTE_SIZE;
-    uint32_t dstGap = (gStride1 - gShape2 * gShape3 * gShape4) * sizeof(typename TileData::DType);
-
-    typename GlobalData::DType* dstAddrP = dstAddr;
-    __ubuf__ typename TileData::DType* ubSrcP = ubAddr;
-
+    // Byte-based move: lenBurst / strides are in bytes.
+    uint32_t nBurst = static_cast<uint32_t>(gShape1);
+    uint32_t lenBurst = static_cast<uint32_t>(validRow) * C0_SIZE_BYTE;
+    uint64_t dstStride = static_cast<uint64_t>(gStride1) * sizeof(typename TileData::DType);
+    uint32_t srcGap = (TileData::Rows * C0_SIZE_BYTE) - lenBurst;
+    uint32_t burstSrcStride = ((lenBurst + 31U) / 32U) * 32U + srcGap;
     int64_t tileStride = TileData::Rows * gShape1 * gShape4;
 
+    set_loop_size_l1toout(1ULL << 21 | 1ULL);
     for (uint32_t i = 0; i < gShape0; i++) {
-        dstAddrP = dstAddr + i * gStride0;
-        ubSrcP = ubAddr + i * tileStride;
-        pto_copy_ubuf_to_gm_align_v2(
-            reinterpret_cast<__gm__ typename GlobalData::RawDType*>(dstAddrP),
-            reinterpret_cast<__ubuf__ typename TileData::DType*>(ubSrcP), 0, nBurst, lenBurstBytes, 0,
-            srcGap * BLOCK_BYTE_SIZE, dstGap);
+        pto_copy_cbuf_to_gm_align_v2<typename TileData::DType>(
+            reinterpret_cast<__gm__ typename GlobalData::DType*>(dstAddr + i * gStride0),
+            reinterpret_cast<__cbuf__ typename TileData::DType*>(srcAddr + i * tileStride), 0, nBurst, lenBurst,
+            dstStride, burstSrcStride);
     }
+    pipe_barrier(PIPE_MTE3);
 }
 
-template <typename GlobalData, typename TileData, typename UbTile, AtomicType atomicType = AtomicType::AtomicNone>
+// L1 NZ Mat -> GM ND. NZ->ND is done in software (the L1->GM move does no layout
+// transform): one 16-row burst per C0 column of each NZ fractal.
+// Scope: 2D ND global Shape<1, 1, 1, rows, cols>; NC1HWC0 / higher-rank not handled.
+template <typename GlobalData, typename TileData>
+PTO_INTERNAL void TStoreMatNz2Nd(
+    typename GlobalData::DType* dstAddr, __cbuf__ typename TileData::DType* srcAddr, int gShape0, int gShape1,
+    int gShape2, int gShape3, int gShape4, int gStride0, int gStride1, int gStride2, int gStride3, int gStride4,
+    int validRow, int validCol)
+{
+    static_assert(
+        sizeof(typename TileData::DType) == 1 || sizeof(typename TileData::DType) == 2 ||
+            sizeof(typename TileData::DType) == 4,
+        "TStoreMat NZ2ND supports 8/16/32-bit payloads.");
+    PTO_ASSERT(
+        gShape0 == 1 && gShape1 == 1 && gShape2 == 1,
+        "TStoreMat NZ2ND currently supports a 2D ND global: Shape<1, 1, 1, rows, cols>!");
+    PTO_ASSERT(validRow == gShape3, "The validRow of TileData must equal the rows dim(gShape3) of the ND global!");
+    PTO_ASSERT(validCol == gShape4, "The validCol of TileData must equal the cols dim(gShape4) of the ND global!");
+
+    constexpr uint32_t c0Size = C0_SIZE_BYTE / sizeof(typename TileData::DType);
+    constexpr uint32_t fractalElems = FRACTAL_NZ_ROW * c0Size;
+    constexpr uint32_t rowBytes = C0_SIZE_BYTE;
+    int hCount = validRow / FRACTAL_NZ_ROW;
+    int nc1 = validCol / static_cast<int>(c0Size);
+    uint64_t burstDstStride = static_cast<uint64_t>(gStride3) * sizeof(typename TileData::DType);
+
+    set_loop_size_l1toout(1ULL << 21 | 1ULL);
+    for (int blk = 0; blk < nc1; blk++) {
+        for (int h = 0; h < hCount; h++) {
+            __cbuf__ typename TileData::DType* srcP =
+                srcAddr + blk * hCount * static_cast<int>(fractalElems) + h * static_cast<int>(fractalElems);
+            typename GlobalData::DType* dstP = dstAddr + h * FRACTAL_NZ_ROW * gStride3 + blk * static_cast<int>(c0Size);
+            pto_copy_cbuf_to_gm_align_v2<typename TileData::DType>(
+                reinterpret_cast<__gm__ typename GlobalData::DType*>(dstP),
+                reinterpret_cast<__cbuf__ typename TileData::DType*>(srcP), 0, static_cast<uint32_t>(FRACTAL_NZ_ROW),
+                rowBytes, burstDstStride, rowBytes);
+        }
+    }
+    pipe_barrier(PIPE_MTE3);
+}
+
+template <typename GlobalData, typename TileData, AtomicType atomicType = AtomicType::AtomicNone>
 __tf__ AICORE void TStoreMat(
-    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src,
-    typename UbTile::TileDType __in__ ubTmp, int gShape0, int gShape1, int gShape2, int gShape3, int gShape4,
-    int gStride0, int gStride1, int gStride2, int gStride3, int gStride4, int validRow, int validCol)
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int gShape0, int gShape1,
+    int gShape2, int gShape3, int gShape4, int gStride0, int gStride1, int gStride2, int gStride3, int gStride4,
+    int validRow, int validCol)
 {
     __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
-    __ubuf__ typename TileData::DType* ubAddr = (__ubuf__ typename TileData::DType*)__cce_get_tile_ptr(ubTmp);
     typename GlobalData::DType* dstAddr = dst;
 
     static_assert(
         !TileData::isRowMajor && (TileData::SFractal == SLayout::RowMajor),
         "TStoreMat: only support NZ fractal layout.");
-    TStoreMatViaUb<GlobalData, TileData>(
-        dstAddr, srcAddr, ubAddr, gShape0, gShape1, gShape2, gShape3, gShape4, gStride0, gStride1, gStride2, gStride3,
-        gStride4, validRow, validCol);
+    if constexpr (GlobalData::layout == pto::Layout::ND) {
+        TStoreMatNz2Nd<GlobalData, TileData>(
+            dstAddr, srcAddr, gShape0, gShape1, gShape2, gShape3, gShape4, gStride0, gStride1, gStride2, gStride3,
+            gStride4, validRow, validCol);
+    } else {
+        TStoreMatNz2Nz<GlobalData, TileData>(
+            dstAddr, srcAddr, gShape0, gShape1, gShape2, gShape3, gShape4, gStride0, gStride1, gStride2, gStride3,
+            gStride4, validRow, validCol);
+    }
 }
 
 template <typename GlobalData, typename TileData, TStoreL2Hint l2Control>
@@ -208,7 +247,14 @@ PTO_INTERNAL void TSTORE_IMPL(GlobalData& dst, TileData& src)
         "Source TileType only support Vec/Acc/Mat!");
     static_assert(atomicType == AtomicType::AtomicNone, "Fix: AtomicAdd is not supported on 9050.");
     if constexpr (TileData::Loc == pto::TileType::Mat) {
-        static_assert(sizeof(TileData::DType) == 0, "TSTORE(Mat2GM): use TMOV(Mat->Vec) then TSTORE(Vec2GM) instead.");
+        static_assert(
+            sizeof(typename TileData::DType) == 1 || sizeof(typename TileData::DType) == 2 ||
+                sizeof(typename TileData::DType) == 4,
+            "TSTORE(Mat2GM) on 9050 supports 8/16/32-bit Mat tiles.");
+        TStoreMat<GlobalData, TileData>(
+            dst.data(), src.data(), dst.GetShape(dim0), dst.GetShape(dim1), dst.GetShape(dim2), dst.GetShape(dim3),
+            dst.GetShape(dim4), dst.GetStride(dim0), dst.GetStride(dim1), dst.GetStride(dim2), dst.GetStride(dim3),
+            dst.GetStride(dim4), src.GetValidRow(), src.GetValidCol());
     } else if constexpr (TileData::Loc == pto::TileType::Acc) {
         static_assert(sizeof(TileData::DType) == 0, "TSTORE(Acc2GM): use TMOV(Acc->Vec) then TSTORE(Vec2GM) instead.");
     } else if constexpr (TileData::Loc == pto::TileType::Vec) {

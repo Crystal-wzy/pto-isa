@@ -7,7 +7,7 @@
 
 ## Introduction
 
-Tile-based GEMV with explicit accumulator input tile (`cInMatrix`) and output tile (`cOutMatrix`).
+Tile-based GEMV with accumulator input (fused accumulate). `cOutMatrix` and `cInMatrix` must reference the same accumulator tile; the operation updates that tile in place.
 
 ## See also
 
@@ -25,6 +25,8 @@ PTO_INST RecordEvent TGEMV_ACC(TileRes &cOutMatrix, TileRes &cInMatrix, TileLeft
 template <AccPhase Phase, typename TileRes, typename TileLeft, typename TileRight, typename... WaitEvents>
 PTO_INST RecordEvent TGEMV_ACC(TileRes &cOutMatrix, TileRes &cInMatrix, TileLeft &aMatrix, TileRight &bMatrix, WaitEvents &... events);
 ```
+
+`cOutMatrix` and `cInMatrix` must reference the same accumulator tile; The underlying instruction takes a single C-matrix address, so accumulator input and output must use the same tile or the same address alias.
 
 ## Math Interpretation
 
@@ -56,6 +58,7 @@ The existing `C` element is the initial accumulator value for the fused multiply
     - `m` must be `1`
     - `k` and `n` (taken from `bMatrix.GetValidRow()` and `bMatrix.GetValidCol()`) must be in `[1, 4095]`
 - The `TMATMUL` accumulator pitch constraint also applies.
+- `cOutMatrix.data() == cInMatrix.data()`; accumulator input and output must use the same tile or the same address alias.
 
 ### Datatype constraints
 
@@ -93,8 +96,8 @@ void example_auto() {
   using C = TileAcc<float, 1, 16>;
   A a;
   B b;
-  C c0, c1;
-  TGEMV_ACC(c1, c0, a, b);
+  C c;
+  TGEMV_ACC(c, c, a, b);
 }
 ```
 
@@ -105,17 +108,24 @@ void example_auto() {
 
 using namespace pto;
 
+constexpr int kTileNum = 4;
+
 void example_manual() {
   using A = TileLeft<half, 1, 16>;
   using B = TileRight<half, 16, 16>;
   using C = TileAcc<float, 1, 16>;
   A a;
   B b;
-  C c0, c1;
+  C c;
   TASSIGN(a, 0x1000);
   TASSIGN(b, 0x2000);
-  TASSIGN(c0, 0x3000);
-  TASSIGN(c1, 0x4000);
-  TGEMV_ACC(c1, c0, a, b);
+  TASSIGN(c, 0x3000);
+  for (int i = 0; i < kTileNum; ++i) {
+    if (i == 0) {
+      TGEMV(c, a, b);
+    } else {
+      TGEMV_ACC(c, c, a, b);
+    }
+  }
 }
 ```

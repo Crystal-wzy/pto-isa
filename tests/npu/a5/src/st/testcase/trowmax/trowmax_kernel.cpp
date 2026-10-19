@@ -395,6 +395,136 @@ extern "C" __global__ AICORE void launchTROWMAXCase56(__gm__ uint16_t* out, __gm
     runTRowMax<uint16_t, 8, 8, 448, 448, 1>(out, src);
 }
 
+extern "C" __global__ AICORE void launchTROWMAXCase57(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 8, 8, 8, 1, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase58(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 1, 1, 8192, 8192, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase59(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 256, 256, 64, 64, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase60(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 8, 8, 2048, 2048, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase61(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 64, 64, 64, 1, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase62(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 63, 63, 72, 65, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase63(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 33, 33, 136, 129, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase64(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 238, 237, 80, 79, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase65(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMax<half, 64, 64, 128, 128, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase66(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMax<half, 32, 32, 256, 255, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase67(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMax<half, 16, 16, 512, 512, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase68(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMax<half, 8, 8, 1024, 1024, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase69(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMax<half, 30, 30, 224, 24, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase70(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMax<int8_t, 128, 128, 256, 256, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase71(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMax<int8_t, 64, 64, 256, 255, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase72(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMax<int8_t, 32, 32, 256, 256, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase73(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMax<int8_t, 16, 16, 256, 255, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase74(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMax<int8_t, 8, 8, 512, 512, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase75(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMax<uint8_t, 128, 128, 256, 256, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase76(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMax<uint8_t, 8, 8, 512, 511, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase77(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMax<uint8_t, 2, 2, 2048, 2048, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase78(__gm__ uint32_t* out, __gm__ uint32_t* src)
+{
+    runTRowMax<uint32_t, 31, 31, 128, 127, 1>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase79(__gm__ uint16_t* out, __gm__ uint16_t* src)
+{
+    runTRowMax<uint16_t, 32, 32, 128, 127, 1>(out, src);
+}
+
+extern "C" __global__ AICORE void launchTROWMAXCase80(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 106, 105, 192, 191, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase81(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 1, 1, 16384, 16384, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase82(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 30, 11, 216, 216, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase83(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 64, 1, 64, 64, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase84(__gm__ float* out, __gm__ float* src)
+{
+    runTRowMax<float, 251, 250, 96, 95, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase85(__gm__ half* out, __gm__ half* src)
+{
+    runTRowMax<half, 128, 127, 320, 319, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase86(__gm__ int16_t* out, __gm__ int16_t* src)
+{
+    runTRowMax<int16_t, 200, 199, 208, 207, 1, 16>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase87(__gm__ int8_t* out, __gm__ int8_t* src)
+{
+    runTRowMax<int8_t, 88, 87, 896, 887, 1, 32>(out, src);
+}
+extern "C" __global__ AICORE void launchTROWMAXCase88(__gm__ uint8_t* out, __gm__ uint8_t* src)
+{
+    runTRowMax<uint8_t, 88, 87, 896, 887, 1, 32>(out, src);
+}
+
 template <uint32_t caseId>
 void launchTROWMAXTestCase(void* out, void* src, aclrtStream stream)
 {
@@ -623,6 +753,134 @@ void launchTROWMAXTestCase(void* out, void* src, aclrtStream stream)
             launchTROWMAXCase56<<<1, nullptr, stream>>>((uint16_t*)out, (uint16_t*)src);
             break;
         }
+        case 57: {
+            launchTROWMAXCase57<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 58: {
+            launchTROWMAXCase58<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 59: {
+            launchTROWMAXCase59<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 60: {
+            launchTROWMAXCase60<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 61: {
+            launchTROWMAXCase61<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 62: {
+            launchTROWMAXCase62<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 63: {
+            launchTROWMAXCase63<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 64: {
+            launchTROWMAXCase64<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 65: {
+            launchTROWMAXCase65<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 66: {
+            launchTROWMAXCase66<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 67: {
+            launchTROWMAXCase67<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 68: {
+            launchTROWMAXCase68<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 69: {
+            launchTROWMAXCase69<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 70: {
+            launchTROWMAXCase70<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 71: {
+            launchTROWMAXCase71<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 72: {
+            launchTROWMAXCase72<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 73: {
+            launchTROWMAXCase73<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 74: {
+            launchTROWMAXCase74<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 75: {
+            launchTROWMAXCase75<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
+        case 76: {
+            launchTROWMAXCase76<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
+        case 77: {
+            launchTROWMAXCase77<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
+        case 78: {
+            launchTROWMAXCase78<<<1, nullptr, stream>>>((uint32_t*)out, (uint32_t*)src);
+            break;
+        }
+        case 79: {
+            launchTROWMAXCase79<<<1, nullptr, stream>>>((uint16_t*)out, (uint16_t*)src);
+            break;
+        }
+        case 80: {
+            launchTROWMAXCase80<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 81: {
+            launchTROWMAXCase81<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 82: {
+            launchTROWMAXCase82<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 83: {
+            launchTROWMAXCase83<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 84: {
+            launchTROWMAXCase84<<<1, nullptr, stream>>>((float*)out, (float*)src);
+            break;
+        }
+        case 85: {
+            launchTROWMAXCase85<<<1, nullptr, stream>>>((half*)out, (half*)src);
+            break;
+        }
+        case 86: {
+            launchTROWMAXCase86<<<1, nullptr, stream>>>((int16_t*)out, (int16_t*)src);
+            break;
+        }
+        case 87: {
+            launchTROWMAXCase87<<<1, nullptr, stream>>>((int8_t*)out, (int8_t*)src);
+            break;
+        }
+        case 88: {
+            launchTROWMAXCase88<<<1, nullptr, stream>>>((uint8_t*)out, (uint8_t*)src);
+            break;
+        }
         default: {
         }
     }
@@ -684,3 +942,35 @@ template void launchTROWMAXTestCase<53>(void* out, void* src, aclrtStream stream
 template void launchTROWMAXTestCase<54>(void* out, void* src, aclrtStream stream);
 template void launchTROWMAXTestCase<55>(void* out, void* src, aclrtStream stream);
 template void launchTROWMAXTestCase<56>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<57>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<58>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<59>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<60>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<61>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<62>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<63>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<64>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<65>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<66>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<67>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<68>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<69>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<70>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<71>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<72>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<73>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<74>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<75>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<76>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<77>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<78>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<79>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<80>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<81>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<82>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<83>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<84>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<85>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<86>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<87>(void* out, void* src, aclrtStream stream);
+template void launchTROWMAXTestCase<88>(void* out, void* src, aclrtStream stream);
