@@ -33,7 +33,7 @@ svg { font-family: Arial, Helvetica, sans-serif; }
 <rect x="0" y="0" width="1200" height="720" class="frame" />
 <rect x="24" y="24" width="1152" height="672" class="panel"/>
 <text x="40" y="46" class="title">TGEMV_ACC</text>
-<text x="40" y="72" class="subtitle">GEMV with explicit accumulator input/output tiles.</text>
+<text x="40" y="72" class="subtitle">GEMV with in-place accumulator input/output tile.</text>
 <text x="40" y="92" class="meta">Template: matmul</text>
 <text x="1160" y="92" class="meta" text-anchor="end">Legend: outline=example; dashed=valid rows/cols (Rv,Cv); shaded=masked; r down / c right; ortho arrows=dataflow</text>
 <line x1="36" y1="104" x2="1164" y2="104" stroke="#e2e8f0" stroke-width="1.5" />
@@ -139,7 +139,7 @@ svg { font-family: Arial, Helvetica, sans-serif; }
 <path d="M 555 370 L 555 404" class="axisLine" marker-end="url(#axisArrow)" />
 <text x="593" y="374" class="axisText">c</text>
 <text x="553" y="408" class="axisText" text-anchor="end">r</text>
-<text x="600" y="140" class="subtitle" text-anchor="middle" fill="#1B7F91">C[0,j] = sum_k A[0,k] * B[k,j]</text>
+<text x="600" y="140" class="subtitle" text-anchor="middle" fill="#1B7F91">C[0,j] += sum_k A[0,k] * B[k,j] (in-place)</text>
 <circle cx="600" cy="324" r="22" class="opCircle" stroke="#1B7F91" />
 <rect x="583" y="307" width="34" height="34" rx="6" class="opRect" stroke="#1B7F91"/>
 <text x="600" y="322.5" class="opText" text-anchor="middle" font-size="8px">TGEMV_</text>
@@ -151,10 +151,10 @@ svg { font-family: Arial, Helvetica, sans-serif; }
 <text x="56" y="528" class="procTitle">Procedure (conceptual)</text>
 <text x="56" y="554" class="procText" xml:space="preserve">
   <tspan x="56" dy="0">for i,j in output valid region:</tspan>
-  <tspan x="56" dy="16">  acc = 0</tspan>
+  <tspan x="56" dy="16">  acc = C[0,j]  (same accumulator tile is input and output)</tspan>
   <tspan x="56" dy="16">  for k in 0..K-1:</tspan>
   <tspan x="56" dy="16">    acc += A[i,k] * B[k,j]</tspan>
-  <tspan x="56" dy="16">  C[i,j] = acc   (+ bias/acc, if applicable)</tspan>
+  <tspan x="56" dy="16">  C[0,j] = acc   (written back to the same tile)</tspan>
 </text>
 <text x="56" y="680" class="meta">Note: semantics apply to the valid region unless stated otherwise.</text>
 </svg>

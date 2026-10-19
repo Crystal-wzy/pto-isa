@@ -19,9 +19,9 @@ Let:
 
 For `0 <= i < M` and `0 <= j < N`:
 
-$$ \mathrm{C1}_{i,j} = \mathrm{C0}_{i,j} + \sum_{k=0}^{K-1} \mathrm{A}_{i,k} \cdot \mathrm{B}_{k,j} $$
+$$ \mathrm{C}_{i,j} \leftarrow \mathrm{C}_{i,j} + \sum_{k=0}^{K-1} \mathrm{A}_{i,k} \cdot \mathrm{B}_{k,j} $$
 
-`C0` is the initial accumulator value for the fused multiply-accumulate sequence. It is not added after computing an independent dot product from zero; this distinction can affect floating-point rounding across K tiles.
+The operation accumulates in place: the existing value in `cMatrix` is the initial accumulator value, and the result is written back to the same tile. It is not added after computing an independent dot product from zero; this distinction can affect floating-point rounding across K tiles.
 
 ## C++ Intrinsic
 
@@ -39,12 +39,14 @@ template <AccPhase Phase = AccPhase::Unspecified, typename TileRes, typename Til
 PTO_INST RecordEvent TMATMUL_ACC(TileRes &cMatrix, TileLeft &aMatrix, TileRight &bMatrix, WaitEvents &... events); // Note: this overload uses cMatrix as both accumulator input and output (in-place), reading its current value as C0 and writing back C1 = C0 + A·B; it neither zeroes nor overwrites
 ```
 
+The four-argument overload is retained for compatibility with existing call sites. Its `cOutMatrix` and `cInMatrix` must reference the same accumulator tile; Prefer the three-argument overload `TMATMUL_ACC(cMatrix, aMatrix, bMatrix)`.
+
 ## Constraints
 
 - All constraints from `TMATMUL` apply to the `(cOutMatrix, aMatrix, bMatrix)` triple.
-- **Implementation notes (A2A3/A5)**:
+ - **Implementation notes (A2A3/A5/A6)**:
     - `TMATMUL_ACC_IMPL` uses `aMatrix.GetValidRow()`, `aMatrix.GetValidCol()`, and `bMatrix.GetValidCol()` for `m/k/n`.
-    - `cInMatrix` is not validated by explicit assertions in the current implementations (target-defined behavior).
+    - The four-argument form requires `cOutMatrix.data() == cInMatrix.data()`; the underlying instruction takes a single C-matrix address, so accumulator input and output must use the same tile or the same address alias.
 
 - **Implementation checks (CPU_SIM, FP8/HIF8)**: Input type combinations, A5 simulation mode, and
   numerical limits follow [TMATMUL](TMATMUL.md#constraints).
@@ -64,8 +66,8 @@ void example_auto() {
   using C = TileAcc<float, 16, 16>;
   A a;
   B b;
-  C c0, c1;
-  TMATMUL_ACC(c1, c0, a, b);
+  C c;
+  TMATMUL_ACC(c, a, b);
 }
 ```
 
@@ -76,17 +78,25 @@ void example_auto() {
 
 using namespace pto;
 
+constexpr int kTileNum = 4;
+
 void example_manual() {
   using A = TileLeft<half, 16, 16>;
   using B = TileRight<half, 16, 16>;
   using C = TileAcc<float, 16, 16>;
   A a;
   B b;
-  C c0, c1;
+  C c;
   TASSIGN(a, 0x1000);
   TASSIGN(b, 0x2000);
-  TASSIGN(c0, 0x3000);
-  TASSIGN(c1, 0x4000);
-  TMATMUL_ACC(c1, c0, a, b);
+  TASSIGN(c, 0x3000);
+  for (int i = 0; i < kTileNum; ++i) {
+    // The first tile initializes C; subsequent tiles accumulate in place.
+    if (i == 0) {
+      TMATMUL(c, a, b);
+    } else {
+      TMATMUL_ACC(c, c, a, b);
+    }
+  }
 }
 ```

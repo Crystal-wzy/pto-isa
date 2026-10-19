@@ -6,7 +6,7 @@
 
 ## 简介
 
-带显式累加器输入Tile（`cInMatrix`）和输出Tile（`cOutMatrix`）的GEMV。
+带累加器输入的GEMV（融合累加）。`cOutMatrix` 和 `cInMatrix` 必须指向同一个累加器 Tile，运算原地更新该 Tile。
 
 ## 另请参见
 
@@ -25,6 +25,8 @@ PTO_INST RecordEvent TGEMV_ACC(TileRes &cOutMatrix, TileRes &cInMatrix, TileLeft
 template <AccPhase Phase, typename TileRes, typename TileLeft, typename TileRight, typename... WaitEvents>
 PTO_INST RecordEvent TGEMV_ACC(TileRes &cOutMatrix, TileRes &cInMatrix, TileLeft &aMatrix, TileRight &bMatrix, WaitEvents &... events);
 ```
+
+`cOutMatrix` 和 `cInMatrix` 必须指向同一个累加器 Tile；底层指令只接收一个 C 矩阵地址，累加输入和输出必须使用同一个 Tile 或同一地址别名。
 
 ## 数学语义
 
@@ -56,6 +58,7 @@ $$ \mathrm{C}_{0,j} \gets \mathrm{C}_{0,j} + \sum_{k=0}^{K-1} \mathrm{A}_{0,k} \
     - `m` 必须为 `1`
     - `k` 和 `n`（取自 `bMatrix.GetValidRow()` 与 `bMatrix.GetValidCol()`）必须位于 `[1, 4095]`
 - `TMATMUL` 的 Acc 步幅约束同样适用。
+- `cOutMatrix.data() == cInMatrix.data()`；累加输入和输出必须是同一个 Tile 或同一地址别名。
 
 ### 数据类型约束
 
@@ -93,8 +96,8 @@ void example_auto() {
   using C = TileAcc<float, 1, 16>;
   A a;
   B b;
-  C c0, c1;
-  TGEMV_ACC(c1, c0, a, b);
+  C c;
+  TGEMV_ACC(c, c, a, b);
 }
 ```
 
@@ -105,17 +108,24 @@ void example_auto() {
 
 using namespace pto;
 
+constexpr int kTileNum = 4;
+
 void example_manual() {
   using A = TileLeft<half, 1, 16>;
   using B = TileRight<half, 16, 16>;
   using C = TileAcc<float, 1, 16>;
   A a;
   B b;
-  C c0, c1;
+  C c;
   TASSIGN(a, 0x1000);
   TASSIGN(b, 0x2000);
-  TASSIGN(c0, 0x3000);
-  TASSIGN(c1, 0x4000);
-  TGEMV_ACC(c1, c0, a, b);
+  TASSIGN(c, 0x3000);
+  for (int i = 0; i < kTileNum; ++i) {
+    if (i == 0) {
+      TGEMV(c, a, b);
+    } else {
+      TGEMV_ACC(c, c, a, b);
+    }
+  }
 }
 ```
