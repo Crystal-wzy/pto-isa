@@ -11,7 +11,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #ifndef TPREFETCH_HPP
 #define TPREFETCH_HPP
 
-#include "TLoad.hpp"
+#include <pto/common/arch_impl_switch.hpp>
 
 namespace pto {
 template <typename TileData, typename GlobalData>

@@ -19,7 +19,13 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto {
 
+// Defined with the same guard as pto/npu/a5/common.hpp (included above): the
+// arch common headers share the COMMON_HPP guard, so a definition there is not
+// visible when another arch common header loads first (e.g. kirin9030 units).
+#ifndef PTO_DEFINED_BLOCK_SIZE
 constexpr const uint32_t BLOCK_SIZE = 32;
+#define PTO_DEFINED_BLOCK_SIZE
+#endif
 constexpr const uint32_t FLOAT_DST_STRIDE_COEF = 2;
 constexpr const uint32_t HALF_DST_STRIDE_COEF = 4;
 constexpr const uint32_t MAX_UB_TMP = 32 * 255;

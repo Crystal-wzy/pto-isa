@@ -19,19 +19,6 @@ namespace pto {
 
 inline namespace TMatmulInternal {
 template <typename TileRes, typename TileLeft, typename TileRight>
-PTO_INTERNAL void InitA6BiasMadOperands(
-    typename TileRes::TileDType cMatrix, typename TileLeft::TileDType aMatrix, typename TileRight::TileDType bMatrix,
-    uint64_t bias, __cc__ typename TileRes::DType*& c, __ca__ typename TileLeft::DType*& a,
-    __cb__ typename TileRight::DType*& b)
-{
-    c = (__cc__ typename TileRes::DType*)__cce_get_tile_ptr(cMatrix);
-    a = (__ca__ typename TileLeft::DType*)__cce_get_tile_ptr(aMatrix);
-    b = (__cb__ typename TileRight::DType*)__cce_get_tile_ptr(bMatrix);
-    uint64_t biasPacked = ((uint64_t)c) & 0xffffffffULL | ((bias & 0xffffffffULL) << 32);
-    c = (__cc__ typename TileRes::DType*)biasPacked;
-}
-
-template <typename TileRes, typename TileLeft, typename TileRight>
 inline constexpr bool kIsMmadF16F32 =
     std::is_same_v<typename TileRes::DType, float> && std::is_same_v<typename TileLeft::DType, half> &&
     std::is_same_v<typename TileRight::DType, half>;
@@ -114,10 +101,13 @@ __tf__ AICORE void TMatmulBias(
     typename TileRes::TileDType __out__ cMatrix, typename TileLeft::TileDType __in__ aMatrix,
     typename TileRight::TileDType __in__ bMatrix, uint64_t bias, uint16_t m, uint16_t k, uint16_t n)
 {
-    __cc__ typename TileRes::DType* c;
-    __ca__ typename TileLeft::DType* a;
-    __cb__ typename TileRight::DType* b;
-    InitA6BiasMadOperands<TileRes, TileLeft, TileRight>(cMatrix, aMatrix, bMatrix, bias, c, a, b);
+    // A6 packs the bias pointer into the low 32 bits of the C matrix pointer.
+    // __tf__ cannot chain another __tf__ helper, so this stays inline.
+    __cc__ typename TileRes::DType* c = (__cc__ typename TileRes::DType*)__cce_get_tile_ptr(cMatrix);
+    __ca__ typename TileLeft::DType* a = (__ca__ typename TileLeft::DType*)__cce_get_tile_ptr(aMatrix);
+    __cb__ typename TileRight::DType* b = (__cb__ typename TileRight::DType*)__cce_get_tile_ptr(bMatrix);
+    uint64_t biasPacked = ((uint64_t)c) & 0xffffffffULL | ((bias & 0xffffffffULL) << 32);
+    c = (__cc__ typename TileRes::DType*)biasPacked;
 
     PTO_A6_DISPATCH_MAD(c, a, b, m, k, n);
 }

@@ -10,8 +10,9 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 #ifndef TMOV_HPP
 #define TMOV_HPP
+#include <pto/common/constants.hpp>
 #include "common.hpp"
-#include "TExtract.hpp"
+#include <pto/common/arch_impl_switch.hpp>
 #include "TPartAdd.hpp"
 
 namespace pto {

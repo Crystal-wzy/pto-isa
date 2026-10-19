@@ -357,7 +357,8 @@ PTO_INTERNAL void pto_copy_cbuf_to_gm_align_v2(
 }
 #endif
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9030) || \
+    defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename T, typename U>
 PTO_INTERNAL void pto_copy_matrix_cc_to_cbuf(
     __cbuf__ T* dst, __cc__ U* src, uint8_t sid, uint16_t nSize, uint16_t mSize, uint32_t dstStride, uint16_t srcStride,
@@ -370,6 +371,14 @@ PTO_INTERNAL void pto_copy_matrix_cc_to_cbuf(
         dst, src, sid, nSize, mSize, dstStride, srcStride, l2CacheCtl, clipReluPre, unitFlagCtl, quantPre, reluPre,
         splitEn, nz2ndEn, quantPost, reluPost, clipReluPost, loopEnhanceEn, eltwiseOp, eltwiseAntqEn,
         loopEnhanceMergeEn, c0PadEn, winoPostEn, broadcastEn, nz2dnEn);
+#elif defined(PTO_NPU_ARCH_A6)
+    // A6 (dav-9201) drops the sid argument; position 7 (l2CacheCtl in A5) is a
+    // bool quant_pre_rnd slot in the 9201 signature, so it is fixed to false.
+    // The remaining parameters align one-to-one with the A5 layout.
+    copy_matrix_cc_to_cbuf(
+        dst, src, nSize, mSize, dstStride, srcStride, false, clipReluPre, unitFlagCtl, quantPre, reluPre, splitEn,
+        nz2ndEn, quantPost, reluPost, clipReluPost, loopEnhanceEn, eltwiseOp, eltwiseAntqEn, loopEnhanceMergeEn,
+        c0PadEn, winoPostEn, broadcastEn, nz2dnEn);
 #elif defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRIN9050)
     copy_matrix_cc_to_cbuf(
         dst, src, sid, nSize, mSize, dstStride, srcStride, clipReluPre, unitFlagCtl, quantPre, reluPre, splitEn,
@@ -394,8 +403,8 @@ PTO_INTERNAL void pto_copy_matrix_cc_to_cbuf(
 }
 #endif
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9030) || defined(PTO_NPU_ARCH_KIRIN9050) || \
-    defined(PTO_NPU_ARCH_KIRINX90)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9030) || \
+    defined(PTO_NPU_ARCH_KIRIN9050) || defined(PTO_NPU_ARCH_KIRINX90)
 template <typename T, typename U>
 PTO_INTERNAL void pto_copy_matrix_cc_to_ub(
     __ubuf__ T* dst, __cc__ U* src, uint8_t sid, uint16_t nSize, uint16_t mSize, uint32_t dstStride, uint16_t srcStride,
@@ -408,6 +417,15 @@ PTO_INTERNAL void pto_copy_matrix_cc_to_ub(
     copy_matrix_cc_to_ub(
         dst, src, sid, nSize, mSize, dstStride, srcStride, dualDstCtl, subBlockid, clipReluPre, unitFlagCtl, quantPre,
         reluPre, splitEn, nz2ndEn, quantPost, reluPost, clipReluPost, loopEnhanceEn, eltwiseOp, eltwiseAntqEn,
+        loopEnhanceMergeEn, c0PadEn, winoPostEn, broadcastEn, nz2dnEn);
+#elif defined(PTO_NPU_ARCH_A6)
+    // A6 (dav-9201) copy_matrix_cc_to_ub has no dualDstCtl/subBlockid control:
+    // the platform wrapper hard-fills positions 7-9 with 0/false/false and its
+    // 3510-signature compat layer drops dual_dst_ctl/sub_blockid entirely.
+    // Position 9 is the quant_pre_rnd slot (false = default rounding).
+    copy_matrix_cc_to_ub(
+        dst, src, nSize, mSize, dstStride, srcStride, 0, false, false, clipReluPre, unitFlagCtl, quantPre, reluPre,
+        splitEn, nz2ndEn, quantPost, reluPost, clipReluPost, loopEnhanceEn, eltwiseOp, eltwiseAntqEn,
         loopEnhanceMergeEn, c0PadEn, winoPostEn, broadcastEn, nz2dnEn);
 #elif defined(PTO_NPU_ARCH_KIRIN9030)
     copy_matrix_cc_to_ub(
@@ -449,6 +467,23 @@ PTO_INTERNAL void pto_copy_cbuf_to_ubuf(
 #endif
 
 } // namespace pto
+
+#if defined(PTO_NPU_ARCH_A6)
+// A5-signature compat overload for the 13-arg dav-9201 copy_gm_to_ubuf_align_v2.
+// pypto codegen emits the 11-arg A5 form directly (it bypasses the pto wrapper),
+// which the A6 builtin rejects at compile time; forward the extra controls
+// (pre_allocation/non_eod_ctrl) as false, mirroring pto_copy_gm_to_ubuf_align_v2.
+template <typename T>
+__aicore__ inline void copy_gm_to_ubuf_align_v2(
+    __ubuf__ T* dst, __gm__ T* src, uint8_t sid, uint32_t nBurst, uint32_t lenBurst, uint8_t leftPaddingCount,
+    uint8_t rightPaddingCount, bool constantPaddingCtl, uint8_t l2CacheCtl, uint64_t burstSrcStride,
+    uint32_t burstDstStride)
+{
+    copy_gm_to_ubuf_align_v2(
+        dst, src, sid, nBurst, lenBurst, leftPaddingCount, rightPaddingCount, constantPaddingCtl,
+        false /* pre_allocation */, l2CacheCtl, burstSrcStride, burstDstStride, false /* non_eod_ctrl */);
+}
+#endif
 
 #endif // __CPU_SIM
 #endif // ARCH_CCE_INTRINSIC_HPP

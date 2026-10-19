@@ -17,6 +17,15 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto {
 
+// 32-byte aligned block shared by the A5/A6 move & sort paths (TSort32, TMov ZZ).
+// Guarded so per-arch copies (e.g. kirinDev0000/kirin9050 TSort32) don't
+// re-define it; not placed in the global constants.hpp because a2a3/TSort32.hpp
+// carries its own unguarded definition that would collide in a2a3 units.
+#ifndef PTO_DEFINED_BLOCK_SIZE
+constexpr const uint32_t BLOCK_SIZE = 32;
+#define PTO_DEFINED_BLOCK_SIZE
+#endif
+
 template <typename T>
 PTO_INTERNAL uint64_t GetByteSize(const uint64_t value)
 {
@@ -184,6 +193,12 @@ template <typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMo
 PTO_INTERNAL constexpr uint8_t GetDualDstCtl()
 {
     if constexpr (mode == AccToVecMode::DualModeSplitM || mode == AccToVecMode::DualModeSplitN) {
+#if defined(PTO_NPU_ARCH_A6)
+        static_assert(
+            mode != AccToVecMode::DualModeSplitM && mode != AccToVecMode::DualModeSplitN,
+            "A6 (dav-9201) does not support dual-destination Acc->Vec moves "
+            "(DualModeSplitM/DualModeSplitN); use SingleModeVec0/1 or a software split.");
+#endif
         static_assert(quantPre == QuantMode_t::NoQuant, "Quant is not support in dual Dst Mode.");
         static_assert(
             (!(!DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox)),
