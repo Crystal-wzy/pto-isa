@@ -623,9 +623,16 @@ __tf__ PTO_INTERNAL void TTransConvNCHW2NC1HWC0(TileDataDst& dst, TileDataSrc& s
     const unsigned fullC1 = vC / C0;         // whole C0 blocks
     const unsigned vC1 = (vC + C0 - 1) / C0; // valid C1 blocks
 
-    const bool vecOk = TTransConvBlockAligned(dstC0, blockSizeElem) && TTransConvBlockAligned(dstH, blockSizeElem) &&
-                       TTransConvBlockAligned(dstC1, blockSizeElem) && TTransConvBlockAligned(dstN, blockSizeElem);
     const bool wContiguous = (vW == rawW) && ((unsigned)dst.GetShape(3) == rawW);
+    // The vector transpose reads 32B from every source-row address, so each address must be 32B
+    // aligned: the row stride (and the h offset when copying row by row) must be block aligned.
+    // Otherwise the hardware truncates the address down to a block boundary and the loaded data
+    // is shifted.
+    const bool srcAlignOk =
+        TTransConvBlockAligned(srcC, blockSizeElem) && (wContiguous || TTransConvBlockAligned(rawW, blockSizeElem));
+    const bool vecOk = srcAlignOk && TTransConvBlockAligned(dstC0, blockSizeElem) &&
+                       TTransConvBlockAligned(dstH, blockSizeElem) && TTransConvBlockAligned(dstC1, blockSizeElem) &&
+                       TTransConvBlockAligned(dstN, blockSizeElem);
     const unsigned xMax = wContiguous ? (vH * rawW) : vW;
     const unsigned xRun = (xMax > 255U * blockSizeElem) ? (255U * blockSizeElem) : xMax;
     const unsigned tmpNeed = xRun * (((C0 + Y_ELEM_OTHER - 1) / Y_ELEM_OTHER) * Y_ELEM_OTHER);
@@ -792,10 +799,14 @@ __tf__ PTO_INTERNAL void TTransConvGNCHW2GNC1HWC0(TileDataDst& dst, TileDataSrc&
     const unsigned fullC1 = vC / C0;
     const unsigned vC1 = (vC + C0 - 1) / C0;
 
-    const bool vecOk = TTransConvBlockAligned(dstC0, blockSizeElem) && TTransConvBlockAligned(dstH, blockSizeElem) &&
-                       TTransConvBlockAligned(dstC1, blockSizeElem) && TTransConvBlockAligned(dstN, blockSizeElem) &&
-                       TTransConvBlockAligned(dstG, blockSizeElem);
     const bool wContiguous = (vW == rawW) && (dstW == rawW);
+    // The vector transpose reads 32B from every source-row address, so the row stride (and the
+    // h offset when copying row by row) must be 32B block aligned.
+    const bool srcAlignOk =
+        TTransConvBlockAligned(srcC, blockSizeElem) && (wContiguous || TTransConvBlockAligned(rawW, blockSizeElem));
+    const bool vecOk = srcAlignOk && TTransConvBlockAligned(dstC0, blockSizeElem) &&
+                       TTransConvBlockAligned(dstH, blockSizeElem) && TTransConvBlockAligned(dstC1, blockSizeElem) &&
+                       TTransConvBlockAligned(dstN, blockSizeElem) && TTransConvBlockAligned(dstG, blockSizeElem);
     const unsigned xMax = wContiguous ? (vH * rawW) : vW;
     const unsigned xRun = (xMax > 255U * blockSizeElem) ? (255U * blockSizeElem) : xMax;
     const unsigned tmpNeed = xRun * (((C0 + Y_ELEM_OTHER - 1) / Y_ELEM_OTHER) * Y_ELEM_OTHER);
@@ -1144,10 +1155,15 @@ __tf__ PTO_INTERNAL void TTransConvNCHW2FractalZ(TileDataDst& dst, TileDataSrc& 
     const unsigned flatC1 = (flatC1Max < vC1) ? flatC1Max : vC1; // never read past the valid C
     const unsigned flatPad = validFlat ? 0 : (rawHWPad - rawHW);
 
-    const bool vecOk = TTransConvBlockAligned(dstD, blockSizeElem) && TTransConvBlockAligned(dstC0, blockSizeElem) &&
+    const bool wContiguous = (vW == rawW);
+    // The vector transpose reads 32B from every source-row address, so the row stride (and the
+    // h offset when copying row by row) must be 32B block aligned.
+    const bool srcAlignOk =
+        TTransConvBlockAligned(srcC, blockSizeElem) && (wContiguous || TTransConvBlockAligned(rawW, blockSizeElem));
+    const bool vecOk = srcAlignOk && TTransConvBlockAligned(dstD, blockSizeElem) &&
+                       TTransConvBlockAligned(dstC0, blockSizeElem) &&
                        TTransConvBlockAligned(dstC0 * sizeof(T) / BLOCK_BYTE_SIZE * BLOCK_BYTE_SIZE, blockSizeElem) &&
                        (dstD * sizeof(T) / BLOCK_BYTE_SIZE) <= 0xFFFFU;
-    const bool wContiguous = (vW == rawW);
     const unsigned xMax = wContiguous ? (vH * rawW) : vW;
     const unsigned xRun = (xMax > 255U * blockSizeElem) ? (255U * blockSizeElem) : xMax;
     const unsigned tmpNeed = xRun * (((C0 + Y_ELEM_OTHER - 1) / Y_ELEM_OTHER) * Y_ELEM_OTHER);
@@ -1296,9 +1312,17 @@ __tf__ PTO_INTERNAL void TTransConvNCDHW2FractalZ3D(TileDataDst& dst, TileDataSr
     const unsigned d0 = (unsigned)dst.GetValidShape(0);
     const unsigned hullN = vN1 * N0;
 
-    const bool vecOk = TTransConvBlockAligned(dstD, blockSizeElem) && TTransConvBlockAligned(dstC0, blockSizeElem) &&
-                       (dstD * sizeof(T) / BLOCK_BYTE_SIZE) <= 0xFFFFU;
     const bool wContiguous = (vW == rawW);
+    // The vector transpose reads 32B starting at every source-row address, so each address must be
+    // 32B aligned. Source rows are offset by n / d planes (and by h when copying row by row); when
+    // those strides are not block aligned the hardware truncates each address down to a block
+    // boundary, so the data loaded for a row is shifted by one 16B/32B unit. Fall back to the
+    // scalar path in that case.
+    const bool srcAlignOk = TTransConvBlockAligned(srcC, blockSizeElem) &&
+                            TTransConvBlockAligned(rawHW, blockSizeElem) &&
+                            (wContiguous || TTransConvBlockAligned(rawW, blockSizeElem));
+    const bool vecOk = srcAlignOk && TTransConvBlockAligned(dstD, blockSizeElem) &&
+                       TTransConvBlockAligned(dstC0, blockSizeElem) && (dstD * sizeof(T) / BLOCK_BYTE_SIZE) <= 0xFFFFU;
     const unsigned xMax = wContiguous ? (vH * rawW) : vW;
     const unsigned xRun = (xMax > 255U * blockSizeElem) ? (255U * blockSizeElem) : xMax;
     const unsigned tmpNeed = xRun * (((C0 + Y_ELEM_OTHER - 1) / Y_ELEM_OTHER) * Y_ELEM_OTHER);

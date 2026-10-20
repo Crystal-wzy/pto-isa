@@ -118,6 +118,7 @@ void LaunchTTRANS3D(T* out, T* src, void* stream)
 }
 
 // NCDHW -> FRACTAL_Z_3D
+template void LaunchTTRANS3D<float, 72, 2, 16, 8, 24, 10, 3, 3, 4>(float* out, float* src, void* stream);
 template void LaunchTTRANS3D<float, 8, 1, 16, 8, 2, 4, 2, 2, 2>(float* out, float* src, void* stream);
 template void LaunchTTRANS3D<float, 16, 1, 16, 8, 4, 5, 2, 2, 4>(float* out, float* src, void* stream);
 template void LaunchTTRANS3D<int32_t, 12, 2, 16, 8, 17, 3, 3, 2, 2>(int32_t* out, int32_t* src, void* stream);

@@ -82,6 +82,8 @@ void test_ttrans_3d()
     EXPECT_TRUE(ret);
 }
 
+TEST_F(TTRANS3DTest, case1_float32_24_10_3_3_4) { test_ttrans_3d<float, 72, 2, 16, 8, 24, 10, 3, 3, 4>(); }
+
 TEST_F(TTRANS3DTest, case1_float32_2_4_2_2_2) { test_ttrans_3d<float, 8, 1, 16, 8, 2, 4, 2, 2, 2>(); }
 
 TEST_F(TTRANS3DTest, case2_float32_4_5_2_2_4) { test_ttrans_3d<float, 16, 1, 16, 8, 4, 5, 2, 2, 4>(); }
