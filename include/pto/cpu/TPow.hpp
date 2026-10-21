@@ -59,48 +59,60 @@ inline T compute_pow(T base_val, T exp_val)
     }
 }
 
-template <typename tile_shape>
+template <typename DstTile, typename BaseTile, typename ExpTile>
 PTO_INTERNAL void TPow_Impl(
-    typename tile_shape::TileDType dst, typename tile_shape::TileDType base, typename tile_shape::TileDType exp,
+    typename DstTile::TileDType dst, typename BaseTile::TileDType base, typename ExpTile::TileDType exp,
     unsigned validRow, unsigned validCol)
 {
-    using T = typename tile_shape::DType;
-    if constexpr (tile_shape::SFractal == SLayout::NoneBox) {
-        if constexpr (tile_shape::isRowMajor) {
+    using T = typename DstTile::DType;
+    if constexpr (DstTile::SFractal == SLayout::NoneBox) {
+        if constexpr (DstTile::isRowMajor) {
             cpu::parallel_for_rows(validRow, validCol, [&](std::size_t r) {
-                const std::size_t rowBase = r * tile_shape::Cols;
+                const std::size_t rowBaseDst = r * DstTile::Cols;
+                const std::size_t rowBaseBase = r * BaseTile::Cols;
+                const std::size_t rowBaseExp = r * ExpTile::Cols;
                 PTO_CPU_VECTORIZE_LOOP
                 for (std::size_t c = 0; c < validCol; ++c) {
-                    const std::size_t idx = rowBase + c;
-                    dst[idx] = compute_pow<T>(base[idx], exp[idx]);
+                    const std::size_t idxDst = rowBaseDst + c;
+                    const std::size_t idxBase = rowBaseBase + c;
+                    const std::size_t idxExp = rowBaseExp + c;
+                    dst[idxDst] = compute_pow<T>(base[idxBase], exp[idxExp]);
                 }
             });
 
         } else {
             cpu::parallel_for_rows(validCol, validRow, [&](std::size_t c) {
-                const std::size_t colBase = c * tile_shape::Rows;
+                const std::size_t colBaseDst = c * DstTile::Rows;
+                const std::size_t colBaseBase = c * BaseTile::Rows;
+                const std::size_t colBaseExp = c * ExpTile::Rows;
                 PTO_CPU_VECTORIZE_LOOP
                 for (std::size_t r = 0; r < validRow; ++r) {
-                    const std::size_t idx = colBase + r;
-                    dst[idx] = compute_pow<T>(base[idx], exp[idx]);
+                    const std::size_t idxDst = colBaseDst + r;
+                    const std::size_t idxBase = colBaseBase + r;
+                    const std::size_t idxExp = colBaseExp + r;
+                    dst[idxDst] = compute_pow<T>(base[idxBase], exp[idxExp]);
                 }
             });
         }
 
     } else {
-        if constexpr (tile_shape::isRowMajor) {
+        if constexpr (DstTile::isRowMajor) {
             cpu::parallel_for_rows(validRow, validCol, [&](std::size_t r) {
                 for (std::size_t c = 0; c < validCol; ++c) {
-                    const std::size_t idx = GetTileElementOffset<tile_shape>(r, c);
-                    dst[idx] = compute_pow<T>(base[idx], exp[idx]);
+                    const std::size_t idxDst = GetTileElementOffset<DstTile>(r, c);
+                    const std::size_t idxBase = GetTileElementOffset<BaseTile>(r, c);
+                    const std::size_t idxExp = GetTileElementOffset<ExpTile>(r, c);
+                    dst[idxDst] = compute_pow<T>(base[idxBase], exp[idxExp]);
                 }
             });
 
         } else {
             cpu::parallel_for_rows(validCol, validRow, [&](std::size_t c) {
                 for (std::size_t r = 0; r < validRow; ++r) {
-                    const std::size_t idx = GetTileElementOffset<tile_shape>(r, c);
-                    dst[idx] = compute_pow<T>(base[idx], exp[idx]);
+                    const std::size_t idxDst = GetTileElementOffset<DstTile>(r, c);
+                    const std::size_t idxBase = GetTileElementOffset<BaseTile>(r, c);
+                    const std::size_t idxExp = GetTileElementOffset<ExpTile>(r, c);
+                    dst[idxDst] = compute_pow<T>(base[idxBase], exp[idxExp]);
                 }
             });
         }
@@ -114,7 +126,7 @@ PTO_INTERNAL void TPOW_IMPL(DstTile& dst, BaseTile& base, ExpTile& exp, TmpTile&
     (void)algo;
     unsigned row = dst.GetValidRow();
     unsigned col = dst.GetValidCol();
-    TPow_Impl<DstTile>(dst.data(), base.data(), exp.data(), row, col);
+    TPow_Impl<DstTile, BaseTile, ExpTile>(dst.data(), base.data(), exp.data(), row, col);
 }
 } // namespace pto
 #endif
