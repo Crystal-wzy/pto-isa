@@ -137,7 +137,7 @@ __global__ AICORE void runTConcat(
     using DynStride = pto::Stride<-1, -1, -1, -1, -1>;
     using GlobalData = GlobalTensor<T, DynShape, DynStride>;
     GlobalData dstGlobal(
-        out, pto::Shape(1, 1, 1, sizes.vRows, sizes.vCols0 + sizes.vCols1),
+        out, pto::Shape(1, 1, 1, sizes.vRows, sizes.dstW),
         pto::Stride(sizes.dstH * sizes.dstW, sizes.dstH * sizes.dstW, sizes.dstH * sizes.dstW, sizes.dstW, 1));
     GlobalData src0Global(
         src0, pto::Shape(1, 1, 1, sizes.vRows, sizes.vCols0),
@@ -149,7 +149,7 @@ __global__ AICORE void runTConcat(
     using TileDataDst = Tile<TileType::Vec, T, sizes.dstH, sizes.dstW, BLayout::RowMajor, -1, -1>;
     using TileDataSrc0 = Tile<TileType::Vec, T, sizes.src0H, sizes.src0W, BLayout::RowMajor, -1, -1>;
     using TileDataSrc1 = Tile<TileType::Vec, T, sizes.src1H, sizes.src1W, BLayout::RowMajor, -1, -1>;
-    TileDataDst dstTile(sizes.vRows, sizes.vCols0 + sizes.vCols1);
+    TileDataDst dstTile(sizes.vRows, sizes.dstW);
     TileDataSrc0 src0Tile(sizes.vRows, sizes.vCols0);
     TileDataSrc1 src1Tile(sizes.vRows, sizes.vCols1);
     TASSIGN(src0Tile, 0x0);
@@ -218,6 +218,11 @@ constexpr TilesSize SIZES_16x63_64{16, 128, 16, 64, 16, 64, 16, 63, 64};
 constexpr TilesSize SIZES_16x31_32{16, 64, 16, 32, 16, 32, 16, 31, 32};
 constexpr TilesSize SIZES_32x127_128{32, 256, 32, 128, 32, 128, 32, 127, 128};
 
+constexpr TilesSize SIZES_64x80_64{64, 128, 64, 80, 64, 64, 64, 80, 64};
+constexpr TilesSize SIZES_16x144_128{16, 256, 16, 144, 16, 128, 16, 144, 128};
+constexpr TilesSize SIZES_16x40_32{16, 64, 16, 40, 16, 32, 16, 40, 32};
+constexpr TilesSize SIZES_32x144_128{32, 256, 32, 144, 32, 128, 32, 144, 128};
+
 template void LaunchTConcat<float, SIZES_64x64>(float* out, float* src0, float* src1, void* stream);
 template void LaunchTConcat<int32_t, SIZES_64x64>(int32_t* out, int32_t* src0, int32_t* src1, void* stream);
 template void LaunchTConcat<aclFloat16, SIZES_16x128>(
@@ -228,6 +233,12 @@ template void LaunchTConcat<aclFloat16, SIZES_16x63_64>(
     aclFloat16* out, aclFloat16* src0, aclFloat16* src1, void* stream);
 template void LaunchTConcat<float, SIZES_16x31_32>(float* out, float* src0, float* src1, void* stream);
 template void LaunchTConcat<int16_t, SIZES_32x127_128>(int16_t* out, int16_t* src0, int16_t* src1, void* stream);
+template void LaunchTConcat<float, SIZES_64x80_64>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTConcat<int32_t, SIZES_64x80_64>(int32_t* out, int32_t* src0, int32_t* src1, void* stream);
+template void LaunchTConcat<aclFloat16, SIZES_16x144_128>(
+    aclFloat16* out, aclFloat16* src0, aclFloat16* src1, void* stream);
+template void LaunchTConcat<float, SIZES_16x40_32>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTConcat<int16_t, SIZES_32x144_128>(int16_t* out, int16_t* src0, int16_t* src1, void* stream);
 
 template void LaunchTConcat<float, int32_t, SIZES_64x64>(
     float* out, float* src0, float* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
@@ -244,6 +255,17 @@ template void LaunchTConcat<aclFloat16, int32_t, SIZES_16x63_64>(
 template void LaunchTConcat<float, int32_t, SIZES_16x31_32>(
     float* out, float* src0, float* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
 template void LaunchTConcat<int16_t, int32_t, SIZES_32x127_128>(
+    int16_t* out, int16_t* src0, int16_t* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+
+template void LaunchTConcat<float, int32_t, SIZES_64x80_64>(
+    float* out, float* src0, float* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+template void LaunchTConcat<int32_t, int32_t, SIZES_64x80_64>(
+    int32_t* out, int32_t* src0, int32_t* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+template void LaunchTConcat<aclFloat16, int32_t, SIZES_16x144_128>(
+    aclFloat16* out, aclFloat16* src0, aclFloat16* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+template void LaunchTConcat<float, int32_t, SIZES_16x40_32>(
+    float* out, float* src0, float* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+template void LaunchTConcat<int16_t, int32_t, SIZES_32x144_128>(
     int16_t* out, int16_t* src0, int16_t* src1, int32_t* src0Idx, int32_t* src1Idx, void* stream);
 
 template void LaunchTConcat<float, int32_t, SIZES_64x64>(
@@ -263,4 +285,16 @@ template void LaunchTConcat<aclFloat16, int32_t, SIZES_16x63_64>(
 template void LaunchTConcat<float, int32_t, SIZES_16x31_32>(
     float* out, float* src0, float* src1, int32_t* outIdx, int32_t* src0Idx, int32_t* src1Idx, void* stream);
 template void LaunchTConcat<int16_t, int32_t, SIZES_32x127_128>(
+    int16_t* out, int16_t* src0, int16_t* src1, int32_t* outIdx, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+
+template void LaunchTConcat<float, int32_t, SIZES_64x80_64>(
+    float* out, float* src0, float* src1, int32_t* outIdx, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+template void LaunchTConcat<int32_t, int32_t, SIZES_64x80_64>(
+    int32_t* out, int32_t* src0, int32_t* src1, int32_t* outIdx, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+template void LaunchTConcat<aclFloat16, int32_t, SIZES_16x144_128>(
+    aclFloat16* out, aclFloat16* src0, aclFloat16* src1, int32_t* outIdx, int32_t* src0Idx, int32_t* src1Idx,
+    void* stream);
+template void LaunchTConcat<float, int32_t, SIZES_16x40_32>(
+    float* out, float* src0, float* src1, int32_t* outIdx, int32_t* src0Idx, int32_t* src1Idx, void* stream);
+template void LaunchTConcat<int16_t, int32_t, SIZES_32x144_128>(
     int16_t* out, int16_t* src0, int16_t* src1, int32_t* outIdx, int32_t* src0Idx, int32_t* src1Idx, void* stream);

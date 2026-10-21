@@ -184,126 +184,204 @@ void test_tconcat()
     }
 }
 
-TEST_F(TCONCATTest, case_float_64x128_64x64_64x64_64x64_64x64)
+TEST_F(TCONCATTest, case_float_64x128_64x64_64x64_64x64_64)
 {
     test_tconcat<float, TilesSize{64, 128, 64, 64, 64, 64, 64, 64, 64}>();
 }
 
-TEST_F(TCONCATTest, case_int32_64x128_64x64_64x64_64x64_64x64)
+TEST_F(TCONCATTest, case_int32_64x128_64x64_64x64_64x64_64)
 {
     test_tconcat<int32_t, TilesSize{64, 128, 64, 64, 64, 64, 64, 64, 64}>();
 }
 
-TEST_F(TCONCATTest, case_half_16x256_16x128_16x128_16x128_16x128)
+TEST_F(TCONCATTest, case_half_16x256_16x128_16x128_16x128_128)
 {
     test_tconcat<aclFloat16, TilesSize{16, 256, 16, 128, 16, 128, 16, 128, 128}>();
 }
 
-TEST_F(TCONCATTest, case_float_16x64_16x32_16x32_16x32_16x32)
+TEST_F(TCONCATTest, case_float_16x64_16x32_16x32_16x32_32)
 {
     test_tconcat<float, TilesSize{16, 64, 16, 32, 16, 32, 16, 32, 32}>();
 }
 
-TEST_F(TCONCATTest, case_int16_32x256_32x128_32x128_32x128_32x128)
+TEST_F(TCONCATTest, case_int16_32x256_32x128_32x128_32x128_128)
 {
     test_tconcat<int16_t, TilesSize{32, 256, 32, 128, 32, 128, 32, 128, 128}>();
 }
 
-TEST_F(TCONCATTest, case_half_16x128_16x64_16x64_16x63_16x64)
+TEST_F(TCONCATTest, case_half_16x128_16x64_16x64_16x63_64)
 {
     test_tconcat<aclFloat16, TilesSize{16, 128, 16, 64, 16, 64, 16, 63, 64}>();
 }
 
-TEST_F(TCONCATTest, case_float_16x64_16x32_16x32_16x31_16x32)
+TEST_F(TCONCATTest, case_float_16x64_16x32_16x32_16x31_32)
 {
     test_tconcat<float, TilesSize{16, 64, 16, 32, 16, 32, 16, 31, 32}>();
 }
 
-TEST_F(TCONCATTest, case_int16_32x256_32x128_32x128_32x127_32x128)
+TEST_F(TCONCATTest, case_int16_32x256_32x128_32x128_32x127_128)
 {
     test_tconcat<int16_t, TilesSize{32, 256, 32, 128, 32, 128, 32, 127, 128}>();
 }
 
+// New bounds checking test cases (v_cols0 + v_cols1 > dstW)
+TEST_F(TCONCATTest, case_float_64x128_64x80_64x64_64x80_64)
+{
+    test_tconcat<float, TilesSize{64, 128, 64, 80, 64, 64, 64, 80, 64}>();
+}
+
+TEST_F(TCONCATTest, case_int32_64x128_64x80_64x64_64x80_64)
+{
+    test_tconcat<int32_t, TilesSize{64, 128, 64, 80, 64, 64, 64, 80, 64}>();
+}
+
+TEST_F(TCONCATTest, case_half_16x256_16x144_16x128_16x144_128)
+{
+    test_tconcat<aclFloat16, TilesSize{16, 256, 16, 144, 16, 128, 16, 144, 128}>();
+}
+
+TEST_F(TCONCATTest, case_float_16x64_16x40_16x32_16x40_32)
+{
+    test_tconcat<float, TilesSize{16, 64, 16, 40, 16, 32, 16, 40, 32}>();
+}
+
+TEST_F(TCONCATTest, case_int16_32x256_32x144_32x128_32x144_128)
+{
+    test_tconcat<int16_t, TilesSize{32, 256, 32, 144, 32, 128, 32, 144, 128}>();
+}
+
 // idx
 
-TEST_F(TCONCATTest, case_float_int32_src_64x128_64x64_64x64_64x64_64x64_64x128_64x64_64x64)
+TEST_F(TCONCATTest, case_float_int32_src_64x128_64x64_64x64_64x64_64_64x128_64x64_64x64)
 {
     test_tconcat<float, TilesSize{64, 128, 64, 64, 64, 64, 64, 64, 64}, int32_t, USE_SRC_IDX>();
 }
 
-TEST_F(TCONCATTest, case_int32_int32_src_64x128_64x64_64x64_64x64_64x64_64x128_64x64_64x64)
+TEST_F(TCONCATTest, case_int32_int32_src_64x128_64x64_64x64_64x64_64_64x128_64x64_64x64)
 {
     test_tconcat<int32_t, TilesSize{64, 128, 64, 64, 64, 64, 64, 64, 64}, int32_t, USE_SRC_IDX>();
 }
 
-TEST_F(TCONCATTest, case_half_int32_src_16x256_16x128_16x128_16x128_16x128_16x256_16x128_16x128)
+TEST_F(TCONCATTest, case_half_int32_src_16x256_16x128_16x128_16x128_128_16x256_16x128_16x128)
 {
     test_tconcat<aclFloat16, TilesSize{16, 256, 16, 128, 16, 128, 16, 128, 128}, int32_t, USE_SRC_IDX>();
 }
 
-TEST_F(TCONCATTest, case_float_int32_src_16x64_16x32_16x32_16x32_16x32_16x64_16x32_16x32)
+TEST_F(TCONCATTest, case_float_int32_src_16x64_16x32_16x32_16x32_32_16x64_16x32_16x32)
 {
     test_tconcat<float, TilesSize{16, 64, 16, 32, 16, 32, 16, 32, 32}, int32_t, USE_SRC_IDX>();
 }
 
-TEST_F(TCONCATTest, case_int16_int32_src_32x256_32x128_32x128_32x128_32x128_32x256_32x128_32x128)
+TEST_F(TCONCATTest, case_int16_int32_src_32x256_32x128_32x128_32x128_128_32x256_32x128_32x128)
 {
     test_tconcat<int16_t, TilesSize{32, 256, 32, 128, 32, 128, 32, 128, 128}, int32_t, USE_SRC_IDX>();
 }
 
-TEST_F(TCONCATTest, case_half_int32_src_16x128_16x64_16x64_16x63_16x64_16x128_16x64_16x64)
+TEST_F(TCONCATTest, case_half_int32_src_16x128_16x64_16x64_16x63_64_16x128_16x64_16x64)
 {
     test_tconcat<aclFloat16, TilesSize{16, 128, 16, 64, 16, 64, 16, 63, 64}, int32_t, USE_SRC_IDX>();
 }
 
-TEST_F(TCONCATTest, case_float_int32_src_16x64_16x32_16x32_16x31_16x32_16x64_16x32_16x32)
+TEST_F(TCONCATTest, case_float_int32_src_16x64_16x32_16x32_16x31_32_16x64_16x32_16x32)
 {
     test_tconcat<float, TilesSize{16, 64, 16, 32, 16, 32, 16, 31, 32}, int32_t, USE_SRC_IDX>();
 }
 
-TEST_F(TCONCATTest, case_int16_int32_src_32x256_32x128_32x128_32x127_32x128_32x256_32x128_32x128)
+TEST_F(TCONCATTest, case_int16_int32_src_32x256_32x128_32x128_32x127_128_32x256_32x128_32x128)
 {
     test_tconcat<int16_t, TilesSize{32, 256, 32, 128, 32, 128, 32, 127, 128}, int32_t, USE_SRC_IDX>();
 }
 
+// New bounds checking src_idx test cases (v_cols0 + v_cols1 > dstW)
+TEST_F(TCONCATTest, case_float_int32_src_64x128_64x80_64x64_64x80_64_64x128_64x80_64x64)
+{
+    test_tconcat<float, TilesSize{64, 128, 64, 80, 64, 64, 64, 80, 64}, int32_t, USE_SRC_IDX>();
+}
+
+TEST_F(TCONCATTest, case_int32_int32_src_64x128_64x80_64x64_64x80_64_64x128_64x80_64x64)
+{
+    test_tconcat<int32_t, TilesSize{64, 128, 64, 80, 64, 64, 64, 80, 64}, int32_t, USE_SRC_IDX>();
+}
+
+TEST_F(TCONCATTest, case_half_int32_src_16x256_16x144_16x128_16x144_128_16x256_16x144_16x128)
+{
+    test_tconcat<aclFloat16, TilesSize{16, 256, 16, 144, 16, 128, 16, 144, 128}, int32_t, USE_SRC_IDX>();
+}
+
+TEST_F(TCONCATTest, case_float_int32_src_16x64_16x40_16x32_16x40_32_16x64_16x40_16x32)
+{
+    test_tconcat<float, TilesSize{16, 64, 16, 40, 16, 32, 16, 40, 32}, int32_t, USE_SRC_IDX>();
+}
+
+TEST_F(TCONCATTest, case_int16_int32_src_32x256_32x144_32x128_32x144_128_32x256_32x144_32x128)
+{
+    test_tconcat<int16_t, TilesSize{32, 256, 32, 144, 32, 128, 32, 144, 128}, int32_t, USE_SRC_IDX>();
+}
+
 // dstidx
 
-TEST_F(TCONCATTest, case_float_int32_dst_64x128_64x64_64x64_64x64_64x64_64x128_64x64_64x64)
+TEST_F(TCONCATTest, case_float_int32_dst_64x128_64x64_64x64_64x64_64_64x128_64x64_64x64)
 {
     test_tconcat<float, TilesSize{64, 128, 64, 64, 64, 64, 64, 64, 64}, int32_t, USE_DST_IDX>();
 }
 
-TEST_F(TCONCATTest, case_int32_int32_dst_64x128_64x64_64x64_64x64_64x64_64x128_64x64_64x64)
+TEST_F(TCONCATTest, case_int32_int32_dst_64x128_64x64_64x64_64x64_64_64x128_64x64_64x64)
 {
     test_tconcat<int32_t, TilesSize{64, 128, 64, 64, 64, 64, 64, 64, 64}, int32_t, USE_DST_IDX>();
 }
 
-TEST_F(TCONCATTest, case_half_int32_dst_16x256_16x128_16x128_16x128_16x128_16x256_16x128_16x128)
+TEST_F(TCONCATTest, case_half_int32_dst_16x256_16x128_16x128_16x128_128_16x256_16x128_16x128)
 {
     test_tconcat<aclFloat16, TilesSize{16, 256, 16, 128, 16, 128, 16, 128, 128}, int32_t, USE_DST_IDX>();
 }
 
-TEST_F(TCONCATTest, case_float_int32_dst_16x64_16x32_16x32_16x32_16x32_16x64_16x32_16x32)
+TEST_F(TCONCATTest, case_float_int32_dst_16x64_16x32_16x32_16x32_32_16x64_16x32_16x32)
 {
     test_tconcat<float, TilesSize{16, 64, 16, 32, 16, 32, 16, 32, 32}, int32_t, USE_DST_IDX>();
 }
 
-TEST_F(TCONCATTest, case_int16_int32_dst_32x256_32x128_32x128_32x128_32x128_32x256_32x128_32x128)
+TEST_F(TCONCATTest, case_int16_int32_dst_32x256_32x128_32x128_32x128_128_32x256_32x128_32x128)
 {
     test_tconcat<int16_t, TilesSize{32, 256, 32, 128, 32, 128, 32, 128, 128}, int32_t, USE_DST_IDX>();
 }
 
-TEST_F(TCONCATTest, case_half_int32_dst_16x128_16x64_16x64_16x63_16x64_16x128_16x64_16x64)
+TEST_F(TCONCATTest, case_half_int32_dst_16x128_16x64_16x64_16x63_64_16x128_16x64_16x64)
 {
     test_tconcat<aclFloat16, TilesSize{16, 128, 16, 64, 16, 64, 16, 63, 64}, int32_t, USE_DST_IDX>();
 }
 
-TEST_F(TCONCATTest, case_float_int32_dst_16x64_16x32_16x32_16x31_16x32_16x64_16x32_16x32)
+TEST_F(TCONCATTest, case_float_int32_dst_16x64_16x32_16x32_16x31_32_16x64_16x32_16x32)
 {
     test_tconcat<float, TilesSize{16, 64, 16, 32, 16, 32, 16, 31, 32}, int32_t, USE_DST_IDX>();
 }
 
-TEST_F(TCONCATTest, case_int16_int32_dst_32x256_32x128_32x128_32x127_32x128_32x256_32x128_32x128)
+TEST_F(TCONCATTest, case_int16_int32_dst_32x256_32x128_32x128_32x127_128_32x256_32x128_32x128)
 {
     test_tconcat<int16_t, TilesSize{32, 256, 32, 128, 32, 128, 32, 127, 128}, int32_t, USE_DST_IDX>();
+}
+
+// New bounds checking dst_idx test cases (v_cols0 + v_cols1 > dstW)
+TEST_F(TCONCATTest, case_float_int32_dst_64x128_64x80_64x64_64x80_64_64x128_64x80_64x64)
+{
+    test_tconcat<float, TilesSize{64, 128, 64, 80, 64, 64, 64, 80, 64}, int32_t, USE_DST_IDX>();
+}
+
+TEST_F(TCONCATTest, case_int32_int32_dst_64x128_64x80_64x64_64x80_64_64x128_64x80_64x64)
+{
+    test_tconcat<int32_t, TilesSize{64, 128, 64, 80, 64, 64, 64, 80, 64}, int32_t, USE_DST_IDX>();
+}
+
+TEST_F(TCONCATTest, case_half_int32_dst_16x256_16x144_16x128_16x144_128_16x256_16x144_16x128)
+{
+    test_tconcat<aclFloat16, TilesSize{16, 256, 16, 144, 16, 128, 16, 144, 128}, int32_t, USE_DST_IDX>();
+}
+
+TEST_F(TCONCATTest, case_float_int32_dst_16x64_16x40_16x32_16x40_32_16x64_16x40_16x32)
+{
+    test_tconcat<float, TilesSize{16, 64, 16, 40, 16, 32, 16, 40, 32}, int32_t, USE_DST_IDX>();
+}
+
+TEST_F(TCONCATTest, case_int16_int32_dst_32x256_32x144_32x128_32x144_128_32x256_32x144_32x128)
+{
+    test_tconcat<int16_t, TilesSize{32, 256, 32, 144, 32, 128, 32, 144, 128}, int32_t, USE_DST_IDX>();
 }

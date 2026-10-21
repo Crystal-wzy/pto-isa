@@ -34,10 +34,6 @@ PTO_INTERNAL void TConcatTileCheck(TileDst& dst, TileSrc0& src0, TileSrc1& src1)
     assert(
         dst.GetValidRow() == src0.GetValidRow() && dst.GetValidRow() == src1.GetValidRow() &&
         "TCONCAT: Valid rows of dst, src0 and src1 tiles should be the same");
-
-    assert(
-        dst.GetValidCol() == src0.GetValidCol() + src1.GetValidCol() &&
-        "TCONCAT: Valid cols of src1 and src1Idx tiles should be the same");
 }
 
 template <typename TileDst, typename TileSrc0, typename TileSrc1, typename TileSrc0Idx, typename TileSrc1Idx>
@@ -77,12 +73,13 @@ template <typename TileDst, typename TileSrc0, typename TileSrc1, typename Conca
 PTO_INTERNAL void TConcatProcessor(TileDst& dst, TileSrc0& src0, TileSrc1& src1, ConcatCaller&& caller)
 {
     const unsigned rows = dst.GetValidRow();
+    const auto validCols = dst.GetValidCol();
     for (unsigned r = 0; r < rows; ++r) {
         const auto [cols0, cols1] = caller.GetColsNumber(r);
-        for (unsigned c = 0; c < cols0; ++c) {
+        for (unsigned c = 0; c < cols0 && c < validCols; ++c) {
             dst.data()[GetTileElementOffset<TileDst>(r, c)] = src0.data()[GetTileElementOffset<TileSrc0>(r, c)];
         }
-        for (unsigned c = 0; c < cols1; ++c) {
+        for (unsigned c = 0; c < cols1 && (c + cols0) < validCols; ++c) {
             dst.data()[GetTileElementOffset<TileDst>(r, cols0 + c)] = src1.data()[GetTileElementOffset<TileSrc1>(r, c)];
         }
     }
