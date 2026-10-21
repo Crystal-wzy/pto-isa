@@ -44,6 +44,11 @@ FORMULA_KIND_MAP = {
     "linear_rows": "FormulaKind::LinearRows",
     "linear_tail": "FormulaKind::LinearTail",
     "nested_loop": "FormulaKind::NestedLoop",
+    "nested_loop_inner_bias": "FormulaKind::NestedLoopInnerBias",
+    "dual_loop_max": "FormulaKind::DualLoopMax",
+    "dual_loop_max_scaled": "FormulaKind::DualLoopMaxScaled",
+    "linear_floor": "FormulaKind::LinearFloor",
+    "affine_grid": "FormulaKind::AffineGrid",
 }
 
 
@@ -163,6 +168,11 @@ def _render_type_defs() -> list[str]:
         "    LinearRows,",
         "    LinearTail,",
         "    NestedLoop,",
+        "    NestedLoopInnerBias,",
+        "    DualLoopMax,",
+        "    DualLoopMaxScaled,",
+        "    LinearFloor,",
+        "    AffineGrid,",
         "};",
         "",
         "struct VfFormulaParam {",

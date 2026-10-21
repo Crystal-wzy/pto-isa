@@ -19,6 +19,14 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto::perf_sim {
 
+#if defined(__NPU_ARCH__)
+inline constexpr uint32_t kDefaultNpuArch = __NPU_ARCH__;
+#else
+inline constexpr uint32_t kDefaultNpuArch = 2201;
+#endif
+inline constexpr uint32_t kAscend950Arch = 3101;
+inline constexpr uint32_t kAscend950UrmaArch = 3510;
+
 // ── Magic number constants ──
 static constexpr uint64_t kPercentMultiplier = 100;
 static constexpr uint64_t kMatrixLatencyBase = 4;
@@ -35,7 +43,7 @@ static constexpr uint64_t kDefaultElemsPerUnit = 32;
 
 struct CostModelRuntimeCtx {
     uint32_t block_dim = 1;
-    uint32_t npu_arch = 2201;
+    uint32_t npu_arch = kDefaultNpuArch;
 };
 
 inline CostModelRuntimeCtx& GetCostModelCtx()
@@ -59,7 +67,13 @@ inline CostModelRuntimeCtx& GetCostModelCtx()
     X(TDIVS) X(TMINS) X(TMAXS) X(TABS) X(TNEG) X(TEXP) X(TSQRT) X(TRSQRT) X(TLOG) X(TRELU) X(TLRELU) X(TNOT)          \
         X(TROWSUM) X(TROWMAX) X(TROWMIN) X(TROWPROD) X(TCOLSUM) X(TCOLMAX) X(TCOLMIN) X(TCOLPROD) X(TMATMUL) X(TGEMV) \
             X(TCVT) X(TMOV) X(TLOAD) X(TSTORE) X(TTRANS) X(TPREFETCH) X(TSORT32) X(TMRGSORT) X(TSEL) X(TSCATTER)      \
-                X(TEXTRACT) X(TINSERT) X(TROWEXPAND) X(TCOLEXPAND) X(TLOADCONV)
+                X(TEXTRACT) X(TINSERT) X(TROWEXPAND) X(TCOLEXPAND) X(TLOADCONV)                                      \
+    X(TMAX) X(TMIN) X(TFMOD) X(TFMODS) X(TREM) X(TREMS) X(TPOW) X(TPOWS) X(TMADD) X(TMULA) X(TPRELU)       \
+        X(TPARTADD) X(TPARTMUL) X(TPARTMAX) X(TPARTMIN) X(TAXPY) X(TROWARGMAX) X(TROWARGMIN)                \
+            X(TCOLARGMAX) X(TCOLARGMIN) X(TROWEXPANDADD) X(TROWEXPANDSUB) X(TROWEXPANDMUL)                  \
+                X(TROWEXPANDDIV) X(TROWEXPANDMAX) X(TROWEXPANDMIN) X(TROWEXPANDEXPDIF) X(TCOLEXPANDADD)     \
+                    X(TCOLEXPANDSUB) X(TCOLEXPANDMUL) X(TCOLEXPANDDIV) X(TCOLEXPANDMAX) X(TCOLEXPANDMIN)    \
+                        X(TCOLEXPANDEXPDIF) X(TEXPANDS)
 // clang-format on
 
 inline bool TryMapOpcode(const std::string& opcode, ::pto::mocker::lightweight::PtoOpcode& out)
@@ -104,6 +118,9 @@ inline uint64_t EstimateLightweightCycles(const std::string& opcode, int rows, i
 
     CostModelInput input{};
     input.op = pto_op;
+    const uint32_t npu_arch = GetCostModelCtx().npu_arch;
+    input.arch =
+        (npu_arch == kAscend950Arch || npu_arch == kAscend950UrmaArch) ? CostModelArch::A5 : CostModelArch::A2A3;
     input.dtype = MapDType(dtype);
     input.rows = rows;
     input.cols = cols;

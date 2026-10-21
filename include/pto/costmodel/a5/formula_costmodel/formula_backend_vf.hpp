@@ -19,6 +19,8 @@ See LICENSE in the root of the software repository for the full text of the Lice
 
 namespace pto::mocker::lightweight::a5::fit {
 
+inline constexpr double kRowLoopStartupCycles = 18.0;
+
 struct VfCurveKey {
     std::string_view op;
     std::string_view src_dtype;
@@ -51,7 +53,8 @@ inline bool TryLookupVfFormulaParam(const VfCurveKey& key, const VfFormulaParam*
 }
 
 inline uint64_t EvalVfFormula(
-    const VfFormulaParam& param, uint64_t loop_count, uint64_t outer_iter, uint64_t inner_iter, uint64_t tail_count)
+    const VfFormulaParam& param, uint64_t loop_count, uint64_t outer_iter, uint64_t inner_iter, uint64_t tail_count,
+    uint64_t row_inner_iter)
 {
     double value = 0.0;
     switch (param.formula_kind) {
@@ -66,9 +69,37 @@ inline uint64_t EvalVfFormula(
             value = param.param0 * static_cast<double>(loop_count) + param.param1 * static_cast<double>(tail_count) +
                     param.param2;
             break;
-        case FormulaKind::NestedLoop:
-            value = (param.param0 * static_cast<double>(inner_iter) + param.param1) * static_cast<double>(outer_iter) +
-                    param.param2;
+        case FormulaKind::NestedLoop: {
+            const double inner = static_cast<double>(inner_iter);
+            value =
+                (param.param0 * inner + param.param1 + param.param3 * inner * inner) * static_cast<double>(outer_iter) +
+                param.param2;
+        } break;
+        case FormulaKind::NestedLoopInnerBias: {
+            const double inner = static_cast<double>(inner_iter);
+            value = (param.param0 * inner + param.param1) * static_cast<double>(outer_iter) + param.param2 * inner +
+                    param.param3;
+        } break;
+        case FormulaKind::DualLoopMax: {
+            const double flat_path = param.param0 * static_cast<double>(loop_count) + param.param1;
+            const double row_path =
+                (param.param2 + static_cast<double>(row_inner_iter)) * static_cast<double>(outer_iter) + param.param3;
+            value = std::max(flat_path, row_path);
+        } break;
+        case FormulaKind::DualLoopMaxScaled: {
+            const double flat_path = param.param0 * static_cast<double>(loop_count) + param.param1;
+            const double row_path =
+                (param.param2 + param.param3 * static_cast<double>(row_inner_iter)) * static_cast<double>(outer_iter) +
+                kRowLoopStartupCycles;
+            value = std::max(flat_path, row_path);
+        } break;
+        case FormulaKind::LinearFloor:
+            value = std::max(param.param0 * static_cast<double>(loop_count) + param.param1, param.param2);
+            break;
+        case FormulaKind::AffineGrid:
+            value = param.param0 + param.param1 * static_cast<double>(outer_iter) +
+                    param.param2 * static_cast<double>(row_inner_iter) +
+                    param.param3 * static_cast<double>(outer_iter * row_inner_iter);
             break;
         default:
             return 0;

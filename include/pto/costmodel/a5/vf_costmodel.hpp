@@ -40,15 +40,65 @@ inline std::string_view PtoOpcodeToKey(PtoOpcode op)
         std::pair{PtoOpcode::TMULS, std::string_view("TMULS")},
         std::pair{PtoOpcode::TDIVS, std::string_view("TDIVS")},
         std::pair{PtoOpcode::TMINS, std::string_view("TMINS")},
+        std::pair{PtoOpcode::TMAXS, std::string_view("TMAXS")},
+        std::pair{PtoOpcode::TABS, std::string_view("TABS")},
         std::pair{PtoOpcode::TNEG, std::string_view("TNEG")},
         std::pair{PtoOpcode::TEXP, std::string_view("TEXP")},
         std::pair{PtoOpcode::TSQRT, std::string_view("TSQRT")},
         std::pair{PtoOpcode::TRSQRT, std::string_view("TRSQRT")},
         std::pair{PtoOpcode::TLOG, std::string_view("TLOG")},
         std::pair{PtoOpcode::TRELU, std::string_view("TRELU")},
+        std::pair{PtoOpcode::TLRELU, std::string_view("TLRELU")},
         std::pair{PtoOpcode::TNOT, std::string_view("TNOT")},
         std::pair{PtoOpcode::TCVT, std::string_view("TCVT")},
         std::pair{PtoOpcode::TSEL, std::string_view("TSEL")},
+        std::pair{PtoOpcode::TMAX, std::string_view("TMAX")},
+        std::pair{PtoOpcode::TMIN, std::string_view("TMIN")},
+        std::pair{PtoOpcode::TFMOD, std::string_view("TFMOD")},
+        std::pair{PtoOpcode::TFMODS, std::string_view("TFMODS")},
+        std::pair{PtoOpcode::TREM, std::string_view("TREM")},
+        std::pair{PtoOpcode::TREMS, std::string_view("TREMS")},
+        std::pair{PtoOpcode::TPOW, std::string_view("TPOW")},
+        std::pair{PtoOpcode::TPOWS, std::string_view("TPOWS")},
+        std::pair{PtoOpcode::TMADD, std::string_view("TMADD")},
+        std::pair{PtoOpcode::TMULA, std::string_view("TMULA")},
+        std::pair{PtoOpcode::TPRELU, std::string_view("TPRELU")},
+        std::pair{PtoOpcode::TPARTADD, std::string_view("TPARTADD")},
+        std::pair{PtoOpcode::TPARTMUL, std::string_view("TPARTMUL")},
+        std::pair{PtoOpcode::TPARTMAX, std::string_view("TPARTMAX")},
+        std::pair{PtoOpcode::TPARTMIN, std::string_view("TPARTMIN")},
+        std::pair{PtoOpcode::TAXPY, std::string_view("TAXPY")},
+        std::pair{PtoOpcode::TROWARGMAX, std::string_view("TROWARGMAX")},
+        std::pair{PtoOpcode::TROWARGMIN, std::string_view("TROWARGMIN")},
+        std::pair{PtoOpcode::TCOLARGMAX, std::string_view("TCOLARGMAX")},
+        std::pair{PtoOpcode::TCOLARGMIN, std::string_view("TCOLARGMIN")},
+        std::pair{PtoOpcode::TROWSUM, std::string_view("TROWSUM")},
+        std::pair{PtoOpcode::TROWMAX, std::string_view("TROWMAX")},
+        std::pair{PtoOpcode::TROWMIN, std::string_view("TROWMIN")},
+        std::pair{PtoOpcode::TROWPROD, std::string_view("TROWPROD")},
+        std::pair{PtoOpcode::TCOLSUM, std::string_view("TCOLSUM")},
+        std::pair{PtoOpcode::TCOLMAX, std::string_view("TCOLMAX")},
+        std::pair{PtoOpcode::TCOLMIN, std::string_view("TCOLMIN")},
+        std::pair{PtoOpcode::TCOLPROD, std::string_view("TCOLPROD")},
+        std::pair{PtoOpcode::TROWEXPAND, std::string_view("TROWEXPAND")},
+        std::pair{PtoOpcode::TROWEXPANDADD, std::string_view("TROWEXPANDADD")},
+        std::pair{PtoOpcode::TROWEXPANDSUB, std::string_view("TROWEXPANDSUB")},
+        std::pair{PtoOpcode::TROWEXPANDMUL, std::string_view("TROWEXPANDMUL")},
+        std::pair{PtoOpcode::TROWEXPANDDIV, std::string_view("TROWEXPANDDIV")},
+        std::pair{PtoOpcode::TROWEXPANDMAX, std::string_view("TROWEXPANDMAX")},
+        std::pair{PtoOpcode::TROWEXPANDMIN, std::string_view("TROWEXPANDMIN")},
+        std::pair{PtoOpcode::TROWEXPANDEXPDIF, std::string_view("TROWEXPANDEXPDIF")},
+        std::pair{PtoOpcode::TCOLEXPAND, std::string_view("TCOLEXPAND")},
+        std::pair{PtoOpcode::TCOLEXPANDADD, std::string_view("TCOLEXPANDADD")},
+        std::pair{PtoOpcode::TCOLEXPANDSUB, std::string_view("TCOLEXPANDSUB")},
+        std::pair{PtoOpcode::TCOLEXPANDMUL, std::string_view("TCOLEXPANDMUL")},
+        std::pair{PtoOpcode::TCOLEXPANDDIV, std::string_view("TCOLEXPANDDIV")},
+        std::pair{PtoOpcode::TCOLEXPANDMAX, std::string_view("TCOLEXPANDMAX")},
+        std::pair{PtoOpcode::TCOLEXPANDMIN, std::string_view("TCOLEXPANDMIN")},
+        std::pair{PtoOpcode::TCOLEXPANDEXPDIF, std::string_view("TCOLEXPANDEXPDIF")},
+        std::pair{PtoOpcode::TEXPANDS, std::string_view("TEXPANDS")},
+        std::pair{PtoOpcode::TSORT32, std::string_view("TSORT32")},
+        std::pair{PtoOpcode::TMRGSORT, std::string_view("TMRGSORT")},
     };
     for (const auto& [opcode, key] : kOpcodeKeys) {
         if (opcode == op) {
@@ -193,6 +243,9 @@ inline bool IsA5ScalarVfOp(PtoOpcode op)
         case PtoOpcode::TMINS:
         case PtoOpcode::TMAXS:
         case PtoOpcode::TNEG:
+        case PtoOpcode::TFMODS:
+        case PtoOpcode::TREMS:
+        case PtoOpcode::TPOWS:
             return true;
         default:
             return false;
@@ -294,13 +347,14 @@ inline bool TryResolveElementsPerRepeat(const CostModelInput& input, VfCurveCont
 
 inline void ResolveLoopCounts(
     const VfCurveContext& context, uint64_t& loop_count, uint64_t& outer_iter, uint64_t& inner_iter,
-    uint64_t& tail_count)
+    uint64_t& tail_count, uint64_t& row_inner_iter)
 {
     const uint64_t valid_rows = static_cast<uint64_t>(context.valid_rows_i);
     const uint64_t valid_cols = static_cast<uint64_t>(context.valid_cols_i);
+    row_inner_iter = CeilDivU64(valid_cols, context.elements_per_repeat);
     if (context.shape_path == fit::ShapePath::Path1D) {
         inner_iter = CeilDivU64(valid_rows * valid_cols, context.elements_per_repeat);
-        outer_iter = 1;
+        outer_iter = valid_rows;
         loop_count = inner_iter;
         tail_count = (valid_rows * valid_cols) % context.elements_per_repeat;
         return;
@@ -324,7 +378,7 @@ inline bool TryResolveTselOpParams(const CostModelInput& input, uint64_t inner_i
 
 inline bool BuildVfCurveKeyAndLoopCount(
     const CostModelInput& input, fit::VfCurveKey& key, uint64_t& loop_count, uint64_t& outer_iter, uint64_t& inner_iter,
-    uint64_t& tail_count)
+    uint64_t& tail_count, uint64_t& row_inner_iter)
 {
     VfCurveContext context;
     if (!TryInitVfCurveContext(input, context) || !TryResolveVfOpParams(input, context) ||
@@ -332,7 +386,7 @@ inline bool BuildVfCurveKeyAndLoopCount(
         return false;
     }
 
-    ResolveLoopCounts(context, loop_count, outer_iter, inner_iter, tail_count);
+    ResolveLoopCounts(context, loop_count, outer_iter, inner_iter, tail_count, row_inner_iter);
     const auto tail_kind = tail_count == 0 ? fit::TailKind::Full : fit::TailKind::Tail;
     if (!TryResolveTselOpParams(input, inner_iter, context)) {
         return false;
@@ -357,7 +411,8 @@ inline bool TryEstimateA5VfCycles(const CostModelInput& input, uint64_t& cycles)
     uint64_t outer_iter = 0;
     uint64_t inner_iter = 0;
     uint64_t tail_count = 0;
-    if (!BuildVfCurveKeyAndLoopCount(input, key, loop_count, outer_iter, inner_iter, tail_count)) {
+    uint64_t row_inner_iter = 0;
+    if (!BuildVfCurveKeyAndLoopCount(input, key, loop_count, outer_iter, inner_iter, tail_count, row_inner_iter)) {
         return false;
     }
 
@@ -366,7 +421,7 @@ inline bool TryEstimateA5VfCycles(const CostModelInput& input, uint64_t& cycles)
         return false;
     }
 
-    cycles = fit::EvalVfFormula(*param, loop_count, outer_iter, inner_iter, tail_count);
+    cycles = fit::EvalVfFormula(*param, loop_count, outer_iter, inner_iter, tail_count, row_inner_iter);
     return true;
 }
 
