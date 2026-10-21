@@ -25,6 +25,9 @@ void LaunchTMOVAcc2VecFBQuantNZ2ND(
 template <int32_t tilingKey>
 void LaunchTMOVAcc2VecSCQuantNZ2ND(uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* src2, void* stream);
 
+template <int32_t tilingKey>
+void LaunchTEXTRACTAcc2ConvTile(uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* src2, void* stream);
+
 class TMOVTest : public testing::Test {
 protected:
     void SetUp() override {}
@@ -79,6 +82,8 @@ void tmov_acc2vec_test(uint32_t M, uint32_t K, uint32_t N)
         LaunchTMOVAcc2VecNZ2ND<key>(dstDevice, src0Device, src1Device, src2Device, stream);
     } else if constexpr (funcKey == 4) {
         LaunchTMOVAcc2VecSCQuantNZ2ND<key>(dstDevice, src0Device, src1Device, src2Device, stream);
+    } else if constexpr (funcKey == 7) {
+        LaunchTEXTRACTAcc2ConvTile<key>(dstDevice, src0Device, src1Device, src2Device, stream);
     }
 
     aclrtSynchronizeStream(stream);
@@ -243,4 +248,34 @@ TEST_F(TMOVTest, case_nz2nd_sc_quant_3)
 TEST_F(TMOVTest, case_nz2nd_sc_quant_4)
 {
     tmov_acc2vec_test<4, int8_t, int8_t, int8_t, 4, 3, 0, false, 64, 64>(60, 128, 32);
+}
+
+TEST_F(TMOVTest, case_acc2convtile_fp32_nchw)
+{
+    tmov_acc2vec_test<7, uint32_t, float, float, 1, 0, 0, false, 128, 64>(128, 7, 64);
+}
+
+TEST_F(TMOVTest, case_acc2convtile_fp32_ncdhw)
+{
+    tmov_acc2vec_test<7, uint32_t, float, float, 2, 0, 0, false, 192, 192>(192, 7, 96);
+}
+
+TEST_F(TMOVTest, case_acc2convtile_fp16_nchw)
+{
+    tmov_acc2vec_test<7, uint16_t, uint16_t, uint16_t, 3, 0, 0, false, 128, 64>(128, 7, 64);
+}
+
+TEST_F(TMOVTest, case_acc2convtile_fp16_ncdhw)
+{
+    tmov_acc2vec_test<7, uint16_t, uint16_t, uint16_t, 4, 0, 0, false, 192, 192>(192, 7, 96);
+}
+
+TEST_F(TMOVTest, case_acc2convtile_int8_nchw)
+{
+    tmov_acc2vec_test<7, int8_t, int8_t, int8_t, 5, 0, 0, false, 128, 64>(128, 7, 64);
+}
+
+TEST_F(TMOVTest, case_acc2convtile_int8_ncdhw)
+{
+    tmov_acc2vec_test<7, int8_t, int8_t, int8_t, 6, 0, 0, false, 192, 192>(192, 7, 96);
 }

@@ -25,6 +25,10 @@ void LaunchTMOVAcc2VecFBQuantNZ2ND(
 template <int32_t tilingKey>
 void LaunchTMOVAcc2VecSCQuantNZ2ND(uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* src2, void* stream);
 
+template <int32_t tilingKey>
+void LaunchTInsertAcc2ConvTile(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream);
+
 class TMOVTest : public testing::Test {
 protected:
     void SetUp() override {}
@@ -42,7 +46,7 @@ std::string GetGoldenDir()
 
 template <
     int32_t funcKey, typename CType, typename AType, typename BType, int32_t key, uint32_t IdxRow = 0,
-    uint32_t IdxCol = 0, bool isInsert = false, uint32_t DstRow = 0, uint32_t DstCol = 0>
+    uint32_t IdxCol = 0, bool isInsert = false, uint32_t DstRow = 0, uint32_t DstCol = 0, bool isConvTile = false>
 void tmov_acc2vec_test(uint32_t M, uint32_t K, uint32_t N)
 {
     size_t aFileSize = M * K * sizeof(AType);
@@ -78,7 +82,9 @@ void tmov_acc2vec_test(uint32_t M, uint32_t K, uint32_t N)
     aclrtMemcpy(src0Device, aFileSize, src0Host, aFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
     aclrtMemcpy(src1Device, bFileSize, src1Host, bFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
     aclrtMemcpy(src2Device, cFileSize, src2Host, cFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
-    if constexpr (funcKey == 1) {
+    if constexpr (funcKey == 1 && isConvTile) {
+        LaunchTInsertAcc2ConvTile<key>(dstDevice, src0Device, src1Device, src2Device, dstDevice, stream);
+    } else if constexpr (funcKey == 1) {
         LaunchTMOVAcc2VecNZ2ND<key>(dstDevice, src0Device, src1Device, src2Device, stream);
     } else if constexpr (funcKey == 4) {
         LaunchTMOVAcc2VecSCQuantNZ2ND<key>(dstDevice, src0Device, src1Device, src2Device, stream);
@@ -253,4 +259,34 @@ TEST_F(TMOVTest, case_nz2nd_sc_quant_3)
 TEST_F(TMOVTest, case_nz2nd_sc_quant_4)
 {
     tmov_acc2vec_test<4, int8_t, int8_t, int8_t, 4, 3, 0, true, 64, 64>(60, 128, 32);
+}
+
+TEST_F(TMOVTest, case_insert_acc2convtile_fp32_nchw)
+{
+    tmov_acc2vec_test<1, float, float, float, 1, 8, 16, true, 128, 64, true>(64, 7, 32);
+}
+
+TEST_F(TMOVTest, case_insert_acc2convtile_fp32_ncdhw)
+{
+    tmov_acc2vec_test<1, float, float, float, 2, 32, 32, true, 384, 96, true>(96, 7, 64);
+}
+
+TEST_F(TMOVTest, case_insert_acc2convtile_fp16_nchw)
+{
+    tmov_acc2vec_test<1, uint16_t, uint16_t, uint16_t, 3, 16, 16, true, 128, 64, true>(64, 7, 32);
+}
+
+TEST_F(TMOVTest, case_insert_acc2convtile_fp16_ncdhw)
+{
+    tmov_acc2vec_test<1, uint16_t, uint16_t, uint16_t, 4, 32, 32, true, 384, 96, true>(96, 7, 64);
+}
+
+TEST_F(TMOVTest, case_insert_acc2convtile_int8_nchw)
+{
+    tmov_acc2vec_test<1, int8_t, int8_t, int8_t, 5, 32, 16, true, 128, 64, true>(64, 7, 32);
+}
+
+TEST_F(TMOVTest, case_insert_acc2convtile_int8_ncdhw)
+{
+    tmov_acc2vec_test<1, int8_t, int8_t, int8_t, 6, 32, 32, true, 384, 96, true>(96, 7, 64);
 }

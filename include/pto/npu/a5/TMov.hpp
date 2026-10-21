@@ -238,6 +238,81 @@ __tf__ AICORE void TMovCcToUb(
         false, false, false, enableNz2Dn);
 }
 
+template <
+    typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t quantPre, ReluPreMode reluMode,
+    STPhase Phase = STPhase::Unspecified, std::enable_if_t<is_conv_tile_v<DstTileData>, int> = 0>
+__tf__ AICORE void TMovCcToUb(
+    typename DstTileData::TileDType __out__ dst, typename SrcTileData::TileDType __in__ src, uint16_t validRow,
+    uint16_t validCol, uint32_t dstStride)
+{
+    using dstType = typename DstTileData::DType;
+    using srcType = typename SrcTileData::DType;
+    constexpr bool subBlockId = (mode == AccToVecMode::SingleModeVec1);
+    constexpr uint8_t unitFlagCtrl = static_cast<uint8_t>(Phase);
+    SetLoop3Para();
+    constexpr uint64_t channelPara = static_cast<uint64_t>(1) << 48;
+    set_channel_para(channelPara);
+    uint32_t srcStride = GetTmovAccSrcStride<SrcTileData>(validRow);
+    __ubuf__ dstType* dstAddr = (__ubuf__ dstType*)__cce_get_tile_ptr(dst);
+    __cc__ srcType* srcData = (__cc__ srcType*)__cce_get_tile_ptr(src);
+    pto_copy_matrix_cc_to_ub(
+        dstAddr, srcData, 0, validCol, validRow, dstStride, srcStride, 0, subBlockId, 0, unitFlagCtrl, quantPre,
+        static_cast<uint8_t>(reluMode), false, false, 0, 0, false, false, 0, false, false, false, false, false, true);
+}
+
+template <typename DstTileData>
+PTO_INTERNAL uint32_t GetTMovConvTileDstStride(DstTileData& dst, uint16_t validRow, uint16_t validCol)
+{
+    static_assert(DstTileData::Loc == TileType::Vec, "TMov ConvTile destination only support Vec.");
+    static_assert(
+        (DstTileData::layout == Layout::NCHW) || (DstTileData::layout == Layout::NCDHW),
+        "TMov ConvTile destination only support NCHW or NCDHW.");
+    static_assert(DstTileData::totalDimCount == 5, "TMov ConvTile destination shape must have 5 dimensions.");
+
+    int64_t n = 0;
+    int64_t c = 0;
+    int64_t h = 0;
+    int64_t w = 0;
+    uint32_t dstStride = 0;
+    if constexpr (DstTileData::layout == Layout::NCHW) {
+        // NCHW is represented as <1, N, C, H, W>.
+        PTO_ASSERT(dst.GetShape(0) == 1, "TMov NCHW: shape0 must be 1.");
+        n = dst.GetShape(1);
+        c = dst.GetShape(2);
+        h = dst.GetShape(3);
+        w = dst.GetShape(4);
+        dstStride = static_cast<uint32_t>(h * w);
+    } else {
+        // NCDHW is represented as <N, C, D, H, W>.
+        n = dst.GetShape(0);
+        c = dst.GetShape(1);
+        h = dst.GetShape(3);
+        w = dst.GetShape(4);
+        dstStride = static_cast<uint32_t>(dst.GetShape(2) * h * w);
+    }
+    PTO_ASSERT(validRow == n * h * w, "TMov ConvTile: validRow must be N * H * W.");
+    PTO_ASSERT(validCol == c, "TMov ConvTile: validCol must be C.");
+    return dstStride;
+}
+
+template <
+    typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t quantPre, ReluPreMode reluMode,
+    STPhase Phase = STPhase::Unspecified>
+PTO_INTERNAL void TMovCcToUb(DstTileData& dst, SrcTileData& src, uint16_t validRow, uint16_t validCol)
+{
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        static_assert(
+            (mode == AccToVecMode::SingleModeVec0) || (mode == AccToVecMode::SingleModeVec1),
+            "TMov ConvTile destination only support single destination modes.");
+        uint32_t dstStride = GetTMovConvTileDstStride(dst, validRow, validCol);
+        TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(
+            dst.data(), src.data(), validRow, validCol, dstStride);
+    } else {
+        TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(
+            dst.data(), src.data(), validRow, validCol);
+    }
+}
+
 template <typename DstTileData, typename SrcTileData>
 PTO_INTERNAL constexpr void CommonCheck()
 {
@@ -785,7 +860,7 @@ PTO_INTERNAL void TMOV_TILE_IMPL(DstTileData& dst, SrcTileData& src)
             GetCastPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
         if constexpr (DstTileData::Loc == TileType::Vec) {
             TMovCcToUb<DstTileData, SrcTileData, AccToVecMode::SingleModeVec0, quantPre, ReluPreMode::NoRelu>(
-                dst.data(), src.data(), m, n);
+                dst, src, m, n);
         } else if constexpr (DstTileData::Loc == TileType::Mat) {
             TMovCcToCb<DstTileData, SrcTileData, quantPre, ReluPreMode::NoRelu>(dst.data(), src.data(), m, n);
         }
@@ -856,8 +931,7 @@ PTO_INTERNAL void TMOV_IMPL(DstTileData& dst, SrcTileData& src)
     uint16_t n = src.GetValidCol();
     constexpr QuantMode_t quantPre = GetCastPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     if constexpr (DstTileData::Loc == TileType::Vec) {
-        TMovCcToUb<DstTileData, SrcTileData, AccToVecMode::SingleModeVec0, quantPre, reluMode, Phase>(
-            dst.data(), src.data(), m, n);
+        TMovCcToUb<DstTileData, SrcTileData, AccToVecMode::SingleModeVec0, quantPre, reluMode, Phase>(dst, src, m, n);
     } else if constexpr (DstTileData::Loc == TileType::Mat) {
         TMovCcToCb<DstTileData, SrcTileData, quantPre, reluMode, Phase>(dst.data(), src.data(), m, n);
     }
@@ -873,7 +947,7 @@ PTO_INTERNAL void TMOV_IMPL(DstTileData& dst, SrcTileData& src)
     uint16_t m = src.GetValidRow();
     uint16_t n = src.GetValidCol();
     constexpr QuantMode_t quantPre = GetCastPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
-    TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(dst.data(), src.data(), m, n);
+    TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(dst, src, m, n);
 }
 
 template <
@@ -887,8 +961,7 @@ PTO_INTERNAL void TMOV_IMPL(DstTileData& dst, SrcTileData& src, uint64_t preQuan
     constexpr QuantMode_t quantPre = GetScalarPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     set_quant_pre(preQuantScalar);
     if constexpr (DstTileData::Loc == TileType::Vec) {
-        TMovCcToUb<DstTileData, SrcTileData, AccToVecMode::SingleModeVec0, quantPre, reluMode, Phase>(
-            dst.data(), src.data(), m, n);
+        TMovCcToUb<DstTileData, SrcTileData, AccToVecMode::SingleModeVec0, quantPre, reluMode, Phase>(dst, src, m, n);
     } else if constexpr (DstTileData::Loc == TileType::Mat) {
         TMovCcToCb<DstTileData, SrcTileData, quantPre, reluMode, Phase>(dst.data(), src.data(), m, n);
     }
@@ -908,7 +981,7 @@ PTO_INTERNAL void TMOV_IMPL(DstTileData& dst, SrcTileData& src, uint64_t preQuan
     uint16_t n = src.GetValidCol();
     constexpr QuantMode_t quantPre = GetScalarPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     set_quant_pre(preQuantScalar);
-    TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(dst.data(), src.data(), m, n);
+    TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(dst, src, m, n);
 }
 
 template <typename FpTileData>
@@ -931,8 +1004,7 @@ PTO_INTERNAL void TMOV_IMPL(DstTileData& dst, SrcTileData& src, FpTileData& fp)
     constexpr QuantMode_t quantPre = GetVectorPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     SetFPC<FpTileData>(fp.data());
     if constexpr (DstTileData::Loc == TileType::Vec) {
-        TMovCcToUb<DstTileData, SrcTileData, AccToVecMode::SingleModeVec0, quantPre, reluMode, Phase>(
-            dst.data(), src.data(), m, n);
+        TMovCcToUb<DstTileData, SrcTileData, AccToVecMode::SingleModeVec0, quantPre, reluMode, Phase>(dst, src, m, n);
     } else if constexpr (DstTileData::Loc == TileType::Mat) {
         TMovCcToCb<DstTileData, SrcTileData, quantPre, reluMode, Phase>(dst.data(), src.data(), m, n);
     }
@@ -953,7 +1025,7 @@ PTO_INTERNAL void TMOV_IMPL(DstTileData& dst, SrcTileData& src, FpTileData& fp)
     uint16_t m = src.GetValidRow();
     uint16_t n = src.GetValidCol();
     SetFPC<FpTileData>(fp.data());
-    TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(dst.data(), src.data(), m, n);
+    TMovCcToUb<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(dst, src, m, n);
 }
 } // namespace pto
 #endif

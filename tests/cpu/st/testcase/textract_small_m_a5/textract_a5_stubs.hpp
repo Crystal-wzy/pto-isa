@@ -76,6 +76,8 @@ void load_cbuf_to_cb_mx(Args&&...);
 template <typename... Args>
 void set_loop3_para(Args&&...);
 template <typename... Args>
+void set_channel_para(Args&&...);
+template <typename... Args>
 void pto_copy_ubuf_to_ubuf(Args&&...);
 template <typename... Args>
 void set_fpc(Args&&...);

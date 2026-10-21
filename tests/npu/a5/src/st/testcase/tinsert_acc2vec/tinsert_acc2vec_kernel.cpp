@@ -572,6 +572,77 @@ __global__ AICORE void RunSplitTMOV(__gm__ OutType* out, __gm__ AType* src0, __g
 #endif
 }
 
+template <
+    typename OutType, typename AType, typename BType, Layout layoutType, int validM, int C, int validK, int dstN,
+    int dstC, int dstD, int dstH, int dstW, int indexRow = 0, int indexCol = 0>
+__global__ AICORE void RunTInsertAcc2ConvTile(
+    __gm__ OutType* out, __gm__ AType* src0, __gm__ BType* src1, __gm__ OutType* dstInit, float scalar)
+{
+    constexpr int blockAlign = std::is_same_v<AType, int8_t> ? 32 : 16;
+    constexpr int alignedK = CeilAlign<int>(validK, blockAlign);
+    RunMATMUL<AType, BType, OutType, validM, alignedK, C, validM, validK, C>(src0, src1, nullptr);
+
+    using AccTile = TileAcc<CType<AType>, validM, C, validM, C>;
+    constexpr int dstRow = dstN * dstH * dstW;
+    constexpr int dstCol = dstC;
+    constexpr int storeCols = layoutType == Layout::NCHW ? dstCol : dstCol * dstD;
+    constexpr int bufferSize = dstRow * storeCols * sizeof(OutType);
+    using DstTileData = std::conditional_t<
+        layoutType == Layout::NCHW,
+        ConvTile<TileType::Vec, OutType, bufferSize, Layout::NCHW, ConvTileShape<1, dstN, dstC, dstH, dstW>>,
+        ConvTile<TileType::Vec, OutType, bufferSize, Layout::NCDHW, ConvTileShape<dstN, dstC, dstD, dstH, dstW>>>;
+    using StoreTileData = Tile<TileType::Vec, OutType, dstRow, storeCols, BLayout::ColMajor, dstRow, storeCols>;
+    using GlobalDataInit = GlobalTensor<
+        OutType, pto::Shape<1, 1, 1, dstRow, storeCols>,
+        pto::Stride<dstRow * storeCols, dstRow * storeCols, dstRow * storeCols, 1, dstRow>, Layout::DN>;
+    using GlobalDataOut = std::conditional_t<
+        layoutType == Layout::NCHW,
+        GlobalTensor<
+            OutType, pto::Shape<1, dstC, 1, dstRow, 1>, pto::Stride<dstC * dstRow, dstRow, dstRow, 1, 1>, Layout::DN>,
+        GlobalTensor<
+            OutType, pto::Shape<1, dstC * dstD, 1, dstRow, 1>, pto::Stride<dstC * dstD * dstRow, dstRow, dstRow, 1, 1>,
+            Layout::DN>>;
+
+    AccTile cTile;
+    DstTileData dstTile;
+    StoreTileData storeTile;
+    TASSIGN(cTile, 0x0);
+    TASSIGN(dstTile, 0x0);
+    TASSIGN(storeTile, 0x0);
+    uint8_t syncId = 0;
+
+#if defined(__DAV_VEC__)
+    GlobalDataInit dstInitGlobal(dstInit);
+    TLOAD(storeTile, dstInitGlobal);
+    set_intra_block(PIPE_MTE2, 0x1);
+#endif
+
+#if defined(__DAV_CUBE__)
+    wait_intra_block(PIPE_FIX, 0x1);
+    uint64_t preScalar = static_cast<uint64_t>(*reinterpret_cast<int32_t*>(&scalar));
+    if constexpr (sizeof(OutType) == 1) {
+        constexpr bool sign = std::is_same_v<OutType, int8_t>;
+        preScalar = (preScalar & ~(static_cast<uint64_t>(1) << 46)) | (static_cast<uint64_t>(sign) << 46);
+    }
+    TINSERT<DstTileData, AccTile>(dstTile, cTile, preScalar, indexRow, indexCol);
+
+#ifndef __PTO_AUTO__
+    set_flag(PIPE_FIX, PIPE_MTE3, EVENT_ID0);
+    wait_flag(PIPE_FIX, PIPE_MTE3, EVENT_ID0);
+#endif
+    set_intra_block(PIPE_FIX, syncId);
+    set_intra_block(PIPE_FIX, syncId + 16);
+#endif
+
+#if defined(__DAV_VEC__)
+    wait_intra_block(PIPE_MTE3, syncId);
+    if (get_subblockid() == 0) {
+        GlobalDataOut dstGlobal(out);
+        TSTORE(dstGlobal, storeTile);
+    }
+#endif
+}
+
 template <int32_t tilingKey>
 void LaunchTMOVAcc2VecNZ2ND(uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* src2, void* stream)
 {
@@ -703,3 +774,53 @@ template void LaunchTMOVAcc2VecSCQuantNZ2ND<1>(uint8_t* out, uint8_t* src0, uint
 template void LaunchTMOVAcc2VecSCQuantNZ2ND<2>(uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* src2, void* stream);
 template void LaunchTMOVAcc2VecSCQuantNZ2ND<3>(uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* src2, void* stream);
 template void LaunchTMOVAcc2VecSCQuantNZ2ND<4>(uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* src2, void* stream);
+
+template <int32_t tilingKey>
+void LaunchTInsertAcc2ConvTile(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream)
+{
+    if constexpr (tilingKey == 1) {
+        RunTInsertAcc2ConvTile<float, float, float, Layout::NCHW, 64, 32, 7, 1, 64, 1, 8, 16, 8, 16>
+            <<<1, nullptr, stream>>>(
+                reinterpret_cast<float*>(out), reinterpret_cast<float*>(src0), reinterpret_cast<float*>(src1),
+                reinterpret_cast<float*>(dstInit), 1);
+    } else if constexpr (tilingKey == 2) {
+        RunTInsertAcc2ConvTile<float, float, float, Layout::NCDHW, 96, 64, 7, 1, 96, 2, 12, 16, 32, 32>
+            <<<1, nullptr, stream>>>(
+                reinterpret_cast<float*>(out), reinterpret_cast<float*>(src0), reinterpret_cast<float*>(src1),
+                reinterpret_cast<float*>(dstInit), 1);
+    } else if constexpr (tilingKey == 3) {
+        RunTInsertAcc2ConvTile<half, half, half, Layout::NCHW, 64, 32, 7, 1, 64, 1, 8, 16, 16, 16>
+            <<<1, nullptr, stream>>>(
+                reinterpret_cast<half*>(out), reinterpret_cast<half*>(src0), reinterpret_cast<half*>(src1),
+                reinterpret_cast<half*>(dstInit), 1);
+    } else if constexpr (tilingKey == 4) {
+        RunTInsertAcc2ConvTile<half, half, half, Layout::NCDHW, 96, 64, 7, 1, 96, 2, 12, 16, 32, 32>
+            <<<1, nullptr, stream>>>(
+                reinterpret_cast<half*>(out), reinterpret_cast<half*>(src0), reinterpret_cast<half*>(src1),
+                reinterpret_cast<half*>(dstInit), 1);
+    } else if constexpr (tilingKey == 5) {
+        RunTInsertAcc2ConvTile<int8_t, int8_t, int8_t, Layout::NCHW, 64, 32, 7, 1, 64, 1, 8, 16, 32, 16>
+            <<<1, nullptr, stream>>>(
+                reinterpret_cast<int8_t*>(out), reinterpret_cast<int8_t*>(src0), reinterpret_cast<int8_t*>(src1),
+                reinterpret_cast<int8_t*>(dstInit), 0.8);
+    } else if constexpr (tilingKey == 6) {
+        RunTInsertAcc2ConvTile<int8_t, int8_t, int8_t, Layout::NCDHW, 96, 64, 7, 1, 96, 2, 12, 16, 32, 32>
+            <<<1, nullptr, stream>>>(
+                reinterpret_cast<int8_t*>(out), reinterpret_cast<int8_t*>(src0), reinterpret_cast<int8_t*>(src1),
+                reinterpret_cast<int8_t*>(dstInit), 0.8);
+    }
+}
+
+template void LaunchTInsertAcc2ConvTile<1>(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream);
+template void LaunchTInsertAcc2ConvTile<2>(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream);
+template void LaunchTInsertAcc2ConvTile<3>(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream);
+template void LaunchTInsertAcc2ConvTile<4>(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream);
+template void LaunchTInsertAcc2ConvTile<5>(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream);
+template void LaunchTInsertAcc2ConvTile<6>(
+    uint8_t* out, uint8_t* src0, uint8_t* src1, uint8_t* dstInit, uint8_t* src3, void* stream);
