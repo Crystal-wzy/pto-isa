@@ -146,15 +146,14 @@ for (int tile_idx = 0; tile_idx < num_tiles; tile_idx++) {
 
 #### 方法1：使用脚本（推荐）
 
+脚本仅接受运行模式（`-r/--run-mode`）与 SoC 版本（`-v/--soc-version`）参数，无独立的 clean/debug 选项。
+
 ```bash
 # CPU 仿真模式（开发调试）
-./run.sh --sim --clean
+./run.sh -r sim -v Ascend910B1
 
 # NPU 模式（性能测试）
-./run.sh --npu --soc Ascend910B1
-
-# Debug 模式
-./run.sh --sim --debug
+./run.sh -r npu -v Ascend910B1
 ```
 
 #### 方法2：手动构建

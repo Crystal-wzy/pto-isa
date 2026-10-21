@@ -9,11 +9,14 @@ See LICENSE in the root of the software repository for the full text of the Lice
 */
 
 #include "test_common.h"
+#include "cpu_tile_test_utils.h"
 #include <pto/pto-inst.hpp>
 #include <gtest/gtest.h>
 
 using namespace std;
 using namespace PtoTestCommon;
+using namespace pto;
+using namespace CpuTileTestUtils;
 
 template <int32_t tilingKey>
 void launchTPOW_demo(uint8_t* out, uint8_t* src, void* stream);
@@ -98,3 +101,40 @@ TEST_F(TPOWTest, case_half_16x256_16x256_16x256) { test_tpow<aclFloat16, 16, 256
 #ifdef CPU_SIM_BFLOAT_ENABLED
 TEST_F(TPOWTest, case_bf16_16x256_16x256_16x256) { test_tpow<bfloat16_t, 16, 256, 16, 256, 16, 256>(); }
 #endif
+
+TEST_F(TPOWTest, case_float_diff_physical_stride)
+{
+    using DstTile = Tile<TileType::Vec, float, 2, 8, BLayout::RowMajor, 2, 3>;
+    using BaseTile = Tile<TileType::Vec, float, 2, 16, BLayout::RowMajor, 2, 3>;
+    using ExpTile = Tile<TileType::Vec, float, 2, 24, BLayout::RowMajor, 2, 3>;
+    using TmpTile = Tile<TileType::Vec, float, 2, 8, BLayout::RowMajor, 2, 3>;
+
+    DstTile dst;
+    BaseTile base;
+    ExpTile exp;
+    TmpTile tmp;
+    std::size_t addr = 0;
+    AssignTileStorage(addr, dst, base, exp, tmp);
+
+    const float baseValues[2][3] = {{1.0f, 2.0f, 3.0f}, {3.0f, 4.0f, 5.0f}};
+    const float expValues[2][3] = {{2.0f, 2.0f, 2.0f}, {2.0f, 2.0f, 2.0f}};
+    for (int r = 0; r < 2; ++r) {
+        for (int c = 0; c < 3; ++c) {
+            SetValue(base, r, c, baseValues[r][c]);
+            SetValue(exp, r, c, expValues[r][c]);
+        }
+    }
+    // The buggy implementation read base[8] and exp[8] for the second row, so place
+    // decoy values there to make any regression visible (correct result is 3^2 = 9).
+    base.data()[8] = 2.0f;
+    exp.data()[8] = 2.0f;
+
+    TPOW(dst, base, exp, tmp);
+
+    const float expected[2][3] = {{1.0f, 4.0f, 9.0f}, {9.0f, 16.0f, 25.0f}};
+    for (int r = 0; r < 2; ++r) {
+        for (int c = 0; c < 3; ++c) {
+            ExpectValueEquals(GetValue(dst, r, c), expected[r][c]);
+        }
+    }
+}

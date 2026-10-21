@@ -75,10 +75,7 @@ allgather_async/
 
 ### 1. CANN Toolkit
 
-CANN Toolkit 9.0.0 及以上版本，可通过以下两种方式获取：
-
-- **方式一**：从[昇腾社区](https://www.hiascend.com/software/cann/community)下载
-- **方式二**：直接下载尝鲜版安装包：[x86_64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/master/20260305000326487/x86_64/Ascend-cann-toolkit_9.0.0_linux-x86_64.run) / [aarch64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/master/20260305000326487/aarch64/Ascend-cann-toolkit_9.0.0_linux-aarch64.run)
+CANN Toolkit 9.0.0 及以上版本，可从[昇腾社区](https://www.hiascend.com/software/cann)下载。
 
 安装方式参考[快速安装 CANN](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha002/softwareinst/instg/instg_quick.html?Mode=PmIns&OS=openEuler&Software=cannToolKit)。
 

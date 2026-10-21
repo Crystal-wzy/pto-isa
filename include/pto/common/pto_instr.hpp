@@ -126,7 +126,7 @@ PTO_INST std::enable_if_t<is_tile_data_v<T> || is_conv_tile_v<T>> TASSIGN(T& obj
 template <SyncCoreType CoreType = SyncCoreType::AIVOnly>
 PTO_INST void SYNCALL()
 {
-#if defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_A5) || defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(__CPU_SIM)
     SYNCALL_IMPL<CoreType>();
 #else
     PTO_STATIC_ASSERT(CoreType != CoreType, "SYNCALL is not supported on this backend.");
@@ -140,7 +140,7 @@ template <
     std::enable_if_t<is_global_data_v<GlobalData>, int> = 0>
 PTO_INST void SYNCALL(GlobalData& gmWorkspace, int32_t usedCores = 0)
 {
-#if defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_A5) || defined(__CPU_SIM)
+#if defined(PTO_NPU_ARCH_A2A3) || defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(__CPU_SIM)
     if constexpr (Mode == SyncAllMode::Hard) {
         (void)gmWorkspace;
         (void)usedCores;

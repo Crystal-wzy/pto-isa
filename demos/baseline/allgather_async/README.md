@@ -75,10 +75,7 @@ allgather_async/
 
 ### 1. CANN Toolkit
 
-CANN Toolkit version 9.0.0 or above. Available via two methods:
-
-- **Option 1**: Download from the [Ascend Community](https://www.hiascend.com/software/cann/community)
-- **Option 2**: Direct download (preview build): [x86_64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/master/20260305000326487/x86_64/Ascend-cann-toolkit_9.0.0_linux-x86_64.run) / [aarch64](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-mirror/software/master/20260305000326487/aarch64/Ascend-cann-toolkit_9.0.0_linux-aarch64.run)
+CANN Toolkit version 9.0.0 or above. Download from the [Ascend Community](https://www.hiascend.com/software/cann).
 
 For installation instructions, refer to [Quick Install CANN](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/850alpha002/softwareinst/instg/instg_quick.html?Mode=PmIns&OS=openEuler&Software=cannToolKit).
 

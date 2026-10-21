@@ -1266,7 +1266,7 @@ inline AICORE void castData_2D_NoPostUpdate(
  * Conversion: f32 -> bf16 #rnd #sat #part
  * Uses cast32to16 helper
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ bfloat16_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2651,7 +2651,7 @@ inline AICORE void castData_1D_NoPostUpdate(
     cast32to16_1D_NoPostUpdate<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ bfloat16_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,

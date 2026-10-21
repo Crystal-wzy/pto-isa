@@ -31,16 +31,20 @@ def gen_golden_data(case_name, param):
         dst_idx_row, dst_idx_col = param.dst_idx_row, param.dst_idx_col
 
     # Generate input arrays
-    input1_valid = np.random.uniform(-1000, 1000, size=(v_valid_row, v_valid_col0)).astype(dtype)
-    input2_valid = np.random.uniform(-1000, 1000, size=(v_valid_row, v_valid_col1)).astype(dtype)
+    input1_valid = np.random.uniform(-1000, 1000,
+                                     size=(v_valid_row, v_valid_col0)).astype(dtype)
+    input2_valid = np.random.uniform(-1000, 1000,
+                                     size=(v_valid_row, v_valid_col1)).astype(dtype)
     input1 = np.zeros([src0_tile_row, src0_tile_col]).astype(dtype)
     input2 = np.zeros([src1_tile_row, src1_tile_col]).astype(dtype)
     input1[0:v_valid_row, 0:v_valid_col0] = input1_valid
     input2[0:v_valid_row, 0:v_valid_col1] = input2_valid
     if (idx_tiles != 'none'):
         elem_size = np.dtype(idxtype).itemsize
-        input1_idx_valid = np.random.uniform(0, v_valid_col0 * elem_size, size=(v_valid_row, 1)).astype(idxtype)
-        input2_idx_valid = np.random.uniform(0, v_valid_col1 * elem_size, size=(v_valid_row, 1)).astype(idxtype)
+        input1_idx_valid = np.random.uniform(
+            0, v_valid_col0 * elem_size, size=(v_valid_row, 1)).astype(idxtype)
+        input2_idx_valid = np.random.uniform(
+            0, v_valid_col1 * elem_size, size=(v_valid_row, 1)).astype(idxtype)
         input1_idx = np.zeros([src0_idx_row, src0_idx_col]).astype(idxtype)
         input2_idx = np.zeros([src1_idx_row, src1_idx_col]).astype(idxtype)
         input1_idx[0:v_valid_row, 0:1] = input1_idx_valid
@@ -52,20 +56,28 @@ def gen_golden_data(case_name, param):
         golden_idx = np.zeros([dst_idx_row, dst_idx_col]).astype(idxtype)
 
     if (idx_tiles == 'none'):
-        golden[:v_valid_row, :v_valid_col0 + v_valid_col1] = np.concatenate([
+        # For basic mode, destination valid cols = v_valid_col0 + v_valid_col1 (as created in kernel)
+        dst_cols = min(v_valid_col0 + v_valid_col1, dst_tile_col)
+        golden[:v_valid_row, :dst_cols] = np.concatenate([
             input1[:v_valid_row, :v_valid_col0],
             input2[:v_valid_row, :v_valid_col1]
-        ], axis=1)
+        ], axis=1)[:, :dst_cols]
     else:
-        if (idx_tiles == 'dst'):
-            golden_idx[:v_valid_row, :1] = (input1_idx + input2_idx)[:v_valid_row, :1]
         for i in range(v_valid_row):
             col1_len = int(input1_idx[i, 0] // elem_size)
             col2_len = int(input2_idx[i, 0] // elem_size)
 
-            golden[i, :col1_len] = input1[i, :col1_len]
-            golden[i, col1_len:col1_len + col2_len] = input2[i, :col2_len]
+            max_dst_cols = dst_tile_col
+            write_len1 = min(col1_len, max_dst_cols)
+            golden[i, :write_len1] = input1[i, :write_len1]
 
+            remaining_cols = max_dst_cols - write_len1
+            write_len2 = min(col2_len, remaining_cols)
+            golden[i, write_len1:write_len1 +
+                   write_len2] = input2[i, :write_len2]
+
+            if (idx_tiles == 'dst'):
+                golden_idx[i, 0] = input1_idx[i, 0] + input2_idx[i, 0]
 
     # Save the input and golden data to binary files
     input1.tofile("input1.bin")
@@ -89,7 +101,8 @@ class TConcatParams:
         self.valid_col0 = valid_col0
         self.valid_col1 = valid_col1
         self.dst_tile_row = self._default_if_none(dst_h, valid_row)
-        self.dst_tile_col = self._default_if_none(dst_w, valid_col0 + valid_col1)
+        self.dst_tile_col = self._default_if_none(
+            dst_w, valid_col0 + valid_col1)
         self.src0_tile_row = self._default_if_none(src0_h, valid_row)
         self.src0_tile_col = self._default_if_none(src0_w, valid_col0)
         self.src1_tile_row = self._default_if_none(src1_h, valid_row)
@@ -97,10 +110,14 @@ class TConcatParams:
 
         self.dst_idx_row = self._default_if_none(dst_idx_h, self.dst_tile_row)
         self.dst_idx_col = self._default_if_none(dst_idx_w, self.dst_tile_col)
-        self.src0_idx_row = self._default_if_none(src0_idx_h, self.src0_tile_row)
-        self.src0_idx_col = self._default_if_none(src0_idx_w, self.src0_tile_col)
-        self.src1_idx_row = self._default_if_none(src1_idx_h, self.src1_tile_row)
-        self.src1_idx_col = self._default_if_none(src1_idx_w, self.src1_tile_col)
+        self.src0_idx_row = self._default_if_none(
+            src0_idx_h, self.src0_tile_row)
+        self.src0_idx_col = self._default_if_none(
+            src0_idx_w, self.src0_tile_col)
+        self.src1_idx_row = self._default_if_none(
+            src1_idx_h, self.src1_tile_row)
+        self.src1_idx_col = self._default_if_none(
+            src1_idx_w, self.src1_tile_col)
 
     @staticmethod
     def _default_if_none(value, default):
@@ -119,7 +136,7 @@ def generate_case_name(param):
     idxtype_str = types_dict.get(param.idxtype)
     idx_tiles = param.idx_tiles
     sizes_str = f"{param.dst_tile_row}x{param.dst_tile_col}_{param.src0_tile_row}x{param.src0_tile_col}_\
-{param.src1_tile_row}x{param.src1_tile_col}_{param.valid_row}x{param.valid_col0}_{param.valid_row}x{param.valid_col1}"
+{param.src1_tile_row}x{param.src1_tile_col}_{param.valid_row}x{param.valid_col0}_{param.valid_col1}"
     idxsizes_str = f"{param.dst_idx_row}x{param.dst_idx_col}_{param.src0_idx_row}x{param.src0_idx_col}_\
 {param.src1_idx_row}x{param.src1_idx_col}"
 
@@ -151,17 +168,42 @@ if __name__ == "__main__":
         TConcatParams(np.float16, 16, 128, 128, np.int32, 'src'),
         TConcatParams(np.float32, 16, 32, 32, np.int32, 'src'),
         TConcatParams(np.int16, 32, 128, 128, np.int32, 'src'),
-        TConcatParams(np.float16, 16, 63, 64, np.int32, 'src', src0_w=64, dst_w=128),
-        TConcatParams(np.float32, 16, 31, 32, np.int32, 'src', src0_w=32, dst_w=64),
-        TConcatParams(np.int16, 32, 127, 128, np.int32, 'src', src0_w=128, dst_w=256),
+        TConcatParams(np.float16, 16, 63, 64, np.int32,
+                      'src', src0_w=64, dst_w=128),
+        TConcatParams(np.float32, 16, 31, 32, np.int32,
+                      'src', src0_w=32, dst_w=64),
+        TConcatParams(np.int16, 32, 127, 128, np.int32,
+                      'src', src0_w=128, dst_w=256),
         TConcatParams(np.float32, 64, 64, 64, np.int32, 'dst'),
         TConcatParams(np.int32, 64, 64, 64, np.int32, 'dst'),
         TConcatParams(np.float16, 16, 128, 128, np.int32, 'dst'),
         TConcatParams(np.float32, 16, 32, 32, np.int32, 'dst'),
         TConcatParams(np.int16, 32, 128, 128, np.int32, 'dst'),
-        TConcatParams(np.float16, 16, 63, 64, np.int32, 'dst', src0_w=64, dst_w=128),
-        TConcatParams(np.float32, 16, 31, 32, np.int32, 'dst', src0_w=32, dst_w=64),
-        TConcatParams(np.int16, 32, 127, 128, np.int32, 'dst', src0_w=128, dst_w=256),
+        TConcatParams(np.float16, 16, 63, 64, np.int32,
+                      'dst', src0_w=64, dst_w=128),
+        TConcatParams(np.float32, 16, 31, 32, np.int32,
+                      'dst', src0_w=32, dst_w=64),
+        TConcatParams(np.int16, 32, 127, 128, np.int32,
+                      'dst', src0_w=128, dst_w=256),
+        # New test cases for validCols bounds checking (cols0 + cols1 > dst valid cols)
+        TConcatParams(np.float32, 64, 80, 64, np.int32, dst_w=128),
+        TConcatParams(np.int32, 64, 80, 64, np.int32, dst_w=128),
+        TConcatParams(np.float16, 16, 144, 128, np.int32, dst_w=256),
+        TConcatParams(np.float32, 16, 40, 32, np.int32, dst_w=64),
+        TConcatParams(np.int16, 32, 144, 128, np.int32, dst_w=256),
+
+        # Also test with dst_idx mode
+        TConcatParams(np.float32, 64, 80, 64, np.int32, 'src', dst_w=128),
+        TConcatParams(np.int32, 64, 80, 64, np.int32, 'src', dst_w=128),
+        TConcatParams(np.float16, 16, 144, 128, np.int32, 'src', dst_w=256),
+        TConcatParams(np.float32, 16, 40, 32, np.int32, 'src', dst_w=64),
+        TConcatParams(np.int16, 32, 144, 128, np.int32, 'src', dst_w=256),
+
+        TConcatParams(np.float32, 64, 80, 64, np.int32, 'dst', dst_w=128),
+        TConcatParams(np.int32, 64, 80, 64, np.int32, 'dst', dst_w=128),
+        TConcatParams(np.float16, 16, 144, 128, np.int32, 'dst', dst_w=256),
+        TConcatParams(np.float32, 16, 40, 32, np.int32, 'dst', dst_w=64),
+        TConcatParams(np.int16, 32, 144, 128, np.int32, 'dst', dst_w=256),
     ]
 
     for param in case_params_list:

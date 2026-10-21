@@ -71,6 +71,7 @@ class TTRANS3DParams:
 
 if __name__ == "__main__":
     case_params_list = [
+        TTRANS3DParams("TTRANS3DTest.case1_float32_24_10_3_3_4", np.float32, 24, 10, 3, 3, 4, 16, 8),
         TTRANS3DParams("TTRANS3DTest.case1_float32_2_4_2_2_2", np.float32, 2, 4, 2, 2, 2, 16, 8),
         TTRANS3DParams("TTRANS3DTest.case2_float32_4_5_2_2_4", np.float32, 4, 5, 2, 2, 4, 16, 8),
         TTRANS3DParams("TTRANS3DTest.case3_int32_17_3_3_2_2", np.int32, 17, 3, 3, 2, 2, 16, 8),
