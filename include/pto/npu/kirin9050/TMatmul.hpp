@@ -38,9 +38,13 @@ PTO_INTERNAL void CheckMadValid()
     using BType = typename TileRight::DType;
     using CType = typename TileRes::DType;
     if constexpr (std::is_same_v<CType, half>) {
+        // half 输出：支持 f16*f16；以及 s8/s16 输入（mac 先做 s32 累加，经 pre-stage dequant 落到 fp16）。
         static_assert(
-            std::is_same_v<AType, half> && std::is_same_v<BType, half>,
-            "TMATMUL: Left Type and Right Type must be half when Acc Type is half.");
+            (std::is_same_v<AType, half> && std::is_same_v<BType, half>) ||
+                (std::is_same_v<AType, int8_t> && std::is_same_v<BType, int8_t>) ||
+                (std::is_same_v<AType, int16_t> && std::is_same_v<BType, int16_t>) ||
+                (std::is_same_v<AType, int16_t> && std::is_same_v<BType, int8_t>),
+            "TMATMUL: fp16 Acc supports f16f16 or s8s8/s16s16/s16s8 inputs (pre-stage dequant).");
     } else if constexpr (std::is_same_v<CType, int32_t>) {
         static_assert(
             (std::is_same_v<AType, int8_t> && std::is_same_v<BType, int8_t>) ||
@@ -49,9 +53,13 @@ PTO_INTERNAL void CheckMadValid()
                 (std::is_same_v<AType, half> && std::is_same_v<BType, half>),
             "TMATMUL: For int32 accumulation, supported input pairs are s8s8/s16s16/s16s8/f16f16.");
     } else if constexpr (std::is_same_v<CType, int16_t> || std::is_same_v<CType, int8_t>) {
+        // int8/int16 输出：支持 f16*f16；以及 s8/s16 输入（pre-stage requant）。
         static_assert(
-            std::is_same_v<AType, half> && std::is_same_v<BType, half>,
-            "TMATMUL: Left Type and Right Type must be half when Acc Type is int16_t or int8_t.");
+            (std::is_same_v<AType, half> && std::is_same_v<BType, half>) ||
+                (std::is_same_v<AType, int8_t> && std::is_same_v<BType, int8_t>) ||
+                (std::is_same_v<AType, int16_t> && std::is_same_v<BType, int16_t>) ||
+                (std::is_same_v<AType, int16_t> && std::is_same_v<BType, int8_t>),
+            "TMATMUL: int8/int16 Acc supports f16f16 or s8s8/s16s16/s16s8 inputs (pre-stage requant).");
     } else {
         static_assert(sizeof(CType) == 0, "TMATMUL: Acc Type only supports int32_t/half/int16_t/int8_t.");
     }
@@ -152,19 +160,28 @@ PTO_INTERNAL void TGEMV_BIAS_IMPL(TileRes& cMatrix, TileLeft& aMatrix, TileRight
 {
     CheckMadValid<TileRes, TileLeft, TileRight>();
     static_assert(std::is_same_v<typename TileRes::DType, typename TileBias::DType>, "No supported bias data type.");
+    // pypto 下发的是单行 Bias tile（TileType::Bias，驻留 BT buffer）；沿用广播 bias 路径，
+    // 经 btAddr 传地址（原 TMatmulFull 走 __cbuf__ 指针 cast，在 aicore 中非法且 __tf__ 调 __tf__）。
     static_assert(
-        (TileBias::Loc == TileType::Mat) && (TileBias::Rows == 1), "TileBias must be Mat tile with single row.");
+        (TileBias::Loc == TileType::Bias || TileBias::Loc == TileType::Mat) && (TileBias::Rows == 1),
+        "TileBias must be a single-row Bias/Mat tile.");
     uint16_t k = bMatrix.GetValidRow();
     uint16_t n = bMatrix.GetValidCol();
     PTO_ASSERT(k >= 1 && k <= MMAD_MAX_SUPPORT_LENGTH, "ERROR: The range of valid aMatrixCol is [1, 4095].");
     PTO_ASSERT(n >= 1 && n <= MMAD_MAX_SUPPORT_LENGTH, "ERROR: The range of valid bMatrixCol is [1, 4095].");
+    uint64_t btAddr = (uint64_t)biasData.data();
     MatmulConfig cfg;
     cfg.initCtrl = false;
-    cfg.broadcastEn = false;
+    cfg.broadcastEn = true;
     cfg.gemvCtrl = true;
     cfg.sizeN = n;
-    TMatmulFull<TileRes, TileLeft, TileRight, TileBias>(
-        cMatrix.data(), aMatrix.data(), bMatrix.data(), biasData.data(), 0, 1, k, n, cfg);
+    if constexpr (std::is_same_v<typename TileRes::DType, half>) {
+        cfg.preQuant = MatmulPreQuant::DeqF16Scalar;
+    }
+    SetMFpcForFp16<typename TileRes::DType>();
+    SetMQuantPre<typename TileRes::DType>(0.0f);
+    TMatmulCore<TileRes, TileLeft, TileRight>(
+        cMatrix.data(), aMatrix.data(), bMatrix.data(), nullptr, btAddr, 1, k, n, cfg.Build());
 }
 
 template <

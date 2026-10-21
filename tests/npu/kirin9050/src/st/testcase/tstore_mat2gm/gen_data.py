@@ -45,14 +45,38 @@ def gen_golden_data_nz2nd(info):
     golden.tofile("./golden.bin")
 
 
+def gen_golden_data_nz2nd_padded(info):
+    # Padded/partial tile (matmul C geometry): the source is the full static sM x sN NZ buffer
+    # (valid region M x N filled, pad zero); golden is the valid M x N top-left of the ND buffer.
+    m, n = info.shape
+    sm, sn = info.tile_shape
+    whole_m, whole_n = info.whole_shape
+    data_type = info.data_type
+    c0 = 32 // np.dtype(data_type).itemsize
+    inner_cols = max(c0, 16)
+    assert sm % 16 == 0 and sn % inner_cols == 0, "padded tile must be 16 / inner-col aligned"
+    assert sm >= m and sn >= n, "padded tile must cover the valid shape"
+    assert whole_m >= m and whole_n >= n, "NZ2ND requires whole >= shape"
+    logical = np.random.randint(-5, 5, size=(m, n)).astype(data_type)
+    full = np.zeros((sm, sn), dtype=data_type)
+    full[0:m, 0:n] = logical
+    nz = full.reshape(sm // 16, 16, sn // inner_cols, inner_cols).transpose(2, 0, 1, 3).astype(data_type)
+    golden = np.zeros((whole_m, whole_n), dtype=data_type)
+    golden[0:m, 0:n] = logical
+    nz.tofile("./input.bin")
+    golden.tofile("./golden.bin")
+
+
 class GlobalTensorInfo:
-    def __init__(self, case_name, data_type, fmt, shape, whole_shape):
+    def __init__(self, case_name, data_type, fmt, shape, whole_shape, tile_shape=None):
         self.case_name = case_name
         self.data_type = data_type
         self.format = fmt
         # NZ: shape / whole_shape are the 5D NZ fractal dims; NZ2ND: (M, N) / (gWholeM, gWholeN).
         self.shape = shape
         self.whole_shape = whole_shape
+        # Padded/partial NZ2ND only: static tile (sM, sN) >= valid (M, N).
+        self.tile_shape = tile_shape
 
 
 if __name__ == "__main__":
@@ -87,6 +111,10 @@ if __name__ == "__main__":
         # 32-bit (C0 = 8).
         GlobalTensorInfo("TStoreMat2GMTest.case11_nz2nd", np.int32, "NZ2ND", (32, 32), (32, 32)),
         GlobalTensorInfo("TStoreMat2GMTest.case12_nz2nd", np.float32, "NZ2ND", (32, 32), (32, 48)),
+        # Padded/partial tile (matmul C geometry): tile_shape = static (sM, sN), shape = valid.
+        GlobalTensorInfo("TStoreMat2GMTest.case13_nz2nd", np.float16, "NZ2ND", (16, 32), (16, 32), (32, 32)),
+        GlobalTensorInfo("TStoreMat2GMTest.case14_nz2nd", np.float16, "NZ2ND", (30, 60), (30, 60), (32, 64)),
+        GlobalTensorInfo("TStoreMat2GMTest.case15_nz2nd", np.int8, "NZ2ND", (16, 16), (16, 16), (32, 32)),
     ]
 
     for info in case_list:
@@ -94,7 +122,9 @@ if __name__ == "__main__":
             os.makedirs(info.case_name)
         original_dir = os.getcwd()
         os.chdir(info.case_name)
-        if info.format == "NZ2ND":
+        if info.tile_shape is not None:
+            gen_golden_data_nz2nd_padded(info)
+        elif info.format == "NZ2ND":
             gen_golden_data_nz2nd(info)
         else:
             gen_golden_data_nz2nz(info)

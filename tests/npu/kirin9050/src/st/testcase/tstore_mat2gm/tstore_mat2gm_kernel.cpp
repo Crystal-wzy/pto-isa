@@ -93,6 +93,44 @@ __global__ AICORE void TStoreMatNz2NdKernel(__gm__ T* out, __gm__ T* src)
     RunTStoreMatNz2Nd<T, M, N, gWholeM, gWholeN>(out, src);
 }
 
+// Mat(NZ in L1) -> GM ND with a padded/partial tile geometry, as produced by matmul:
+// the tile static shape (sM, sN) is larger than the valid region (M, N), and M/N need not be
+// 16 / C0 aligned. The source is the full sM x sN NZ buffer; the destination is the valid
+// M x N top-left region of a gWholeM x gWholeN ND buffer.
+template <typename T, int M, int N, int sM, int sN, int gWholeM, int gWholeN>
+AICORE inline void RunTStoreMatNz2NdPadded(__gm__ T* out, __gm__ T* src)
+{
+    constexpr int c0 = 32 / sizeof(T);
+    constexpr int innerCols = (c0 > 16) ? c0 : 16; // C/Acc NZ inner column width (elements)
+    using SrcShape = pto::Shape<1, sN / innerCols, sM / 16, 16, innerCols>;
+    using SrcStride = pto::Stride<sM * sN, (sM / 16) * 16 * innerCols, 16 * innerCols, innerCols, 1>;
+    using SrcGlobal = GlobalTensor<T, SrcShape, SrcStride, Layout::NZ>;
+
+    using DstShape = pto::Shape<1, 1, 1, M, N>;
+    using DstStride = pto::Stride<gWholeM * gWholeN, gWholeM * gWholeN, gWholeM * gWholeN, gWholeN, 1>;
+    using DstGlobal = GlobalTensor<T, DstShape, DstStride, Layout::ND>;
+
+    SrcGlobal srcGlobal(src);
+    DstGlobal dstGlobal(out);
+
+    // Static tile is the padded allocation; valid shape is (M, N).
+    using TileData = Tile<TileType::Mat, T, sM, sN, BLayout::ColMajor, -1, -1, SLayout::RowMajor, 512>;
+    TileData srcTile(M, N);
+    TASSIGN(srcTile, 0x0);
+
+    TLOAD(srcTile, srcGlobal);
+    set_flag(PIPE_MTE2, PIPE_MTE3, EVENT_ID0);
+    wait_flag(PIPE_MTE2, PIPE_MTE3, EVENT_ID0);
+    TSTORE(dstGlobal, srcTile);
+    out = dstGlobal.data();
+}
+
+template <typename T, int M, int N, int sM, int sN, int gWholeM, int gWholeN>
+__global__ AICORE void TStoreMatNz2NdPaddedKernel(__gm__ T* out, __gm__ T* src)
+{
+    RunTStoreMatNz2NdPadded<T, M, N, sM, sN, gWholeM, gWholeN>(out, src);
+}
+
 template <
     typename T, int gShape0, int gShape1, int gShape2, int gShape3, int gShape4, int gWholeShape0, int gWholeShape1,
     int gWholeShape2, int gWholeShape3, int gWholeShape4>
@@ -146,3 +184,20 @@ template void LaunchTStoreNz2Nd<uint16_t, 16, 16, 24, 32>(uint16_t* out, uint16_
 // 32-bit NZ2ND.
 template void LaunchTStoreNz2Nd<int32_t, 32, 32, 32, 32>(int32_t* out, int32_t* src, void* stream);
 template void LaunchTStoreNz2Nd<float, 32, 32, 32, 48>(float* out, float* src, void* stream);
+
+// NZ2ND padded/partial tile: static tile (sM, sN) > valid (M, N); M may be < static Rows and
+// not 16-aligned, N may not be C0-aligned. Mirrors the matmul C tile geometry.
+template <typename T, int M, int N, int sM, int sN, int gWholeM, int gWholeN>
+void LaunchTStoreNz2NdPadded(T* out, T* src, void* stream)
+{
+    TStoreMatNz2NdPaddedKernel<T, M, N, sM, sN, gWholeM, gWholeN><<<1, nullptr, stream>>>(out, src);
+}
+
+// fp16: valid 16x32 in a 32x32 tile (static Rows 32 > validRow 16) -> 011-style int32 not covered;
+// fp16: valid 30x60 in a 32x64 tile (M not 16-aligned, N=60 not C0-aligned).
+template void LaunchTStoreNz2NdPadded<aclFloat16, 16, 32, 32, 32, 16, 32>(
+    aclFloat16* out, aclFloat16* src, void* stream);
+template void LaunchTStoreNz2NdPadded<aclFloat16, 30, 60, 32, 64, 30, 60>(
+    aclFloat16* out, aclFloat16* src, void* stream);
+// int8: valid 16x16 in a 32x32 tile; N=16 < C0=32 (old nc1 = 16/32 -> 0 blocks).
+template void LaunchTStoreNz2NdPadded<int8_t, 16, 16, 32, 32, 16, 16>(int8_t* out, int8_t* src, void* stream);

@@ -23,6 +23,9 @@ void LaunchTStoreNz2Nz(T* out, T* src0, void* stream);
 template <typename T, int M, int N, int gWholeM, int gWholeN>
 void LaunchTStoreNz2Nd(T* out, T* src0, void* stream);
 
+template <typename T, int M, int N, int sM, int sN, int gWholeM, int gWholeN>
+void LaunchTStoreNz2NdPadded(T* out, T* src0, void* stream);
+
 class TStoreMat2GMTest : public testing::Test {
 protected:
     void SetUp() override {}
@@ -150,6 +153,61 @@ void test_tstore_nz2nd()
     EXPECT_TRUE(ret);
 }
 
+// NZ2ND with a padded/partial tile: source is the full sM x sN NZ buffer, the tile's valid
+// region is M x N (M may be < static Rows, M/N may be non-16/non-C0 aligned).
+template <typename DataType, int M, int N, int sM, int sN, int gWholeM, int gWholeN>
+void test_tstore_nz2nd_padded()
+{
+    size_t srcSize = static_cast<size_t>(sM) * sN * sizeof(DataType);
+    size_t dstSize = static_cast<size_t>(gWholeM) * gWholeN * sizeof(DataType);
+
+    aclInit(nullptr);
+    aclrtSetDevice(0);
+
+    aclrtStream stream;
+    aclrtCreateStream(&stream);
+
+    DataType *dstHost, *srcHost;
+    DataType *dstDevice, *srcDevice;
+
+    aclrtMallocHost((void**)(&dstHost), dstSize);
+    aclrtMallocHost((void**)(&srcHost), srcSize);
+
+    aclrtMalloc((void**)&dstDevice, dstSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    aclrtMalloc((void**)&srcDevice, srcSize, ACL_MEM_MALLOC_HUGE_FIRST);
+
+    ReadFile(GetGoldenDir() + "/input.bin", srcSize, srcHost, srcSize);
+    aclrtMemset(dstDevice, dstSize, 0, dstSize);
+    aclrtMemset(dstHost, dstSize, 0, dstSize);
+
+    aclrtMemcpy(dstDevice, dstSize, dstHost, dstSize, ACL_MEMCPY_HOST_TO_DEVICE);
+    aclrtMemcpy(srcDevice, srcSize, srcHost, srcSize, ACL_MEMCPY_HOST_TO_DEVICE);
+    LaunchTStoreNz2NdPadded<DataType, M, N, sM, sN, gWholeM, gWholeN>(dstDevice, srcDevice, stream);
+
+    aclrtSynchronizeStream(stream);
+    aclrtMemcpy(dstHost, dstSize, dstDevice, dstSize, ACL_MEMCPY_DEVICE_TO_HOST);
+
+    WriteFile(GetGoldenDir() + "/output.bin", dstHost, dstSize);
+
+    aclrtFree(dstDevice);
+    aclrtFree(srcDevice);
+
+    aclrtFreeHost(dstHost);
+    aclrtFreeHost(srcHost);
+
+    aclrtDestroyStream(stream);
+    aclrtResetDevice(0);
+    aclFinalize();
+
+    std::vector<DataType> golden(dstSize / sizeof(DataType));
+    std::vector<DataType> devFinal(dstSize / sizeof(DataType));
+    ReadFile(GetGoldenDir() + "/golden.bin", dstSize, golden.data(), dstSize);
+    ReadFile(GetGoldenDir() + "/output.bin", dstSize, devFinal.data(), dstSize);
+
+    bool ret = ResultCmp<DataType>(golden, devFinal, 0.001f);
+    EXPECT_TRUE(ret);
+}
+
 // Mat(NZ)->GM via TSTORE(Mat), 8/16/32-bit.
 TEST_F(TStoreMat2GMTest, case1_nz2nz) { test_tstore_nz2nz<aclFloat16, 1, 1, 2, 16, 16, 1, 1, 2, 16, 16>(); }
 
@@ -194,3 +252,11 @@ TEST_F(TStoreMat2GMTest, case10_nz2nd) { test_tstore_nz2nd<uint16_t, 16, 16, 24,
 // 32-bit.
 TEST_F(TStoreMat2GMTest, case11_nz2nd) { test_tstore_nz2nd<int32_t, 32, 32, 32, 32>(); }
 TEST_F(TStoreMat2GMTest, case12_nz2nd) { test_tstore_nz2nd<float, 32, 32, 32, 48>(); }
+
+// Padded/partial tile (matmul C geometry): static tile (sM, sN) > valid (M, N).
+// fp16: valid 16x32 in a static 32x32 tile (static Rows 32 > validRow 16).
+TEST_F(TStoreMat2GMTest, case13_nz2nd) { test_tstore_nz2nd_padded<aclFloat16, 16, 32, 32, 32, 16, 32>(); }
+// fp16: valid 30x60 in a static 32x64 tile (M not 16-aligned, N=60 not C0-aligned).
+TEST_F(TStoreMat2GMTest, case14_nz2nd) { test_tstore_nz2nd_padded<aclFloat16, 30, 60, 32, 64, 30, 60>(); }
+// int8: valid 16x16 in a static 32x32 tile (N=16 < C0=32).
+TEST_F(TStoreMat2GMTest, case15_nz2nd) { test_tstore_nz2nd_padded<int8_t, 16, 16, 32, 32, 16, 16>(); }
