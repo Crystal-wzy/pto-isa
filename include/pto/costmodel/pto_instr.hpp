@@ -10,6 +10,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #ifndef PTO_INSTR_HPP
 #define PTO_INSTR_HPP
 #include <string_view>
+#include <type_traits>
 
 // Intentionally reuse the common PTO include guard so this header can act as a
 // drop-in replacement when <pto/pto-inst.hpp> selects it for __COSTMODEL.
@@ -67,6 +68,22 @@ inline void InjectTileCycles(T& obj)
 
 // Record one PTO instruction to the pipeline simulator.
 
+template <typename T>
+inline constexpr const char* CostModelTileDTypeString()
+{
+    using TileType = std::remove_cvref_t<T>;
+    if constexpr (requires { typename TileType::DType; }) {
+        using TileDType = typename TileType::DType;
+        if constexpr (std::is_same_v<TileDType, bfloat16_t>) {
+            const uint32_t npuArch = perf_sim::GetCostModelCtx().npu_arch;
+            if (npuArch == perf_sim::kAscend950Arch || npuArch == perf_sim::kAscend950UrmaArch) {
+                return "bf16";
+            }
+        }
+    }
+    return perf_sim::TileTraits<TileType>::dtype_str();
+}
+
 // Helper: try to extract dimensions + dtype from a single tile; returns true if successful.
 template <typename T>
 inline bool TryTileInfo(int& rows, int& cols, std::string& dtype, T&& tile)
@@ -77,7 +94,7 @@ inline bool TryTileInfo(int& rows, int& cols, std::string& dtype, T&& tile)
                   }) {
         rows = static_cast<int>(tile.GetValidRow());
         cols = static_cast<int>(tile.GetValidCol());
-        dtype = perf_sim::TileTraits<std::remove_reference_t<T>>::dtype_str();
+        dtype = CostModelTileDTypeString<T>();
         return true;
     } else if constexpr (requires {
                              tile.Rows;
@@ -85,7 +102,7 @@ inline bool TryTileInfo(int& rows, int& cols, std::string& dtype, T&& tile)
                          }) {
         rows = tile.Rows;
         cols = tile.Cols;
-        dtype = perf_sim::TileTraits<std::remove_reference_t<T>>::dtype_str();
+        dtype = CostModelTileDTypeString<T>();
         return true;
     }
     return false;

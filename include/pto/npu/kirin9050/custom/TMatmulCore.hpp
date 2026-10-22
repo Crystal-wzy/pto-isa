@@ -38,9 +38,17 @@ __tf__ PTO_INTERNAL void TMatmulCore(
     __cb__ typename TileRight::DType* b = (__cb__ typename TileRight::DType*)__cce_get_tile_ptr(bData);
     __cbuf__ void* c = (__cbuf__ void*)__cce_get_tile_ptr(cData);
 
-    if (config & 0x1) {
-        ZeroInitCTilePtr<TileRes>(c);
-    }
+    // The hardware clears the accumulator through the initCtrl bit (config & 0x1); the software
+    // clear below raced with the M-pipe macro instruction (a delayed clear wiped the first K slice
+    // of every C tile after the first one in multi-batch GEMV), so it stays disabled.
+    // if (config & 0x1) {
+    //     ZeroInitCTilePtr<TileRes>(c);
+    //     // The L1 clear above is issued outside the M (macro instruction) pipe. Without an
+    //     // explicit barrier the first matmul of a C tile can be queued before the clear
+    //     // retires and the clear then wipes that slice (observed as a missing K slice for
+    //     // every C tile after the first one in multi-batch GEMV).
+    //     pipe_barrier(PIPE_ALL);
+    // }
 
     matmul_to_cbuf(c, a, b, biasAddr, btAddr, config);
 }
@@ -73,6 +81,11 @@ __tf__ PTO_INTERNAL void TMatmulBiasNonBroadcast(
     cfg.initCtrl = initCtrl;
     cfg.broadcastEn = false;
     cfg.sizeN = n;
+    // 与 TMatmul / TMatmulBiasBroadcast 对齐：half 输出需显式开启 fp16 反量化（preQuant），
+    // 否则 fixpipe 不按 fp16 处理累加结果（kirin9050 非宏指令 non-broadcast bias 路径）。
+    if constexpr (std::is_same_v<typename TileRes::DType, half>) {
+        cfg.preQuant = MatmulPreQuant::DeqF16Scalar;
+    }
     SetMFpcForFp16<typename TileRes::DType>();
     SetMQuantPre<typename TileRes::DType>(0.0f);
     TMatmulCore<TileRes, TileLeft, TileRight>(cData, aData, bData, (__cbuf__ int32_t*)biasPtr, 0, m, k, n, cfg.Build());
@@ -84,7 +97,9 @@ PTO_INTERNAL void TMatmulBiasBroadcast(
     typename TileRight::TileDType __in__ bData, uint64_t btAddr, uint16_t m, uint16_t k, uint16_t n, bool initCtrl)
 {
     using T = typename TileRes::DType;
-    ZeroInitCTile<TileRes>(cData);
+    // 广播 bias 路径由硬件用 btAddr 初始化 C，无需软件清零；软件清零与 M 管宏指令
+    // 无同步，会与后续 tile 的 matmul 竞态（同 TMatmulCore 中已注释的 initCtrl 清零）。
+    // ZeroInitCTile<TileRes>(cData);
     MatmulConfig cfg;
     cfg.initCtrl = initCtrl;
     cfg.broadcastEn = true;
@@ -112,7 +127,8 @@ PTO_INTERNAL void TMatmulMacroAcc(
     constexpr bool initCtrl = isClear;
 
     if constexpr (hasBias) {
-        ZeroInitCTile<TileRes>(cData);
+        // 广播 bias 路径由硬件用 btAddr 初始化 C，无需软件清零（清零与宏指令无同步，会竞态）。
+        // ZeroInitCTile<TileRes>(cData);
     }
 
     using InputType = typename TileLeft::DType;
@@ -151,7 +167,8 @@ PTO_INTERNAL void TMatmulMacro(
     bool initCtrl;
     if constexpr (hasBias) {
         initCtrl = false;
-        ZeroInitCTile<TileRes>(cData);
+        // 广播 bias 路径由硬件用 btAddr 初始化 C，无需软件清零（清零与宏指令无同步，会竞态）。
+        // ZeroInitCTile<TileRes>(cData);
     } else if constexpr (isAcc) {
         initCtrl = false;
     } else {
@@ -185,6 +202,11 @@ PTO_INTERNAL void TMatmulGemv(
     cfg.initCtrl = initCtrl;
     cfg.gemvCtrl = true;
     cfg.sizeN = n;
+    // 与 TMatmul 对齐：half 输出需显式开启 fp16 反量化（preQuant）。
+    // 缺失时 fp16 GEMV（M=1,N>1）输出错误，而 s8->s32 GEMV 正常——与实测现象一致。
+    if constexpr (std::is_same_v<typename TileRes::DType, half>) {
+        cfg.preQuant = MatmulPreQuant::DeqF16Scalar;
+    }
     SetMFpcForFp16<typename TileRes::DType>();
     SetMQuantPre<typename TileRes::DType>(0.0f);
     TMatmulCore<TileRes, TileLeft, TileRight>(cData, aData, bData, nullptr, 0, 1, k, n, cfg.Build());

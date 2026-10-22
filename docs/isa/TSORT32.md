@@ -21,7 +21,7 @@ void vbitsort(__ubuf__ T *dst,        // sorted value-index pairs out
 
 - `repeat` (cap `REPEAT_MAX = 255`) is packed into `config[63:56]`.
 - Blocks are **contiguous, strided by 32 elements**: block `b` reads `src0[b*32 : b*32+32]` and `src1[b*32 : b*32+32]`, writes `dst[b*32*coef : ...]` where `coef` = 2 (float) or 4 (half) — the value-index pair expansion factor.
-- Sort order: **descending** by value; ties broken by smaller index first.
+- Sort order: **descending** by value; equal values keep their original input order.
 
 ## Math Interpretation
 

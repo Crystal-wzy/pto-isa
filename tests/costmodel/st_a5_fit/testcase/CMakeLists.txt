@@ -46,6 +46,11 @@ set(ALL_TESTCASES
     tneg_fit
     trecip_fit
     tsel_fit
+    elementwise_fit
+    reduction_fit
+    local_expand_fit
+    sort_fit
+    dtype_expansion_fit
 )
 
 foreach(TESTCASE ${ALL_TESTCASES})

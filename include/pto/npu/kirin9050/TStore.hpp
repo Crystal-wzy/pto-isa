@@ -74,22 +74,41 @@ PTO_INTERNAL void TStoreMatNz2Nd(
     PTO_ASSERT(validCol == gShape4, "The validCol of TileData must equal the cols dim(gShape4) of the ND global!");
 
     constexpr uint32_t c0Size = C0_SIZE_BYTE / sizeof(typename TileData::DType);
-    constexpr uint32_t fractalElems = FRACTAL_NZ_ROW * c0Size;
-    constexpr uint32_t rowBytes = C0_SIZE_BYTE;
-    int hCount = validRow / FRACTAL_NZ_ROW;
-    int nc1 = validCol / static_cast<int>(c0Size);
+    // NZ 内列宽/分形大小取自 tile 自身（C/Acc 为 fractalCSize = 16 元素；AB tile 按 32B）。
+    constexpr uint32_t innerCols = TileData::InnerCols;
+    constexpr uint32_t fractalElems = TileData::InnerNumel;
+    constexpr uint32_t srcRowStride = innerCols * sizeof(typename TileData::DType);
+    // L1 中 NZ 的行块数由 tile 的静态 Rows 决定：mmad 按 ceilAlign 后的行数写回，
+    // validRow 可能小于 static Rows（如 M=16 落在 32 行 tile 内），也可能是非 16 倍数（M=30）。
+    // 列方向同理：validCol 可能非 C0 对齐（N=60），末列块只搬剩余有效列，避免越过 GM 行尾。
+    // mmad writes ceil16(validRow) rows. Do not use TileData::Rows here: for 1-byte
+    // outputs the codegen pads rawShape rows to 32 (32B row alignment), which would
+    // make hBlocks=2 and shift the second N fractal by one extra row block.
+    int hBlocks = (validRow + FRACTAL_NZ_ROW - 1) / FRACTAL_NZ_ROW;
+    int nc1 = (validCol + static_cast<int>(c0Size) - 1) / static_cast<int>(c0Size);
     uint64_t burstDstStride = static_cast<uint64_t>(gStride3) * sizeof(typename TileData::DType);
 
     set_loop_size_l1toout(1ULL << 21 | 1ULL);
-    for (int blk = 0; blk < nc1; blk++) {
-        for (int h = 0; h < hCount; h++) {
+    for (int h = 0; h < hBlocks; h++) {
+        int rowsThisBurst = validRow - h * FRACTAL_NZ_ROW;
+        if (rowsThisBurst <= 0) {
+            break;
+        }
+        rowsThisBurst = rowsThisBurst > FRACTAL_NZ_ROW ? FRACTAL_NZ_ROW : rowsThisBurst;
+        for (int blk = 0; blk < nc1; blk++) {
+            int srcCol = blk * static_cast<int>(c0Size);
+            int colsThisBlock = validCol - srcCol;
+            colsThisBlock = colsThisBlock > static_cast<int>(c0Size) ? static_cast<int>(c0Size) : colsThisBlock;
+            uint32_t lenBurst = static_cast<uint32_t>(colsThisBlock) * sizeof(typename TileData::DType);
+            int srcBlockCol = srcCol / static_cast<int>(innerCols);
+            int srcInnerCol = srcCol % static_cast<int>(innerCols);
             __cbuf__ typename TileData::DType* srcP =
-                srcAddr + blk * hCount * static_cast<int>(fractalElems) + h * static_cast<int>(fractalElems);
-            typename GlobalData::DType* dstP = dstAddr + h * FRACTAL_NZ_ROW * gStride3 + blk * static_cast<int>(c0Size);
+                srcAddr + (hBlocks * srcBlockCol + h) * static_cast<int>(fractalElems) + static_cast<int>(srcInnerCol);
+            typename GlobalData::DType* dstP = dstAddr + h * FRACTAL_NZ_ROW * gStride3 + srcCol;
             pto_copy_cbuf_to_gm_align_v2<typename TileData::DType>(
                 reinterpret_cast<__gm__ typename GlobalData::DType*>(dstP),
-                reinterpret_cast<__cbuf__ typename TileData::DType*>(srcP), 0, static_cast<uint32_t>(FRACTAL_NZ_ROW),
-                rowBytes, burstDstStride, rowBytes);
+                reinterpret_cast<__cbuf__ typename TileData::DType*>(srcP), 0, static_cast<uint32_t>(rowsThisBurst),
+                lenBurst, burstDstStride, srcRowStride);
         }
     }
     pipe_barrier(PIPE_MTE3);

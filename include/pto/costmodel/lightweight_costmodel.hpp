@@ -69,6 +69,59 @@ enum class PtoOpcode {
     TCOLEXPAND,
     TLOADCONV,
     TPREFETCH,
+    TMAX,
+    TMIN,
+    TAND,
+    TOR,
+    TANDS,
+    TORS,
+    TXOR,
+    TXORS,
+    TFMOD,
+    TFMODS,
+    TREM,
+    TREMS,
+    TPOW,
+    TPOWS,
+    TMADD,
+    TMULA,
+    TPRELU,
+    TPARTADD,
+    TPARTMUL,
+    TPARTMAX,
+    TPARTMIN,
+    TAXPY,
+    TCMP,
+    TCMPS,
+    TROWARGMAX,
+    TROWARGMIN,
+    TCOLARGMAX,
+    TCOLARGMIN,
+    TROWEXPANDADD,
+    TROWEXPANDSUB,
+    TROWEXPANDMUL,
+    TROWEXPANDDIV,
+    TROWEXPANDMAX,
+    TROWEXPANDMIN,
+    TROWEXPANDEXPDIF,
+    TCOLEXPANDADD,
+    TCOLEXPANDSUB,
+    TCOLEXPANDMUL,
+    TCOLEXPANDDIV,
+    TCOLEXPANDMAX,
+    TCOLEXPANDMIN,
+    TCOLEXPANDEXPDIF,
+    TEXPANDS,
+    TSELS,
+    TCONCAT,
+    TGATHER,
+    TGATHERB,
+    TFILLPAD,
+    TFILLPAD_EXPAND,
+    TTRI,
+    TDEQUANT,
+    TRESHAPE,
+    COUNT,
 };
 
 enum class DType : uint8_t {
@@ -146,7 +199,8 @@ struct PredictRuntimeConfig {
 
 namespace a5 {
 inline bool TryEstimateA5VfCycles(const CostModelInput& input, uint64_t& cycles);
-}
+inline bool TryEstimateA5SpecialCycles(const CostModelInput& input, uint64_t& cycles);
+} // namespace a5
 
 inline constexpr const char* DTypeToString(DType dtype)
 {
@@ -186,13 +240,110 @@ inline constexpr const char* DTypeToString(DType dtype)
 
 inline constexpr const char* PtoOpcodeToString(PtoOpcode op)
 {
-    constexpr std::array<const char*, 45> names = {
-        "TADD",     "TSUB",    "TMUL",     "TDIV",     "TRECIP",  "TADDS",      "TSUBS",      "TMULS",     "TDIVS",
-        "TMINS",    "TMAXS",   "TABS",     "TNEG",     "TEXP",    "TSQRT",      "TRSQRT",     "TLOG",      "TRELU",
-        "TLRELU",   "TNOT",    "TROWSUM",  "TROWMAX",  "TROWMIN", "TROWPROD",   "TCOLSUM",    "TCOLMAX",   "TCOLMIN",
-        "TCOLPROD", "TMATMUL", "TGEMV",    "TCVT",     "TMOV",    "TLOAD",      "TSTORE",     "TTRANS",    "TSORT32",
-        "TMRGSORT", "TSEL",    "TSCATTER", "TEXTRACT", "TINSERT", "TROWEXPAND", "TCOLEXPAND", "TLOADCONV", "TPREFETCH",
+    constexpr std::array names = {
+        "TADD",
+        "TSUB",
+        "TMUL",
+        "TDIV",
+        "TRECIP",
+        "TADDS",
+        "TSUBS",
+        "TMULS",
+        "TDIVS",
+        "TMINS",
+        "TMAXS",
+        "TABS",
+        "TNEG",
+        "TEXP",
+        "TSQRT",
+        "TRSQRT",
+        "TLOG",
+        "TRELU",
+        "TLRELU",
+        "TNOT",
+        "TROWSUM",
+        "TROWMAX",
+        "TROWMIN",
+        "TROWPROD",
+        "TCOLSUM",
+        "TCOLMAX",
+        "TCOLMIN",
+        "TCOLPROD",
+        "TMATMUL",
+        "TGEMV",
+        "TCVT",
+        "TMOV",
+        "TLOAD",
+        "TSTORE",
+        "TTRANS",
+        "TSORT32",
+        "TMRGSORT",
+        "TSEL",
+        "TSCATTER",
+        "TEXTRACT",
+        "TINSERT",
+        "TROWEXPAND",
+        "TCOLEXPAND",
+        "TLOADCONV",
+        "TPREFETCH",
+        "TMAX",
+        "TMIN",
+        "TAND",
+        "TOR",
+        "TANDS",
+        "TORS",
+        "TXOR",
+        "TXORS",
+        "TFMOD",
+        "TFMODS",
+        "TREM",
+        "TREMS",
+        "TPOW",
+        "TPOWS",
+        "TMADD",
+        "TMULA",
+        "TPRELU",
+        "TPARTADD",
+        "TPARTMUL",
+        "TPARTMAX",
+        "TPARTMIN",
+        "TAXPY",
+        "TCMP",
+        "TCMPS",
+        "TROWARGMAX",
+        "TROWARGMIN",
+        "TCOLARGMAX",
+        "TCOLARGMIN",
+        "TROWEXPANDADD",
+        "TROWEXPANDSUB",
+        "TROWEXPANDMUL",
+        "TROWEXPANDDIV",
+        "TROWEXPANDMAX",
+        "TROWEXPANDMIN",
+        "TROWEXPANDEXPDIF",
+        "TCOLEXPANDADD",
+        "TCOLEXPANDSUB",
+        "TCOLEXPANDMUL",
+        "TCOLEXPANDDIV",
+        "TCOLEXPANDMAX",
+        "TCOLEXPANDMIN",
+        "TCOLEXPANDEXPDIF",
+        "TEXPANDS",
+        "TSELS",
+        "TCONCAT",
+        "TGATHER",
+        "TGATHERB",
+        "TFILLPAD",
+        "TFILLPAD_EXPAND",
+        "TTRI",
+        "TDEQUANT",
+        "TRESHAPE",
     };
+    static_assert(names.size() == static_cast<size_t>(PtoOpcode::COUNT));
+    static_assert(std::string_view(names[static_cast<size_t>(PtoOpcode::TNOT)]) == "TNOT");
+    static_assert(std::string_view(names[static_cast<size_t>(PtoOpcode::TMATMUL)]) == "TMATMUL");
+    static_assert(std::string_view(names[static_cast<size_t>(PtoOpcode::TAXPY)]) == "TAXPY");
+    static_assert(std::string_view(names[static_cast<size_t>(PtoOpcode::TRESHAPE)]) == "TRESHAPE");
     auto idx = static_cast<std::underlying_type_t<PtoOpcode>>(op);
     if (idx >= 0 && static_cast<size_t>(idx) < names.size()) {
         return names[static_cast<size_t>(idx)];
@@ -367,8 +518,8 @@ inline bool TryEstimateA5Cycles(
     const CostModelInput& input, const PredictRuntimeConfig& predict_config, CostModelResult& result)
 {
     uint64_t cycles = 0;
-    if (!a5::TryEstimateA5VfCycles(input, cycles)) {
-        return WarnAndFallbackToZero(input, result, "unsupported A5 VF curve key");
+    if (!a5::TryEstimateA5SpecialCycles(input, cycles) && !a5::TryEstimateA5VfCycles(input, cycles)) {
+        return WarnAndFallbackToZero(input, result, "unsupported A5 costmodel key");
     }
     result.cycles = static_cast<double>(cycles);
     result.latency_us = evaluator::CyclesToUs(cycles, predict_config.frequency_mhz);
@@ -457,5 +608,6 @@ inline CostModelResult EstimateCycles(const CostModelInput& input)
 } // namespace pto::mocker::lightweight
 
 #include <pto/costmodel/a5/vf_costmodel.hpp>
+#include <pto/costmodel/a5/reduction_costmodel.hpp>
 
 #endif

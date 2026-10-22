@@ -30,15 +30,7 @@ struct ScoreIndexPair {
     uint32_t index;
 
     // 用于降序排序的比较函数（稳定排序）
-    bool operator<(const ScoreIndexPair& other) const
-    {
-        // 降序排序：分数大的在前
-        if (score != other.score) {
-            return score > other.score; // 降序
-        }
-        // 分数相同时，按原始索引升序（i<j时优先存储i）
-        return index < other.index;
-    }
+    bool operator<(const ScoreIndexPair& other) const { return score > other.score; }
 };
 
 template <typename T, typename TileDataDst, typename TileDataSrc, typename TileDataIdx>
@@ -60,16 +52,10 @@ PTO_INTERNAL void TSort32(
             }
 
             // 对当前分段进行稳定排序（降序）
-            // 使用稳定排序以保持相同分数的原始顺序
+            // 使用稳定排序以保持相同分数的原始顺序，与 A3 硬件 VBS32 行为一致
             std::stable_sort(
-                segment.begin(), segment.end(), [](const ScoreIndexPair<T>& a, const ScoreIndexPair<T>& b) {
-                    // 主要按分数降序排序
-                    if (a.score != b.score) {
-                        return a.score > b.score; // 降序
-                    }
-                    // 分数相同时，按原始索引升序（i<j时优先存储i）
-                    return a.index < b.index;
-                });
+                segment.begin(), segment.end(),
+                [](const ScoreIndexPair<T>& a, const ScoreIndexPair<T>& b) { return a.score > b.score; });
 
             int num = 0;
             int t = 0;

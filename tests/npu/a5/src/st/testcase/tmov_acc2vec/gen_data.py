@@ -164,29 +164,27 @@ def gen_golden_data(case_name, param):
         golden = get_golden_nd_to_nz(golden, base_m, base_n, dst_type, s_fractal_size)
     elif dst_format == "DN":
         golden = golden.transpose()
+    elif dst_format == "NCHW":
+        shape = param.shape
+        golden = golden.reshape(shape[0], shape[1], shape[2], shape[3]).transpose(0, 3, 1, 2).astype(dst_type)
+    elif dst_format == "NCDHW":
+        shape_ncdhw = param.ncdhw_shape
+        golden_ncdhw = np.zeros(shape_ncdhw, dtype=dst_type)
+        shape_orig = param.shape
+        golden_nchw = (
+            golden.reshape(shape_orig[0], shape_orig[1], shape_orig[2], shape_orig[3])
+            .transpose(0, 3, 1, 2)
+            .astype(dst_type)
+        )
+        golden_ncdhw[:, :, 0, :, :] = golden_nchw
+        golden = golden_ncdhw
     golden.astype(dst_type).tofile("./golden.bin")
 
 
 class TMovParams:
-    def __init__(
-        self,
-        atype,
-        btype,
-        dst_type,
-        m,
-        k,
-        n,
-        base_m=0,
-        base_k=0,
-        base_n=0,
-        dst_format="ND",
-        s_fractal_size=512,
-        is_v_quant=False,
-        is_s_quant=False,
-        is_relu=False,
-        quant_type=None,
-        scalar=1,
-    ):
+    def __init__(self, atype, btype, dst_type, m, k, n, base_m=0, base_k=0, base_n=0, dst_format="ND",
+                 s_fractal_size=512, is_v_quant=False, is_s_quant=False, is_relu=False, quant_type=None, scalar=1,
+                 shape=(0, 0, 0, 0), ncdhw_shape=(0, 0, 0, 0, 0)):
         self.atype = atype
         self.btype = btype
         self.ctype = np.float32
@@ -208,6 +206,8 @@ class TMovParams:
             self.quant_type = quant_type
         if is_s_quant:
             self.scalar = scalar
+        self.shape = shape
+        self.ncdhw_shape = ncdhw_shape
 
 
 if __name__ == "__main__":
@@ -265,6 +265,12 @@ if __name__ == "__main__":
         "TMOVTest.case_nz2dn_sc_quant_2",
         "TMOVTest.case_nz2dn_sc_quant_3",
         "TMOVTest.case_nz2dn_sc_quant_4",
+        "TMOVTest.case_acc2convtile_fp32_nchw",
+        "TMOVTest.case_acc2convtile_fp32_ncdhw",
+        "TMOVTest.case_acc2convtile_fp16_nchw",
+        "TMOVTest.case_acc2convtile_fp16_ncdhw",
+        "TMOVTest.case_acc2convtile_int8_nchw",
+        "TMOVTest.case_acc2convtile_int8_ncdhw",
     ]
 
     case_params_list = [
@@ -294,9 +300,8 @@ if __name__ == "__main__":
         TMovParams(np.int8, np.int8, np.int8, 128, 48, 128, 0, 0, 0, "NZ", 512, True, False, False, np.uint64),
         TMovParams(np.int8, np.int8, np.float16, 64, 80, 96, 0, 0, 0, "NZ", 512, True, False, False, np.uint64),
         TMovParams(np.float32, np.float32, np.int8, 125, 32, 91, 128, 32, 96, "NZ", 512, True, False, True, np.uint64),
-        TMovParams(
-            np.float32, np.float32, np.float16, 73, 16, 110, 80, 16, 112, "NZ", 512, True, False, True, np.uint64
-        ),
+        TMovParams(np.float32, np.float32, np.float16, 73, 16, 110, 80, 16, 112, "NZ", 512, True, False, True,
+                   np.uint64),
         TMovParams(np.float32, np.float32, np.float16, 48, 32, 80, 0, 0, 0, "NZ", 512, False, True, True, None, 2),
         TMovParams(np.int8, np.int8, np.float16, 96, 48, 128, 0, 0, 0, "NZ", 512, False, True, True, None, 4),
         TMovParams(np.int8, np.int8, np.int8, 125, 64, 124, 128, 64, 128, "NZ", 512, False, True, False, None, 5),
@@ -322,6 +327,17 @@ if __name__ == "__main__":
         TMovParams(np.float32, np.float32, np.int8, 96, 128, 60, 0, 0, 0, "DN", 512, False, True, True, None, 5),
         TMovParams(np.int8, np.int8, np.float16, 32, 128, 64, 0, 0, 0, "DN", 512, False, True, False, None, 3),
         TMovParams(np.int8, np.int8, np.int8, 64, 64, 90, 0, 0, 0, "DN", 512, False, True, False, None, 1),
+        TMovParams(np.float32, np.float32, np.float32, 128, 7, 64, 0, 0, 0, "NCHW", shape=(1, 8, 16, 64)),
+        TMovParams(np.float32, np.float32, np.float32, 192, 7, 96, 0, 0, 0, "NCDHW", shape=(1, 12, 16, 96),
+                   ncdhw_shape=(1, 96, 2, 12, 16)),
+        TMovParams(np.float16, np.float16, np.float16, 128, 7, 64, 0, 0, 0, "NCHW", 512, False, True, False, None, 2,
+                   shape=(1, 8, 16, 64)),
+        TMovParams(np.float16, np.float16, np.float16, 192, 7, 96, 0, 0, 0, "NCDHW", 512, False, True, False, None, 2,
+                   shape=(1, 12, 16, 96), ncdhw_shape=(1, 96, 2, 12, 16)),
+        TMovParams(np.int8, np.int8, np.int8, 128, 7, 64, 0, 0, 0, "NCHW", 512, False, True, False, None, 3,
+                   shape=(1, 8, 16, 64)),
+        TMovParams(np.int8, np.int8, np.int8, 192, 7, 96, 0, 0, 0, "NCDHW", 512, False, True, False, None, 3,
+                   shape=(1, 12, 16, 96), ncdhw_shape=(1, 96, 2, 12, 16)),
     ]
 
     for i, case_name in enumerate(case_name_list):

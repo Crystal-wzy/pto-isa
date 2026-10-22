@@ -41,13 +41,17 @@ PTO_INTERNAL void TEXTRACT_IMPL(DstTileData& dst, SrcTileData& src, uint16_t ind
 {
     static_assert((DstTileData::Loc == TileType::Vec), "Destination TileType only support Mat and Vec.");
     CheckTMovAccValid<DstTileData, SrcTileData, typename DstTileData::DType, typename SrcTileData::DType>();
-    static_assert(
-        (DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox),
-        "Dst fractal format should be (BFractal: RowMajor, SFractal: NoneBox).");
     constexpr QuantMode_t quantPre = GetCastPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
-    TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
-        dst.data(), src.data(), dst.GetValidRow(), dst.GetValidCol(), src.GetValidRow(), src.GetValidCol(), indexRow,
-        indexCol);
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(dst, src, indexRow, indexCol);
+    } else {
+        static_assert(
+            (DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox),
+            "Dst fractal format should be (BFractal: RowMajor, SFractal: NoneBox).");
+        TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+            dst.data(), src.data(), dst.GetValidRow(), dst.GetValidCol(), src.GetValidRow(), src.GetValidCol(),
+            indexRow, indexCol);
+    }
 }
 
 // scalar quant
@@ -85,14 +89,18 @@ PTO_INTERNAL void TEXTRACT_IMPL(
 {
     CheckTMovAccValid<DstTileData, SrcTileData, typename DstTileData::DType, typename SrcTileData::DType, true>();
     static_assert((DstTileData::Loc == TileType::Vec), "Destination TileType only support Mat.");
-    static_assert(
-        (DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox),
-        "Dst fractal format should be (BFractal: RowMajor, SFractal: NoneBox).");
     constexpr QuantMode_t quantPre = GetScalarPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     set_quant_pre(preQuantScalar);
-    TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
-        dst.data(), src.data(), dst.GetValidRow(), dst.GetValidCol(), src.GetValidRow(), src.GetValidCol(), indexRow,
-        indexCol);
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(dst, src, indexRow, indexCol);
+    } else {
+        static_assert(
+            (DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox),
+            "Dst fractal format should be (BFractal: RowMajor, SFractal: NoneBox).");
+        TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+            dst.data(), src.data(), dst.GetValidRow(), dst.GetValidCol(), src.GetValidRow(), src.GetValidCol(),
+            indexRow, indexCol);
+    }
 }
 
 // fp
@@ -133,16 +141,20 @@ PTO_INTERNAL void TEXTRACT_IMPL(
 {
     CheckTMovAccValid<DstTileData, SrcTileData, typename DstTileData::DType, typename SrcTileData::DType, true>();
     static_assert((DstTileData::Loc == TileType::Vec), "Destination TileType only support Mat and Vec.");
-    static_assert(
-        (DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox),
-        "Dst fractal format should be (BFractal: RowMajor, SFractal: NoneBox).");
     static_assert(FpTileData::Loc == TileType::Scaling, "Fp only support Scaling.");
     constexpr QuantMode_t quantPre = GetVectorPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     SetFPC<FpTileData>(fp.data(), indexCol);
 
-    TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
-        dst.data(), src.data(), dst.GetValidRow(), dst.GetValidCol(), src.GetValidRow(), src.GetValidCol(), indexRow,
-        indexCol);
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(dst, src, indexRow, indexCol);
+    } else {
+        static_assert(
+            (DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox),
+            "Dst fractal format should be (BFractal: RowMajor, SFractal: NoneBox).");
+        TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+            dst.data(), src.data(), dst.GetValidRow(), dst.GetValidCol(), src.GetValidRow(), src.GetValidCol(),
+            indexRow, indexCol);
+    }
 }
 
 } // namespace pto

@@ -120,6 +120,89 @@ __tf__ PTO_INTERNAL void SetFPCInsert(typename FpTileData::TileDType __in__ fp)
     set_fpc(deqTensorAddr);
 }
 
+template <typename DstTileData>
+PTO_INTERNAL uint32_t GetTInsertConvTileDstStride(
+    DstTileData& dst, uint16_t validRow, uint16_t validCol, uint16_t indexRow, uint16_t indexCol)
+{
+    static_assert(DstTileData::Loc == TileType::Vec, "TINSERT ConvTile destination only support Vec.");
+    static_assert(
+        (DstTileData::layout == Layout::NCHW) || (DstTileData::layout == Layout::NCDHW),
+        "TINSERT ConvTile destination only support NCHW or NCDHW.");
+    static_assert(DstTileData::totalDimCount == 5, "TINSERT ConvTile destination shape must have 5 dimensions.");
+
+    int64_t n = 0;
+    int64_t c = 0;
+    int64_t h = 0;
+    int64_t w = 0;
+    uint32_t dstStride = 0;
+    if constexpr (DstTileData::layout == Layout::NCHW) {
+        // NCHW is represented as <1, N, C, H, W>.
+        n = dst.GetShape(1);
+        c = dst.GetShape(2);
+        h = dst.GetShape(3);
+        w = dst.GetShape(4);
+        dstStride = static_cast<uint32_t>(h * w);
+    } else {
+        // NCDHW is represented as <N, C, D, H, W>.
+        n = dst.GetShape(0);
+        c = dst.GetShape(1);
+        h = dst.GetShape(3);
+        w = dst.GetShape(4);
+        dstStride = static_cast<uint32_t>(dst.GetShape(2) * h * w);
+    }
+    PTO_ASSERT(validRow <= n * h * w, "TINSERT ConvTile: validRow must not exceed N * H * W.");
+    PTO_ASSERT(validCol <= c, "TINSERT ConvTile: validCol must not exceed C.");
+    PTO_ASSERT(indexRow + validRow <= n * h * w, "TINSERT ConvTile: inserted rows are out of range.");
+    PTO_ASSERT(indexCol + validCol <= c, "TINSERT ConvTile: inserted cols are out of range.");
+    return dstStride;
+}
+
+template <
+    typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t QuantPre, ReluPreMode reluMode,
+    STPhase Phase = STPhase::Unspecified>
+__tf__ PTO_INTERNAL void TInsertAccToVec(
+    typename DstTileData::TileDType __out__ dst, typename SrcTileData::TileDType __in__ src, uint16_t validRow,
+    uint16_t validCol, uint16_t indexRow, uint16_t indexCol, uint32_t dstStride)
+{
+    using dstType = typename DstTileData::DType;
+    static_assert(
+        SrcTileData::Compact == CompactMode::Null, "TINSERT ConvTile does not support compact mode source tiles.");
+    static_assert(
+        (mode == AccToVecMode::SingleModeVec0) || (mode == AccToVecMode::SingleModeVec1),
+        "TINSERT ConvTile destination only support single destination modes.");
+    constexpr bool subBlockId = (mode == AccToVecMode::SingleModeVec1);
+    constexpr uint8_t unitFlagCtrl = static_cast<uint8_t>(Phase);
+    constexpr int32_t c0Size = BLOCK_BYTE_SIZE / sizeof(dstType);
+
+    PTO_ASSERT(
+        ((dstStride * sizeof(dstType) % C0_SIZE_BYTE == 0) && (dstStride > 0)),
+        "TINSERT ConvTile dstStride * sizeof(dstType) must be a non-zero multiple of 32 bytes.");
+    validCol = (validCol + c0Size - 1) / c0Size * c0Size;
+    SetLoop3Para();
+    constexpr uint64_t channelPara = static_cast<uint64_t>(1) << 48;
+    set_channel_para(channelPara);
+
+    uint32_t srcStride = GetTmovAccSrcStride<SrcTileData>(validRow);
+    uint32_t dstOffset = static_cast<uint32_t>(indexCol) * dstStride + indexRow;
+    __ubuf__ dstType* dstAddr = (__ubuf__ dstType*)__cce_get_tile_ptr(dst) + dstOffset;
+    __cc__ typename SrcTileData::DType* srcData = (__cc__ typename SrcTileData::DType*)__cce_get_tile_ptr(src);
+    pto_copy_matrix_cc_to_ub(
+        dstAddr, srcData, 0, validCol, validRow, dstStride, srcStride, 0, subBlockId, 0, unitFlagCtrl, QuantPre,
+        static_cast<uint8_t>(reluMode), false, false, 0, 0, false, false, 0, false, false, false, false, false, true);
+}
+
+template <
+    typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t quantPre, ReluPreMode reluMode,
+    STPhase Phase = STPhase::Unspecified, std::enable_if_t<is_conv_tile_v<DstTileData>, int> = 0>
+PTO_INTERNAL void TInsertAccToVec(DstTileData& dst, SrcTileData& src, uint16_t indexRow, uint16_t indexCol)
+{
+    uint16_t validRow = src.GetValidRow();
+    uint16_t validCol = src.GetValidCol();
+    uint32_t dstStride = GetTInsertConvTileDstStride(dst, validRow, validCol, indexRow, indexCol);
+    TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(
+        dst.data(), src.data(), validRow, validCol, indexRow, indexCol, dstStride);
+}
+
 template <
     typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t quantPre, ReluPreMode reluMode,
     STPhase Phase = STPhase::Unspecified>
@@ -133,8 +216,12 @@ PTO_INTERNAL void TInsertAccDispatch(DstTileData& dst, SrcTileData& src, uint16_
             dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
     } else if constexpr (DstTileData::Loc == TileType::Vec) {
         static_assert(Phase == STPhase::Unspecified, "STPhase is only supported for Acc-to-Mat TINSERT");
-        TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
-            dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+        if constexpr (is_conv_tile_v<DstTileData>) {
+            TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode, Phase>(dst, src, indexRow, indexCol);
+        } else {
+            TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+                dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+        }
     } else {
         static_assert(
             DstTileData::Loc == TileType::Mat || DstTileData::Loc == TileType::Vec,
@@ -159,8 +246,12 @@ PTO_INTERNAL void TINSERT_IMPL(DstTileData& dst, SrcTileData& src, uint16_t inde
     static_assert((DstTileData::Loc == TileType::Vec), "Destination TileType only support Vec.");
     CheckTMovAccValid<DstTileData, SrcTileData, typename DstTileData::DType, typename SrcTileData::DType>();
     constexpr QuantMode_t quantPre = GetCastPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
-    TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
-        dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(dst, src, indexRow, indexCol);
+    } else {
+        TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+            dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+    }
 }
 
 // scalar quant (Acc→Mat or Acc→Vec, default AccToVecMode::SingleModeVec0)
@@ -186,8 +277,12 @@ PTO_INTERNAL void TINSERT_IMPL(
     CheckTMovAccValid<DstTileData, SrcTileData, typename DstTileData::DType, typename SrcTileData::DType, true>();
     constexpr QuantMode_t quantPre = GetScalarPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     set_quant_pre(preQuantScalar);
-    TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
-        dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(dst, src, indexRow, indexCol);
+    } else {
+        TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+            dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+    }
 }
 
 // vector quant (Acc→Mat or Acc→Vec, default AccToVecMode::SingleModeVec0)
@@ -217,8 +312,12 @@ PTO_INTERNAL void TINSERT_IMPL(
     CheckTMovAccValid<DstTileData, SrcTileData, typename DstTileData::DType, typename SrcTileData::DType, true>();
     constexpr QuantMode_t quantPre = GetVectorPreQuantMode<typename SrcTileData::DType, typename DstTileData::DType>();
     SetFPCInsert<FpTileData>(fp.data());
-    TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
-        dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(dst, src, indexRow, indexCol);
+    } else {
+        TInsertAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+            dst.data(), src.data(), src.GetValidRow(), src.GetValidCol(), indexRow, indexCol);
+    }
 }
 template <typename T, typename DstTileData, typename SrcTileData>
 __tf__ PTO_INTERNAL void TInsertImpl(

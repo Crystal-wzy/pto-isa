@@ -148,9 +148,10 @@ def gen_golden_data(case_name, param):
         golden = np.maximum(golden, 0)
 
     if param.index_rows == 0 and param.index_cols == 0:
-        dst_data = np.zeros((m, n), dtype=dst_type)
+        dst_data = np.ones((m, n), dtype=dst_type)
     else:
-        dst_data = np.zeros((param.dst_row, param.dst_col), dtype=dst_type)
+        dst_data = np.ones((param.dst_row, param.dst_col), dtype=dst_type)
+
     dst_data.astype(dst_type).tofile("./dst.bin")
     if param.index_rows != 0 or param.index_cols != 0:
         dstm = min(param.dst_row, param.index_rows + m)
@@ -162,12 +163,26 @@ def gen_golden_data(case_name, param):
     else:
         golden.astype(dst_type).tofile("./golden.bin")
 
+    if getattr(param, 'dst_format', 'ND') == 'NCHW':
+        shape = param.shape
+        golden = dst_data.reshape(shape[0], shape[1], shape[2], shape[3]).transpose(0, 3, 1, 2)
+        golden.astype(dst_type).tofile("./golden.bin")
+    elif getattr(param, 'dst_format', 'ND') == 'NCDHW':
+        ncdhw_dst_data = np.ones((param.dst_row * param.ncdhw_shape[2], param.dst_col), dtype=dst_type)
+        ncdhw_dst_data.astype(dst_type).tofile("./dst.bin")
+        shape_ncdhw = param.ncdhw_shape
+        shape_nchw = param.shape
+        golden = np.ones(shape_ncdhw, dtype=dst_type)
+        golden[:, :, 0, :, :] = dst_data.reshape(
+            shape_nchw[0], shape_nchw[1], shape_nchw[2], shape_nchw[3]).transpose(0, 3, 1, 2)
+        golden.astype(dst_type).tofile("./golden.bin")
 
 class TMovParams:
     def __init__(self, atype, btype, dst_type, m, k, n, base_m=0, base_k=0, base_n=0,
                  dst_format='ND', s_fractal_size=512, is_v_quant=False,
                  is_s_quant=False, is_relu=False, quant_type=None, scalar=1,
-                 index_rows=0, index_cols=0, is_insert=False, dst_row=0, dst_col=0):
+                 index_rows=0, index_cols=0, is_insert=False, dst_row=0, dst_col=0,
+                 shape=(0, 0, 0, 0), ncdhw_shape=(0, 0, 0, 0, 0)):
         self.atype = atype
         self.btype = btype
         self.ctype = np.float32
@@ -194,6 +209,8 @@ class TMovParams:
         self.is_insert = is_insert
         self.dst_row = dst_row
         self.dst_col = dst_col
+        self.shape = shape
+        self.ncdhw_shape = ncdhw_shape
 
 
 if __name__ == "__main__":
@@ -217,6 +234,12 @@ if __name__ == "__main__":
         "TMOVTest.case_nz2nd_sc_quant_2",
         "TMOVTest.case_nz2nd_sc_quant_3",
         "TMOVTest.case_nz2nd_sc_quant_4",
+        "TMOVTest.case_insert_acc2convtile_fp32_nchw",
+        "TMOVTest.case_insert_acc2convtile_fp32_ncdhw",
+        "TMOVTest.case_insert_acc2convtile_fp16_nchw",
+        "TMOVTest.case_insert_acc2convtile_fp16_ncdhw",
+        "TMOVTest.case_insert_acc2convtile_int8_nchw",
+        "TMOVTest.case_insert_acc2convtile_int8_ncdhw",
     ]
 
     case_params_list = [
@@ -251,6 +274,21 @@ if __name__ == "__main__":
                    5, 32, True, 40, 128),
         TMovParams(np.int8, np.int8, np.int8, 60, 128, 32, 0, 0, 0, 'ND', 512, False, True, False, None, 1,
                    3, 0, True, 64, 64),
+        TMovParams(np.float32, np.float32, np.float32, 64, 7, 32, 0, 0, 0, 'NCHW', shape=(1, 8, 16, 64),
+                   index_rows=8, index_cols=16, is_insert=True, dst_row=128, dst_col=64),
+        TMovParams(np.float32, np.float32, np.float32, 96, 7, 64, 0, 0, 0, 'NCDHW',
+                   shape=(1, 12, 16, 96), ncdhw_shape=(1, 96, 2, 12, 16),
+                   index_rows=32, index_cols=32, is_insert=True, dst_row=192, dst_col=96),
+        TMovParams(np.float16, np.float16, np.float16, 64, 7, 32, 0, 0, 0, 'NCHW',
+                   shape=(1, 8, 16, 64), index_rows=16, index_cols=16, is_insert=True, dst_row=128, dst_col=64),
+        TMovParams(np.float16, np.float16, np.float16, 96, 7, 64, 0, 0, 0, 'NCDHW',
+                   shape=(1, 12, 16, 96), ncdhw_shape=(1, 96, 2, 12, 16),
+                   index_rows=32, index_cols=32, is_insert=True, dst_row=192, dst_col=96),
+        TMovParams(np.int8, np.int8, np.int8, 64, 7, 32, 0, 0, 0, 'NCHW', 512, False, True, False, None, 0.8,
+                   shape=(1, 8, 16, 64), index_rows=32, index_cols=16, is_insert=True, dst_row=128, dst_col=64),
+        TMovParams(np.int8, np.int8, np.int8, 96, 7, 64, 0, 0, 0, 'NCDHW', 512, False, True, False, None, 0.8,
+                   shape=(1, 12, 16, 96), ncdhw_shape=(1, 96, 2, 12, 16),
+                   index_rows=32, index_cols=32, is_insert=True, dst_row=192, dst_col=96),
     ]
 
     for i, case_name in enumerate(case_name_list):

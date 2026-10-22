@@ -575,6 +575,101 @@ __tf__ PTO_INTERNAL void TExtractAccToVec(
     }
 }
 
+template <typename DstTileData>
+PTO_INTERNAL uint32_t GetTExtractConvTileDstStride(
+    DstTileData& dst, uint16_t& validRow, uint16_t& validCol, uint16_t srcValidRow, uint16_t srcValidCol,
+    uint16_t indexRow, uint16_t indexCol)
+{
+    static_assert(DstTileData::Loc == TileType::Vec, "TEXTRACT ConvTile destination only support Vec.");
+    static_assert(
+        (DstTileData::layout == Layout::NCHW) || (DstTileData::layout == Layout::NCDHW),
+        "TEXTRACT ConvTile destination only support NCHW or NCDHW.");
+    static_assert(DstTileData::totalDimCount == 5, "TEXTRACT ConvTile destination shape must have 5 dimensions.");
+
+    int64_t n = 0;
+    int64_t c = 0;
+    int64_t h = 0;
+    int64_t w = 0;
+    uint32_t dstStride = 0;
+    if constexpr (DstTileData::layout == Layout::NCHW) {
+        // NCHW is represented as <1, N, C, H, W>.
+        n = dst.GetShape(1);
+        c = dst.GetShape(2);
+        h = dst.GetShape(3);
+        w = dst.GetShape(4);
+        dstStride = static_cast<uint32_t>(h * w);
+    } else {
+        // NCDHW is represented as <N, C, D, H, W>.
+        n = dst.GetShape(0);
+        c = dst.GetShape(1);
+        h = dst.GetShape(3);
+        w = dst.GetShape(4);
+        dstStride = static_cast<uint32_t>(dst.GetShape(2) * h * w);
+    }
+    validRow = static_cast<uint16_t>(n * h * w);
+    validCol = static_cast<uint16_t>(c);
+    PTO_ASSERT(validRow == n * h * w, "TEXTRACT ConvTile: validRow must be N * H * W.");
+    PTO_ASSERT(validCol == c, "TEXTRACT ConvTile: validCol must be C.");
+    PTO_ASSERT(indexRow + validRow <= srcValidRow, "TEXTRACT ConvTile: window exceeds source valid rows.");
+    PTO_ASSERT(indexCol + validCol <= srcValidCol, "TEXTRACT ConvTile: window exceeds source valid columns.");
+    return dstStride;
+}
+
+template <typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t quantPre, ReluPreMode reluMode>
+__tf__ PTO_INTERNAL void TExtractAccToVec(
+    typename DstTileData::TileDType __out__ dst, typename SrcTileData::TileDType __in__ src, uint16_t validRow,
+    uint16_t validCol, uint16_t srcValidRow, uint16_t srcValidCol, uint16_t indexRow, uint16_t indexCol,
+    uint32_t dstStride)
+{
+    using dstType = typename DstTileData::DType;
+    using srcType = typename SrcTileData::DType;
+    constexpr int32_t c0Size = BLOCK_BYTE_SIZE / sizeof(dstType);
+    constexpr bool subBlockId = (mode == AccToVecMode::SingleModeVec1);
+    PTO_ASSERT(
+        ((dstStride * sizeof(dstType) % C0_SIZE_BYTE == 0) && (dstStride > 0)),
+        "TEXTRACT ConvTile dstStride * sizeof(dstType) must be a non-zero multiple of 32 bytes.");
+
+    constexpr uint16_t ndNum = 1;
+    constexpr uint16_t dstNdStride = 0;
+    constexpr uint16_t srcNdStride = 0;
+    constexpr uint64_t loop3Para = static_cast<uint64_t>(dstNdStride) << 32 | static_cast<uint64_t>(srcNdStride) << 16 |
+                                   static_cast<uint64_t>(ndNum);
+    set_loop3_para(loop3Para);
+    constexpr uint64_t channelPara = static_cast<uint64_t>(1) << 48;
+    set_channel_para(channelPara);
+
+    __ubuf__ dstType* dstAddr = (__ubuf__ dstType*)__cce_get_tile_ptr(dst);
+    uint32_t srcStride = SrcTileData::Rows;
+    uint32_t srcOffset = SrcTileData::Rows * ACC_C0_SIZE * (indexCol / ACC_C0_SIZE) +
+                         (indexRow * ACC_C0_SIZE + (indexCol % ACC_C0_SIZE));
+
+    validCol = (validCol + c0Size - 1) / c0Size * c0Size;
+    __cc__ srcType* srcData = (__cc__ srcType*)__cce_get_tile_ptr(src) + srcOffset;
+    pto_copy_matrix_cc_to_ub(
+        dstAddr, srcData, 0, validCol, validRow, dstStride, srcStride, 0, subBlockId, 0, 0, quantPre,
+        static_cast<uint8_t>(reluMode), false, false, 0, 0, false, false, 0, false, false, false, false, false, true);
+}
+
+template <
+    typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t quantPre, ReluPreMode reluMode,
+    std::enable_if_t<is_conv_tile_v<DstTileData>, int> = 0>
+PTO_INTERNAL void TExtractAccToVec(DstTileData& dst, SrcTileData& src, uint16_t indexRow, uint16_t indexCol)
+{
+    static_assert(
+        SrcTileData::Compact == CompactMode::Null, "TEXTRACT ConvTile does not support compact mode source tiles.");
+    static_assert(
+        (mode == AccToVecMode::SingleModeVec0) || (mode == AccToVecMode::SingleModeVec1),
+        "TEXTRACT ConvTile destination only support single destination modes.");
+    uint16_t validRow = 0;
+    uint16_t validCol = 0;
+    uint16_t srcValidRow = src.GetValidRow();
+    uint16_t srcValidCol = src.GetValidCol();
+    uint32_t dstStride =
+        GetTExtractConvTileDstStride(dst, validRow, validCol, srcValidRow, srcValidCol, indexRow, indexCol);
+    TExtractAccToVec<DstTileData, SrcTileData, mode, quantPre, reluMode>(
+        dst.data(), src.data(), validRow, validCol, srcValidRow, srcValidCol, indexRow, indexCol, dstStride);
+}
+
 template <typename DstTileData, typename SrcTileData>
 __tf__ PTO_INTERNAL void TExtractToBConv(
     typename DstTileData::TileDType __out__ dst, typename SrcTileData::TileDType __in__ src, uint16_t srcCol,

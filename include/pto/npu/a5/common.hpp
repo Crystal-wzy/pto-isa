@@ -182,11 +182,19 @@ PTO_INTERNAL void CheckTMovAccValid()
                 (std::is_same<DstType, int32_t>::value), "The output data type must be restricted to int32_t.");
         }
     }
-    static_assert(
-        ((DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox) ||
-         (!DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox) ||
-         (!DstTileData::isRowMajor && DstTileData::SFractal == SLayout::RowMajor)),
-        "Only support nz2nz, nz2nd or nz2dn.");
+    if constexpr (is_conv_tile_v<DstTileData>) {
+        static_assert(DstTileData::Loc == TileType::Vec, "TMov ConvTile destination only support Vec.");
+        static_assert(
+            (DstTileData::layout == Layout::NCHW) || (DstTileData::layout == Layout::NCDHW),
+            "TMov ConvTile destination only support NCHW or NCDHW.");
+        static_assert(DstTileData::totalDimCount == 5, "TMov ConvTile destination shape must have 5 dimensions.");
+    } else {
+        static_assert(
+            ((DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox) ||
+             (!DstTileData::isRowMajor && DstTileData::SFractal == SLayout::NoneBox) ||
+             (!DstTileData::isRowMajor && DstTileData::SFractal == SLayout::RowMajor)),
+            "Only support nz2nz, nz2nd or nz2dn.");
+    }
 }
 
 template <typename DstTileData, typename SrcTileData, AccToVecMode mode, QuantMode_t quantPre>

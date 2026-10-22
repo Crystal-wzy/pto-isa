@@ -19,6 +19,9 @@ template <int32_t tilingKey>
 void LaunchTMOVAcc2VecNZ2ND(uint8_t* out, uint8_t* src0, uint8_t* src1, void* stream);
 
 template <int32_t tilingKey>
+void LaunchTMOVAcc2ConvTile(uint8_t* out, uint8_t* src0, uint8_t* src1, void* stream);
+
+template <int32_t tilingKey>
 void LaunchTMOVAcc2VecNZ2DN(uint8_t* out, uint8_t* src0, uint8_t* src1, void* stream);
 
 template <int32_t tilingKey>
@@ -63,6 +66,9 @@ void tmov_acc2vec_test(uint32_t M, uint32_t K, uint32_t N)
     size_t aFileSize = M * K * sizeof(AType);
     size_t bFileSize = K * N * sizeof(BType);
     size_t cFileSize = M * N * sizeof(CType);
+    if constexpr (funcKey == 7 && (key == 2 || key == 4 || key == 6)) {
+        cFileSize *= 2; // NCDHW output contains one empty depth plane.
+    }
 
     aclInit(nullptr);
     aclrtSetDevice(0);
@@ -98,6 +104,8 @@ void tmov_acc2vec_test(uint32_t M, uint32_t K, uint32_t N)
         LaunchTMOVAcc2VecSCQuantNZ2NZ<key>(dstDevice, src0Device, src1Device, stream);
     } else if constexpr (funcKey == 6) {
         LaunchTMOVAcc2VecSCQuantNZ2DN<key>(dstDevice, src0Device, src1Device, stream);
+    } else if constexpr (funcKey == 7) {
+        LaunchTMOVAcc2ConvTile<key>(dstDevice, src0Device, src1Device, stream);
     }
 
     aclrtSynchronizeStream(stream);
@@ -346,3 +354,15 @@ TEST_F(TMOVTest, case_nz2dn_sc_quant_2) { tmov_acc2vec_test<6, int8_t, float, fl
 TEST_F(TMOVTest, case_nz2dn_sc_quant_3) { tmov_acc2vec_test<6, uint16_t, int8_t, int8_t, 3>(32, 128, 64); }
 
 TEST_F(TMOVTest, case_nz2dn_sc_quant_4) { tmov_acc2vec_test<6, int8_t, int8_t, int8_t, 4>(64, 64, 90); }
+
+TEST_F(TMOVTest, case_acc2convtile_fp32_nchw) { tmov_acc2vec_test<7, uint32_t, float, float, 1>(128, 7, 64); }
+
+TEST_F(TMOVTest, case_acc2convtile_fp32_ncdhw) { tmov_acc2vec_test<7, uint32_t, float, float, 2>(192, 7, 96); }
+
+TEST_F(TMOVTest, case_acc2convtile_fp16_nchw) { tmov_acc2vec_test<7, uint16_t, uint16_t, uint16_t, 3>(128, 7, 64); }
+
+TEST_F(TMOVTest, case_acc2convtile_fp16_ncdhw) { tmov_acc2vec_test<7, uint16_t, uint16_t, uint16_t, 4>(192, 7, 96); }
+
+TEST_F(TMOVTest, case_acc2convtile_int8_nchw) { tmov_acc2vec_test<7, int8_t, int8_t, int8_t, 5>(128, 7, 64); }
+
+TEST_F(TMOVTest, case_acc2convtile_int8_ncdhw) { tmov_acc2vec_test<7, int8_t, int8_t, int8_t, 6>(192, 7, 96); }
