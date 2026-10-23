@@ -232,16 +232,15 @@ inline bool BuildAsyncSessionSdma(const CommContext& ctx, AsyncSession& out)
         return false;
     }
     out = AsyncSession{};
-    out.engine = DmaEngine::SDMA;
+    ::pto::comm::detail::ActivateEngineState<DmaEngine::SDMA>(out);
     out.valid = true;
     out.contextGm = ctx.sdmaWs;
-    out.tmpBufAddr = nullptr;
-    out.tmpBufSize = 0;
-    out.syncId = 0;
-    out.channelGroupIdx = sdma::kAutoChannelGroupIdx;
-    out.blockBytes = sdma::kDefaultSdmaBlockBytes;
-    out.commBlockOffset = 0;
-    out.queueNum = kDefaultSdmaQueueNum;
+    // tmpBufAddr/tmpBufSize/syncId stay at the zeros AsyncSession{} gave them: a host-built session
+    // has no UB scratch, so the device side fills those in before the first post.
+    out.cfg.sdma.channelGroupIdx = sdma::kAutoChannelGroupIdx;
+    out.cfg.sdma.blockBytes = sdma::kDefaultSdmaBlockBytes;
+    out.cfg.sdma.commBlockOffset = 0;
+    out.cfg.sdma.queueNum = kDefaultSdmaQueueNum;
     return true;
 }
 
@@ -258,12 +257,13 @@ inline bool BuildAsyncSessionUrma(const CommContext& ctx, AsyncSession& out)
         return false;
     }
     out = AsyncSession{};
-    out.engine = DmaEngine::URMA;
+    // AsyncSession{} leaves cfg/rt on their SDMA alternative; activate URMA's.
+    ::pto::comm::detail::ActivateEngineState<DmaEngine::URMA>(out);
     out.valid = true;
     out.contextGm = ctx.urmaWs;
-    out.destRankId = 0; // unused by new API; kept for compatibility.
-    out.qpIdxBase = 0;
-    out.qpCount = 1;
+    // destRankId (unused by the new API, kept for compatibility) and qpIdxBase stay at the zeros
+    // AsyncSession{} gave them.
+    out.cfg.urma.qpCount = 1;
     return true;
 }
 #endif

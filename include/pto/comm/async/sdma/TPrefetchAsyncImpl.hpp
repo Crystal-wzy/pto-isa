@@ -143,7 +143,7 @@ PTO_INTERNAL comm::AsyncEvent TPrefetchAsyncSdmaImpl(GlobalData& srcGlobalData, 
     comm::sdma::SdmaSession sdmaSession;
     comm::sdma::detail::LoadSdmaSession(session, sdmaSession);
     const comm::AsyncEvent event = comm::sdma::__sdma_cmo_prefetch(srcGlobalData.data(), totalBytes, sdmaSession);
-    session.sdmaRuntimeCtx = sdmaSession.runtimeCtx;
+    session.rt.sdma = sdmaSession.runtimeCtx;
     return event;
 }
 
@@ -185,7 +185,7 @@ PTO_INTERNAL comm::AsyncEvent TPREFETCH_ASYNC_IMPL(GlobalData& srcGlobalData, Pr
         return comm::AsyncEvent(0, comm::DmaEngine::SDMA);
     }
     comm::AsyncEvent batchEvent;
-    if (session.sdmaRuntimeCtx.batchStagedDataSqeCount != 0U) {
+    if (session.rt.sdma.batchStagedDataSqeCount != 0U) {
         batchEvent = comm::sdma::detail::SdmaFlushPendingAsyncPut(session);
         if (!batchEvent.valid()) {
             return {};

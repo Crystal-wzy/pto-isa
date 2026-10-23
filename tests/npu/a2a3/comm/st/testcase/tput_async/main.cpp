@@ -139,6 +139,21 @@ TEST_F(TPutAsyncPostStability2Ranks, UsedQueueCount_Q4ThenQ1_LastWaitOnly)
     ASSERT_TRUE(RunTPutAsyncPostsWaitFinal(2, 2, 0, FirstDeviceId(), 2, 1, 4));
 }
 
+// Rebuild the session on a workspace that already holds post history, with the first session narrow.
+// The second session inherits slots fenced on one queue, so its very first post must not wait on
+// queues the first session never touched.
+TEST_F(TPutAsyncPostStability2Ranks, SessionRebuild_NarrowFirst_Q4)
+{
+    ASSERT_TRUE(RunTPutAsyncSessionRebuild(2, 2, 0, FirstDeviceId(), 140, 1, 4, false));
+}
+
+// Same rebuild with a wide first session, so the second session inherits slots fenced on four queues
+// and must keep fencing all four as its own posts wrap the 64-slot ring.
+TEST_F(TPutAsyncPostStability2Ranks, SessionRebuild_WideFirst_Q4)
+{
+    ASSERT_TRUE(RunTPutAsyncSessionRebuild(2, 2, 0, FirstDeviceId(), 140, 1, 4, true));
+}
+
 // Issue eight deferred Q4 Posts from the root to each of two peers and verify remote consumption.
 TEST_F(TPutAsyncPostStability3Ranks, Deferred_P8_Q4_3Ranks)
 {

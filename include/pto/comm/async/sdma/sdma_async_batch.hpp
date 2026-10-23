@@ -44,21 +44,21 @@ PTO_INTERNAL bool ValidateBatchSqCapacity(
 
 PTO_INTERNAL void FillBatchDataSqes(
     __gm__ BatchWriteChannelInfo* channels, __gm__ uint8_t* recvBuffer, __gm__ uint8_t* sendBuffer,
-    const SdmaConfig& config, uint32_t stagedDataSqeCount, const SdmaRuntimeContext& runtimeCtx)
+    const SdmaConfig& config, uint32_t stagedDataSqeCount, const SdmaSqCursor& cursor)
 {
     for (uint32_t index = 0U; index < config.iter_num; ++index) {
         const uint32_t globalIndex = stagedDataSqeCount + index;
         const uint32_t queue = globalIndex % config.queue_num;
         const uint32_t priorSqesOnQueue = globalIndex / config.queue_num;
         const uint32_t sqDepth = channels[queue].sq_depth;
-        const uint32_t sqTail = (runtimeCtx.sqTail[queue] + priorSqesOnQueue) % sqDepth;
+        const uint32_t sqTail = (cursor.sqTail[queue] + priorSqesOnQueue) % sqDepth;
         uint32_t transferBytes = static_cast<uint32_t>(config.block_bytes);
         if (index + 1U == config.iter_num) {
             transferBytes = static_cast<uint32_t>(config.per_core_bytes - index * config.block_bytes);
         }
         __gm__ uint8_t* src = sendBuffer + config.comm_block_offset + index * config.block_bytes;
         __gm__ uint8_t* dst = recvBuffer + config.comm_block_offset + index * config.block_bytes;
-        AddOneMemcpySqe(channels + queue, src, dst, 0U, transferBytes, sqTail, sqTail - runtimeCtx.sqHead[queue]);
+        AddOneMemcpySqe(channels + queue, src, dst, 0U, transferBytes, sqTail, sqTail - cursor.sqHead[queue]);
     }
     pipe_barrier(PIPE_ALL);
 }
@@ -126,16 +126,17 @@ PTO_INTERNAL AsyncEvent SdmaDeferAsyncPut(
         }
     }
 
-    FillBatchDataSqes(state.channels, recvBuffer, sendBuffer, config, stagedDataSqeCount, session.runtimeCtx);
+    FillBatchDataSqes(state.channels, recvBuffer, sendBuffer, config, stagedDataSqeCount, state.cursor);
     session.runtimeCtx.batchStagedDataSqeCount = static_cast<uint32_t>(totalDataSqeCount);
     session.runtimeCtx.batchStagedOperationCount += 1U;
-    asyncSession.sdmaRuntimeCtx = session.runtimeCtx;
+    asyncSession.rt.sdma = session.runtimeCtx;
     return MakeSdmaDeferredEvent(session);
 }
 
 struct SdmaBatchSubmitState {
     __gm__ BatchWriteChannelInfo* channels;
     __gm__ uint8_t* flagPayload;
+    SdmaSqCursor cursor;
     uint32_t queueNum;
     uint32_t dataQueueCount;
     uint32_t postQueueCount;
@@ -160,6 +161,7 @@ PTO_INTERNAL bool PrepareSdmaBatchSubmit(
         reinterpret_cast<__gm__ BatchWriteChannelInfo*>(execCtx.contextGm + sizeof(BatchWriteFlagInfo));
     state.channels = channelBase + execCtx.channelGroupIdx * execCtx.baseConfig.queue_num;
     state.queueNum = execCtx.baseConfig.queue_num;
+    LoadSqCursor(state.channels, state.queueNum, state.cursor);
     state.dataQueueCount = stagedDataSqeCount < state.queueNum ? stagedDataSqeCount : state.queueNum;
     state.postQueueCount = session.runtimeCtx.usedQueueCount > state.dataQueueCount ?
                                session.runtimeCtx.usedQueueCount :
@@ -180,32 +182,35 @@ PTO_INTERNAL bool PrepareSdmaBatchSubmit(
     return true;
 }
 
-PTO_INTERNAL void UpdateBatchDataSqTails(
-    uint32_t stagedDataSqeCount, const SdmaBatchSubmitState& state, SdmaRuntimeContext& runtimeCtx)
+PTO_INTERNAL void UpdateBatchDataSqTails(uint32_t stagedDataSqeCount, SdmaBatchSubmitState& state)
 {
     for (uint32_t queue = 0U; queue < state.dataQueueCount; ++queue) {
         const uint32_t count = BatchDataSqeCountOnQueue(stagedDataSqeCount, state.queueNum, queue);
-        runtimeCtx.sqTail[queue] = (runtimeCtx.sqTail[queue] + count) % state.channels[queue].sq_depth;
+        state.cursor.sqTail[queue] = (state.cursor.sqTail[queue] + count) % state.channels[queue].sq_depth;
     }
 }
 
-PTO_INTERNAL void PublishSdmaBatch(const SdmaBatchSubmitState& state, uint32_t stagedDataSqeCount, SdmaSession& session)
+PTO_INTERNAL void PublishSdmaBatch(SdmaBatchSubmitState& state, uint32_t stagedDataSqeCount, SdmaSession& session)
 {
     SdmaRuntimeContext& runtimeCtx = session.runtimeCtx;
     const SdmaExecContext& execCtx = session.execCtx;
     WriteFlagPayload(state.postId, state.postQueueCount, state.flagPayload, session);
-    UpdateBatchDataSqTails(stagedDataSqeCount, state, runtimeCtx);
+    UpdateBatchDataSqTails(stagedDataSqeCount, state);
     runtimeCtx.nextPostId = state.postId;
+    // Published before PersistSqTails below, which writes both of these out as one word: pairing the
+    // new post id with the previous prefix would under-report what this post fenced, and a session
+    // resumed on this workspace would then wait on too narrow a prefix.
+    runtimeCtx.usedQueueCount = state.postQueueCount;
     UbTmpBuf tmpBuf = execCtx.tmpBuf;
-    FlushDataCacheAndRingDoorbells(state.channels, state.dataQueueCount, runtimeCtx.sqTail, tmpBuf, execCtx.syncId);
-    SubmitFlagTransferSqes(state.channels, state.flagPayload, state.postQueueCount, runtimeCtx);
-    PersistSqTails(state.channels, state.queueNum, runtimeCtx, tmpBuf, execCtx.syncId);
-    PublishFlagTransferSqes(state.channels, 0U, state.dataQueueCount, runtimeCtx.sqTail, tmpBuf, execCtx.syncId);
+    FlushDataCacheAndRingDoorbells(state.channels, state.dataQueueCount, state.cursor.sqTail, tmpBuf, execCtx.syncId);
+    SubmitFlagTransferSqes(
+        state.channels, state.flagPayload, runtimeCtx.postDoneBase, state.postQueueCount, state.cursor);
+    PersistSqTails(state.channels, state.queueNum, runtimeCtx, state.cursor, tmpBuf, execCtx.syncId);
+    PublishFlagTransferSqes(state.channels, 0U, state.dataQueueCount, state.cursor.sqTail, tmpBuf, execCtx.syncId);
     if (state.dataQueueCount < state.postQueueCount) {
         PublishFlagTransferSqes(
-            state.channels, state.dataQueueCount, state.postQueueCount, runtimeCtx.sqTail, tmpBuf, execCtx.syncId);
+            state.channels, state.dataQueueCount, state.postQueueCount, state.cursor.sqTail, tmpBuf, execCtx.syncId);
     }
-    runtimeCtx.usedQueueCount = state.postQueueCount;
     runtimeCtx.batchStagedDataSqeCount = 0U;
     runtimeCtx.batchStagedOperationCount = 0U;
 }
@@ -226,7 +231,7 @@ PTO_INTERNAL AsyncEvent SdmaFlushPendingAsyncPut(const AsyncSession& asyncSessio
         return {};
     }
     PublishSdmaBatch(state, stagedDataSqeCount, session);
-    asyncSession.sdmaRuntimeCtx = session.runtimeCtx;
+    asyncSession.rt.sdma = session.runtimeCtx;
     return AsyncEvent(state.eventHandle, DmaEngine::SDMA);
 }
 

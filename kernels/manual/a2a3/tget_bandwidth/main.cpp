@@ -25,7 +25,9 @@ int main(int argc, char** argv)
         const int firstDeviceId = firstDeviceValue == nullptr ? 0 : std::atoi(firstDeviceValue);
         ok = RunTGetDeviceBaseline(2, 2, 0, firstDeviceId);
     } else {
-        ok = RunTGetBandwidthSweep(2, 2, 0, 0);
+        const char* sweepFirstDeviceValue = std::getenv("TGET_SWEEP_FIRST_DEVICE_ID");
+        const int sweepFirstDeviceId = sweepFirstDeviceValue == nullptr ? 0 : std::atoi(sweepFirstDeviceValue);
+        ok = RunTGetBandwidthSweep(2, 2, 0, sweepFirstDeviceId);
     }
     CommMpiFinalize();
     if (ok) {

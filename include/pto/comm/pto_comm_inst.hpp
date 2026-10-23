@@ -359,7 +359,7 @@ PTO_INST AsyncEvent TPUT_ASYNC(
     }
     if (mode == AsyncSubmitMode::IMMEDIATE) {
         AsyncEvent batchEvent;
-        if (session.sdmaRuntimeCtx.batchStagedDataSqeCount != 0U) {
+        if (session.rt.sdma.batchStagedDataSqeCount != 0U) {
             batchEvent = FlushPendingAsyncPut<engine>(session);
             if (!batchEvent.valid()) {
                 return {};
@@ -371,7 +371,7 @@ PTO_INST AsyncEvent TPUT_ASYNC(
     if (!deferredEvent.valid()) {
         return deferredEvent;
     }
-    const bool reachesBatchSize = session.sdmaRuntimeCtx.batchStagedOperationCount >= session.batchSize;
+    const bool reachesBatchSize = session.rt.sdma.batchStagedOperationCount >= session.batchSize;
     if (mode == AsyncSubmitMode::DEFER_AND_SUBMIT || reachesBatchSize) {
         return FlushPendingAsyncPut<engine>(session);
     }
@@ -400,8 +400,8 @@ PTO_INST AsyncEvent TPUT_ASYNC(
         }
         if (mode == AsyncSubmitMode::IMMEDIATE) {
             AsyncEvent batchEvent;
-            if (session.urmaRuntimeCtx.batchLogicalWqeCount != 0U) {
-                if (session.urmaRuntimeCtx.batchPeer != peer) {
+            if (session.rt.urma.batchLogicalWqeCount != 0U) {
+                if (session.rt.urma.batchPeer != peer) {
                     PTO_ASSERT(false, "TPUT_ASYNC URMA: immediate peer differs from the pending logical batch.");
                     return {};
                 }
@@ -416,7 +416,7 @@ PTO_INST AsyncEvent TPUT_ASYNC(
         if (!deferredEvent.valid()) {
             return deferredEvent;
         }
-        const bool reachesBatchSize = session.urmaRuntimeCtx.batchStagedOperationCount >= session.batchSize;
+        const bool reachesBatchSize = session.rt.urma.batchStagedOperationCount >= session.batchSize;
         if (mode == AsyncSubmitMode::DEFER_AND_SUBMIT) {
             return urma::detail::FinishUrmaAsyncPutBatch(session, peer);
         }
@@ -448,8 +448,8 @@ PTO_INST AsyncEvent TPUT_ASYNC(
         }
         if (mode == AsyncSubmitMode::IMMEDIATE) {
             AsyncEvent batchEvent;
-            if (session.urmaRuntimeCtx.batchLogicalWqeCount != 0U) {
-                if (session.urmaRuntimeCtx.batchPeer != peer) {
+            if (session.rt.urma.batchLogicalWqeCount != 0U) {
+                if (session.rt.urma.batchPeer != peer) {
                     PTO_ASSERT(false, "TPUT_ASYNC URMA: immediate peer differs from the pending logical batch.");
                     return {};
                 }
@@ -464,7 +464,7 @@ PTO_INST AsyncEvent TPUT_ASYNC(
         if (!deferredEvent.valid()) {
             return deferredEvent;
         }
-        const bool reachesBatchSize = session.urmaRuntimeCtx.batchStagedOperationCount >= session.batchSize;
+        const bool reachesBatchSize = session.rt.urma.batchStagedOperationCount >= session.batchSize;
         if (mode == AsyncSubmitMode::DEFER_AND_SUBMIT) {
             return urma::detail::FinishUrmaAsyncPutBatch(session, peer);
         }
@@ -523,7 +523,7 @@ PTO_INST AsyncEvent TPUT_ASYNC_NOTIFY(
     AsyncEvent batchEvent;
 #if defined(PTO_NPU_ARCH_A2A3)
     if constexpr (engine == DmaEngine::SDMA) {
-        if (session.sdmaRuntimeCtx.batchStagedDataSqeCount != 0U) {
+        if (session.rt.sdma.batchStagedDataSqeCount != 0U) {
             batchEvent = FlushPendingAsyncPut<engine>(session);
             if (!batchEvent.valid()) {
                 return {};
@@ -532,8 +532,8 @@ PTO_INST AsyncEvent TPUT_ASYNC_NOTIFY(
     }
 #elif defined(PTO_NPU_ARCH_A5)
     if constexpr (engine == DmaEngine::URMA) {
-        if (session.urmaRuntimeCtx.batchLogicalWqeCount != 0U) {
-            if (session.urmaRuntimeCtx.batchPeer != peer) {
+        if (session.rt.urma.batchLogicalWqeCount != 0U) {
+            if (session.rt.urma.batchPeer != peer) {
                 PTO_ASSERT(false, "TPUT_ASYNC_NOTIFY URMA: peer differs from the pending logical batch.");
                 return {};
             }
@@ -563,7 +563,7 @@ PTO_INST AsyncEvent TGET_ASYNC(
     AsyncEvent batchEvent;
 #if defined(PTO_NPU_ARCH_A2A3)
     if constexpr (engine == DmaEngine::SDMA) {
-        if (session.sdmaRuntimeCtx.batchStagedDataSqeCount != 0U) {
+        if (session.rt.sdma.batchStagedDataSqeCount != 0U) {
             batchEvent = FlushPendingAsyncPut<engine>(session);
             if (!batchEvent.valid()) {
                 return {};
@@ -573,8 +573,8 @@ PTO_INST AsyncEvent TGET_ASYNC(
 #elif defined(PTO_NPU_ARCH_A5)
     if constexpr (engine == DmaEngine::URMA) {
         const uint32_t peer = session.destRankId;
-        if (session.urmaRuntimeCtx.batchLogicalWqeCount != 0U) {
-            if (session.urmaRuntimeCtx.batchPeer != peer) {
+        if (session.rt.urma.batchLogicalWqeCount != 0U) {
+            if (session.rt.urma.batchPeer != peer) {
                 PTO_ASSERT(false, "TGET_ASYNC URMA: peer differs from the pending logical batch.");
                 return {};
             }
@@ -605,8 +605,8 @@ PTO_INST AsyncEvent TGET_ASYNC(
     AsyncEvent batchEvent;
 #if defined(PTO_NPU_ARCH_A5)
     if constexpr (engine == DmaEngine::URMA) {
-        if (session.urmaRuntimeCtx.batchLogicalWqeCount != 0U) {
-            if (session.urmaRuntimeCtx.batchPeer != peer) {
+        if (session.rt.urma.batchLogicalWqeCount != 0U) {
+            if (session.rt.urma.batchPeer != peer) {
                 PTO_ASSERT(false, "TGET_ASYNC URMA: peer differs from the pending logical batch.");
                 return {};
             }

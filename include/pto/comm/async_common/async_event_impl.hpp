@@ -30,8 +30,8 @@ PTO_INTERNAL bool BuildAsyncSession(
     const sdma::SdmaBaseConfig& baseConfig = {sdma::kDefaultSdmaBlockBytes, 0, 1},
     uint32_t channelGroupIdx = sdma::kAutoChannelGroupIdx)
 {
-    session.engine = engine;
     if constexpr (engine == DmaEngine::SDMA) {
+        // BuildSdmaSession activates the SDMA alternative, which sets session.engine.
         session.valid = sdma::BuildSdmaSession(scratchTile, workspace, session, syncId, baseConfig, channelGroupIdx);
         return session.valid;
     } else {
@@ -48,11 +48,13 @@ PTO_INTERNAL bool BuildAsyncSession(__gm__ uint8_t* workspace, AsyncSession& ses
 {
     static_assert(engine == DmaEngine::URMA, "This overload is for URMA only");
     session = AsyncSession{};
-    session.engine = engine;
+    // AsyncSession{} leaves cfg/rt on their SDMA alternative, so the URMA ones
+    // have to be activated explicitly rather than inherited from the defaults.
+    detail::ActivateEngineState<DmaEngine::URMA>(session);
     session.contextGm = workspace;
-    session.destRankId = 0;
-    session.qpIdxBase = 0;
-    session.qpCount = 1;
+    // destRankId and qpIdxBase keep the zeros AsyncSession{} gave them; the shared-pool path below
+    // is the only one that moves qpIdxBase off its base.
+    session.cfg.urma.qpCount = 1;
     if (workspace == nullptr) {
         return false;
     }
@@ -66,7 +68,7 @@ PTO_INTERNAL bool BuildAsyncSession(__gm__ uint8_t* workspace, AsyncSession& ses
         return false;
     }
     session.qpIdxBase = static_cast<uint32_t>(get_block_idx()) * perCore;
-    session.qpCount = perCore;
+    session.cfg.urma.qpCount = perCore;
     session.valid = (session.qpIdxBase + perCore <= urma::detail::UrmaJettyIdxBound(info));
     return session.valid;
 }
@@ -191,7 +193,7 @@ PTO_INTERNAL uint32_t AsyncEvent::CompletionRecordCount(const AsyncSession& sess
             uint64_t postId = 0ULL;
             uint32_t queueCount = 0U;
             return sdma::detail::DecodeSdmaEventHandle(handle, postId, queueCount) &&
-                           session.sdmaRuntimeCtx.postDoneBase != nullptr ?
+                           session.rt.sdma.postDoneBase != nullptr ?
                        queueCount :
                        kCompletionRecordCountError;
         }
@@ -246,10 +248,10 @@ PTO_INTERNAL AsyncCompletionRecord AsyncEvent::CompletionRecordAt(const AsyncSes
             uint64_t postId = 0ULL;
             uint32_t queueCount = 0U;
             if (!sdma::detail::DecodeSdmaEventHandle(handle, postId, queueCount) || idx >= queueCount ||
-                session.sdmaRuntimeCtx.postDoneBase == nullptr) {
+                session.rt.sdma.postDoneBase == nullptr) {
                 return record;
             }
-            record.addr = sdma::detail::GetPostDoneRecordAddr(session.sdmaRuntimeCtx.postDoneBase, idx);
+            record.addr = sdma::detail::GetPostDoneRecordAddr(session.rt.sdma.postDoneBase, idx);
             record.expected = postId;
             record.kind = CompletionKind::SDMA_POST_DONE;
             return record;

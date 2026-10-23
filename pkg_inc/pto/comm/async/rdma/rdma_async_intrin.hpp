@@ -64,7 +64,9 @@ AICORE inline bool BuildSession(
 AICORE inline void StoreSession(const RdmaSession& rdmaSession, AsyncSession& session)
 {
     session = AsyncSession{};
-    session.engine = DmaEngine::RDMA;
+    // AsyncSession{} leaves cfg on its SDMA alternative; activate the RDMA one.
+    // session.rt has no RDMA alternative because RDMA keeps no runtime state.
+    ::pto::comm::detail::ActivateEngineState<DmaEngine::RDMA>(session);
     session.valid = rdmaSession.valid;
     session.contextGm = rdmaSession.execCtx.contextGm;
     session.tmpBufAddr = rdmaSession.execCtx.tmpBuf.addr;
@@ -72,8 +74,8 @@ AICORE inline void StoreSession(const RdmaSession& rdmaSession, AsyncSession& se
     session.syncId = rdmaSession.execCtx.syncId;
     session.destRankId = rdmaSession.execCtx.destRankId;
     session.qpIdxBase = rdmaSession.execCtx.qpIdx;
-    session.rdmaBackend = rdmaSession.execCtx.backend;
-    session.myPe = rdmaSession.execCtx.myPe;
+    session.cfg.rdma.backend = rdmaSession.execCtx.backend;
+    session.cfg.rdma.myPe = rdmaSession.execCtx.myPe;
 }
 
 AICORE inline bool BuildSession(
@@ -101,10 +103,10 @@ AICORE inline RdmaExecContext MakeExecContext(const AsyncSession& session, uint3
 {
     RdmaExecContext ctx{};
     ctx.contextGm = session.contextGm;
-    ctx.backend = session.rdmaBackend;
+    ctx.backend = session.cfg.rdma.backend;
     ctx.destRankId = peer;
     ctx.qpIdx = session.qpIdxBase;
-    ctx.myPe = session.myPe;
+    ctx.myPe = session.cfg.rdma.myPe;
     ctx.tmpBuf = {session.tmpBufAddr, session.tmpBufSize};
     ctx.syncId = session.syncId;
     return ctx;
@@ -114,7 +116,7 @@ AICORE inline RdmaEventContext MakeEventContext(const AsyncSession& session)
 {
     RdmaEventContext ctx{};
     ctx.contextGm = session.contextGm;
-    ctx.backend = session.rdmaBackend;
+    ctx.backend = session.cfg.rdma.backend;
     ctx.tmpBuf = {session.tmpBufAddr, session.tmpBufSize};
     ctx.syncId = session.syncId;
     return ctx;

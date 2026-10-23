@@ -23,17 +23,16 @@ namespace detail {
 PTO_INTERNAL void DiscardPendingAsyncPutBatch(const AsyncSession& session)
 {
     if (session.engine == DmaEngine::SDMA) {
-        session.sdmaRuntimeCtx.batchStagedDataSqeCount = 0U;
-        session.sdmaRuntimeCtx.batchStagedOperationCount = 0U;
+        session.rt.sdma.batchStagedDataSqeCount = 0U;
+        session.rt.sdma.batchStagedOperationCount = 0U;
         return;
     }
     if (session.engine == DmaEngine::URMA) {
-        session.urmaRuntimeCtx = {};
+        session.rt.urma = {};
         return;
     }
-    session.sdmaRuntimeCtx.batchStagedDataSqeCount = 0U;
-    session.sdmaRuntimeCtx.batchStagedOperationCount = 0U;
-    session.urmaRuntimeCtx = {};
+    // Any other engine (RDMA) keeps no staged batch state, and session.rt holds
+    // no alternative for it, so there is nothing to discard.
 }
 
 template <DmaEngine engine>

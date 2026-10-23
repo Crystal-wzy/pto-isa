@@ -334,7 +334,7 @@ private:
             info->jettyCount != tilingData_->multiServerTiling.urmaJettyCount ||
             info->jettyCount != tilingData_->fixedGroupTiling.physicalAicNum || info->rankCount != rankSize_)
             trap();
-        if (!BuildAsyncSession<DmaEngine::URMA>(urmaWorkspace_, peer, session) || session.qpCount != 1U ||
+        if (!BuildAsyncSession<DmaEngine::URMA>(urmaWorkspace_, peer, session) || session.cfg.urma.qpCount != 1U ||
             session.qpIdxBase != get_block_idx() || !urma::detail::ValidateUrmaSession(session, peer))
             trap();
     }

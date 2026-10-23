@@ -188,7 +188,7 @@ AICORE inline UrmaMultiPostResult UrmaPostSend(
         return result;
     }
 
-    const uint32_t jettiesToUse = UrmaJettiesForMessage(session.qpCount, messageLen);
+    const uint32_t jettiesToUse = UrmaJettiesForMessage(session.cfg.urma.qpCount, messageLen);
     const uint64_t sliceBytes = UrmaSliceBytes(jettiesToUse, messageLen);
 
     for (uint32_t slot = 0U; slot < jettiesToUse; ++slot) {

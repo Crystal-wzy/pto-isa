@@ -700,10 +700,18 @@ struct TGetDeviceBaselinePolicy {
 
 bool RunTGetDeviceBaseline(int n_ranks, int n_devices, int first_rank_id, int first_device_id)
 {
+#ifdef TGET_BASELINE_NO_DEVICE_BASELINE
+    (void)n_ranks;
+    (void)n_devices;
+    (void)first_rank_id;
+    (void)first_device_id;
+    return false;
+#else
     return ForkAndRunWithHcclRootInfo(
         n_ranks, first_rank_id, first_device_id, [&](int rankId, const HcclRootInfo* rootInfo) {
             return benchmark::RunDeviceBaselineKernel<float, TGetDeviceBaselinePolicy>(
                 rankId, n_ranks, n_devices, first_rank_id, first_device_id, rootInfo, kTGetEnvNames, "TGET",
                 "TGET_ASYNC");
         });
+#endif
 }

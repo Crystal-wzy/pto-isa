@@ -178,7 +178,7 @@ __global__ AICORE void TPutAsyncUrmaBatchConsumeKernel(
             return;
         }
         session.batchSize = 3U;
-        if (jettyIndex >= session.qpCount) {
+        if (jettyIndex >= session.cfg.urma.qpCount) {
             status[0] = 0U;
             return;
         }
@@ -242,7 +242,7 @@ __global__ AICORE void TPutAsyncUrmaBatchConsumeKernel(
                     return;
                 }
             }
-            if (!lastBatchEvent.valid() || lastBatchEvent.urmaJettyCount != session.qpCount ||
+            if (!lastBatchEvent.valid() || lastBatchEvent.urmaJettyCount != session.cfg.urma.qpCount ||
                 lastBatchEvent.urmaJettyBase != session.qpIdxBase) {
                 producerStatus = 0U;
                 break;
@@ -337,7 +337,7 @@ __global__ AICORE void TPutAsyncUrmaBatchPolicyKernel(
 
             pto::comm::AsyncSession session;
             if (!pto::comm::BuildAsyncSession<pto::comm::DmaEngine::URMA>(urmaWorkspace, session) ||
-                session.qpCount < kSelectedJettiesPerCore) {
+                session.cfg.urma.qpCount < kSelectedJettiesPerCore) {
                 status[0] = 0U;
                 return;
             }
@@ -396,7 +396,7 @@ __global__ AICORE void TPutAsyncUrmaBatchPolicyKernel(
                 session.batchSize = 1U;
                 session.submitMode = pto::comm::AsyncSubmitMode::DEFER;
                 event = pto::comm::TPUT_ASYNC<pto::comm::DmaEngine::URMA>(dst, src, session, kTargetPeer);
-                if (session.urmaRuntimeCtx.batchStagedWqeCount != 0U) {
+                if (session.rt.urma.batchStagedWqeCount != 0U) {
                     status[0] = 0U;
                     return;
                 }
@@ -582,7 +582,7 @@ __global__ AICORE void TPutAsyncUrmaLargeMultiWqeKernel(
 
     pto::comm::AsyncSession session;
     if (!pto::comm::BuildAsyncSession<pto::comm::DmaEngine::URMA>(urmaWorkspace, session) ||
-        session.qpCount < kSelectedJettiesPerCore) {
+        session.cfg.urma.qpCount < kSelectedJettiesPerCore) {
         status[0] = 0U;
         return;
     }
@@ -606,7 +606,7 @@ __global__ AICORE void TPutAsyncUrmaLargeMultiWqeKernel(
     session.submitMode = pto::comm::AsyncSubmitMode::DEFER_AND_SUBMIT;
     const pto::comm::AsyncEvent event =
         pto::comm::TPUT_ASYNC<pto::comm::DmaEngine::URMA>(dst, src, session, kTargetPeer);
-    if (!event.valid() || event.urmaJettyCount != session.qpCount || !event.Wait(session)) {
+    if (!event.valid() || event.urmaJettyCount != session.cfg.urma.qpCount || !event.Wait(session)) {
         status[0] = 0U;
         return;
     }

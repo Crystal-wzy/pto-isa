@@ -149,10 +149,10 @@ AICORE inline bool ValidateUrmaSessionAt(const AsyncSession& session, uint32_t p
 
 AICORE inline bool ValidateUrmaSession(const AsyncSession& session, uint32_t peer)
 {
-    if (session.qpCount == 0U || session.qpCount > kUrmaMaxJettiesPerCore) {
+    if (session.cfg.urma.qpCount == 0U || session.cfg.urma.qpCount > kUrmaMaxJettiesPerCore) {
         return false;
     }
-    for (uint32_t j = 0U; j < session.qpCount; ++j) {
+    for (uint32_t j = 0U; j < session.cfg.urma.qpCount; ++j) {
         if (!ValidateUrmaSessionAt(session, peer, session.qpIdxBase + j)) {
             return false;
         }

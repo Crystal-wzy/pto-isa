@@ -89,7 +89,7 @@ PTO_INTERNAL void AddOneCmoSqe(
 template <typename = void>
 PTO_INTERNAL void SubmitCmoPrefetchSqes(
     __gm__ BatchWriteChannelInfo* batchWriteChannelInfo, __gm__ uint8_t* src, const SdmaConfig& config,
-    SdmaRuntimeContext& runtimeCtx)
+    SdmaSqCursor& cursor)
 {
     for (uint32_t idx = 0U; idx < config.iter_num; ++idx) {
         uint32_t queueIdx = idx % config.queue_num;
@@ -103,9 +103,9 @@ PTO_INTERNAL void SubmitCmoPrefetchSqes(
         __gm__ uint8_t* srcAddr = src + config.comm_block_offset + idx * config.block_bytes;
 
         AddOneCmoSqe(
-            channelInfo, srcAddr, transferBytes, runtimeCtx.sqTail[queueIdx],
-            runtimeCtx.sqTail[queueIdx] - runtimeCtx.sqHead[queueIdx]);
-        runtimeCtx.sqTail[queueIdx] = (runtimeCtx.sqTail[queueIdx] + 1U) % channelInfo->sq_depth;
+            channelInfo, srcAddr, transferBytes, cursor.sqTail[queueIdx],
+            cursor.sqTail[queueIdx] - cursor.sqHead[queueIdx]);
+        cursor.sqTail[queueIdx] = (cursor.sqTail[queueIdx] + 1U) % channelInfo->sq_depth;
     }
 }
 
@@ -120,7 +120,7 @@ PTO_INTERNAL AsyncEvent SdmaCmoPrefetch(__gm__ uint8_t* src, uint64_t messageLen
     if (!BeginSdmaPost(messageLen, session, config, state)) {
         return {};
     }
-    SubmitCmoPrefetchSqes(state.channels, src, config, session.runtimeCtx);
+    SubmitCmoPrefetchSqes(state.channels, src, config, state.cursor);
     return FinishSdmaPost(config, state, session);
 }
 
