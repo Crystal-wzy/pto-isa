@@ -59,6 +59,19 @@ __simt_callee__ AICORE PTO_INLINE uint32_t gather_remap(uint32_t idx, uint32_t c
     }
 }
 
+template <typename T>
+__simt_callee__ AICORE PTO_INLINE void mgather_copy_or_zero(__ubuf__ T* dst, __gm__ const T* src, uint32_t doRead)
+{
+    if constexpr (
+        std::is_same_v<T, float8_e4m3_t> || std::is_same_v<T, float8_e5m2_t> || std::is_same_v<T, hifloat8_t>) {
+        __ubuf__ uint8_t* dstByte = reinterpret_cast<__ubuf__ uint8_t*>(dst);
+        __gm__ const uint8_t* srcByte = reinterpret_cast<__gm__ const uint8_t*>(src);
+        *dstByte = doRead ? *srcByte : static_cast<uint8_t>(0);
+    } else {
+        *dst = doRead ? *src : static_cast<T>(0);
+    }
+}
+
 #ifndef PTO_TILE_OFFSET_2D_DEFINED
 #define PTO_TILE_OFFSET_2D_DEFINED
 template <typename Tile2D>
@@ -107,8 +120,7 @@ AICORE __simt_vf__ LAUNCH_BOUND(1024) PTO_INLINE void simt_mgather_row_kernel(
         __gm__ const T* srcRow = table + safeIdx * validCols;
 #pragma unroll 4
         for (uint32_t col = colSeg * mgather_cfg::WARP_SIZE + tx; col < validCols; col += kColStride) {
-            const T val = doRead ? srcRow[col] : static_cast<T>(0);
-            dst[tile_offset_2d<TileDst>(row, col)] = val;
+            mgather_copy_or_zero(dst + tile_offset_2d<TileDst>(row, col), srcRow + col, doRead);
         }
     }
 }
@@ -146,7 +158,7 @@ AICORE __simt_vf__ LAUNCH_BOUND(1024) PTO_INLINE void simt_mgather_elem_kernel(
         const uint32_t rawIdx = static_cast<uint32_t>(indices[idxOff]);
         uint32_t doRead;
         const uint32_t safeIdx = gather_remap<Oob>(rawIdx, tableSize, doRead);
-        dst[dstOff] = doRead ? table[safeIdx] : static_cast<T>(0);
+        mgather_copy_or_zero(dst + dstOff, table + safeIdx, doRead);
     }
 }
 
@@ -216,7 +228,14 @@ __tf__ AICORE void MGatherScalarImpl(
         doRead = (rawIdx < tableSize) ? 1u : 0u;
         safeIdx = rawIdx;
     }
-    dstPtr[0] = doRead ? tablePtr[safeIdx] : static_cast<T>(0);
+    if constexpr (
+        std::is_same_v<T, float8_e4m3_t> || std::is_same_v<T, float8_e5m2_t> || std::is_same_v<T, hifloat8_t>) {
+        __ubuf__ uint8_t* dstByte = reinterpret_cast<__ubuf__ uint8_t*>(dstPtr);
+        __gm__ const uint8_t* srcByte = reinterpret_cast<__gm__ const uint8_t*>(tablePtr);
+        dstByte[0] = doRead ? srcByte[safeIdx] : static_cast<uint8_t>(0);
+    } else {
+        dstPtr[0] = doRead ? tablePtr[safeIdx] : static_cast<T>(0);
+    }
     set_flag(PIPE_S, PIPE_V, EVENT_ID0);
     wait_flag(PIPE_S, PIPE_V, EVENT_ID0);
 }

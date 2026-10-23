@@ -308,6 +308,47 @@ inline AICORE void runRowDyn(__gm__ T __out__* out, __gm__ T __in__* table, __gm
     (void)dstBytes;
 }
 
+template <
+    pto::GatherOOB Oob, typename T, typename TIdx, int kPadRows, int kPadCols, int kPadIdxCols, int64_t kRtValidRows,
+    int64_t kRtValidCols, int kTableRows>
+inline AICORE void runRowDynStaticTable(__gm__ T __out__* out, __gm__ T __in__* table, __gm__ TIdx __in__* indices)
+{
+    using TableShape = pto::Shape<1, 1, 1, kTableRows, kPadCols>;
+    using TableStride = pto::Stride<1, 1, 1, kPadCols, 1>;
+    using IdxShape = pto::Shape<1, 1, 1, 1, kPadIdxCols>;
+    using IdxStride = pto::Stride<1, 1, 1, kPadIdxCols, 1>;
+    using OutShape = pto::Shape<1, 1, 1, kPadRows, kPadCols>;
+    using OutStride = pto::Stride<1, 1, 1, kPadCols, 1>;
+
+    GlobalTensor<T, TableShape, TableStride> tableGlobal(table);
+    GlobalTensor<TIdx, IdxShape, IdxStride> idxGlobal(indices);
+    GlobalTensor<T, OutShape, OutStride> outGlobal(out);
+
+    using DstTile = Tile<TileType::Vec, T, kPadRows, kPadCols, BLayout::RowMajor, -1, -1>;
+    using IdxTile = Tile<TileType::Vec, TIdx, 1, kPadIdxCols, BLayout::RowMajor, -1, -1>;
+
+    DstTile dstTile(static_cast<unsigned>(kRtValidRows), static_cast<unsigned>(kRtValidCols));
+    IdxTile idxTile(1u, static_cast<unsigned>(kRtValidRows));
+
+    constexpr int idxBytes = ((1 * kPadIdxCols * (int)sizeof(TIdx) + 31) / 32) * 32;
+    constexpr int dstBytes = ((kPadRows * kPadCols * (int)sizeof(T) + 31) / 32) * 32;
+    TASSIGN(idxTile, 0x0);
+    TASSIGN(dstTile, idxBytes);
+
+    TLOAD(idxTile, idxGlobal);
+#ifndef __PTO_AUTO__
+    set_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
+    wait_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
+#endif
+    MGATHER<Coalesce::Row, Oob>(dstTile, tableGlobal, idxTile);
+#ifndef __PTO_AUTO__
+    set_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
+    wait_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
+#endif
+    TSTORE(outGlobal, dstTile);
+    (void)dstBytes;
+}
+
 template <pto::GatherOOB Oob, typename T, typename TIdx, int kDstRows, int kDstCols, int kTableSize>
 inline AICORE void runElem2D(__gm__ T __out__* out, __gm__ T __in__* table, __gm__ TIdx __in__* indices)
 {
@@ -429,6 +470,17 @@ inline AICORE void runElem2D(__gm__ T __out__* out, __gm__ T __in__* table, __gm
         runMGATHER_##NAME<<<1, nullptr, stream>>>(reinterpret_cast<T*>(out), reinterpret_cast<T*>(table), indices); \
     }
 
+#define DEFINE_ROW_DYN_STATIC(NAME, THOST, T, TIDX, PR, PC, PIC, RVR, RVC, TR, OOB)                                 \
+    extern "C" __global__ AICORE void runMGATHER_##NAME(__gm__ T* out, __gm__ T* table, __gm__ TIDX* indices)       \
+    {                                                                                                               \
+        runRowDynStaticTable<pto::GatherOOB::OOB, T, TIDX, PR, PC, PIC, (int64_t)RVR, (int64_t)RVC, TR>(            \
+            out, table, indices);                                                                                   \
+    }                                                                                                               \
+    void Launch_##NAME(THOST* out, THOST* table, TIDX* indices, void* stream)                                       \
+    {                                                                                                               \
+        runMGATHER_##NAME<<<1, nullptr, stream>>>(reinterpret_cast<T*>(out), reinterpret_cast<T*>(table), indices); \
+    }
+
 DEFINE_ROW(row_float_8x32_64rows, float, float, int32_t, 8, 32, 64, Undefined)
 DEFINE_ROW(row_half_16x64_64rows, aclFloat16, half, int32_t, 16, 64, 64, Undefined)
 DEFINE_ROW(row_int32_8x16_32rows, int32_t, int32_t, int32_t, 8, 16, 32, Undefined)
@@ -454,6 +506,7 @@ DEFINE_ELEM(elem_half_zero_32_16size, aclFloat16, half, int32_t, 32, 16, Zero)
 DEFINE_ELEM2D(elem2d_float_8x32_256size, float, float, int32_t, 8, 32, 256, Undefined)
 DEFINE_ELEM2D(elem2d_int32_8x16_256size, int32_t, int32_t, int32_t, 8, 16, 256, Undefined)
 DEFINE_ELEM2D(elem2d_half_4x32_256size, aclFloat16, half, int32_t, 4, 32, 256, Undefined)
+DEFINE_ELEM2D(elem2d_fp8e4m3_zero_16x32_2048size, uint8_t, float8_e4m3_t, int32_t, 16, 32, 2048, Zero)
 DEFINE_ELEM2D(elem2d_int32_unaligned_3x8_64size, int32_t, int32_t, int32_t, 3, 8, 64, Undefined)
 DEFINE_ELEM2D(elem2d_uint8_unaligned_3x32_256size, uint8_t, uint8_t, int32_t, 3, 32, 256, Undefined)
 DEFINE_ELEM2D_PAD(elem2d_int32_unaligned_3x3_in_3x8_64size, int32_t, int32_t, int32_t, 3, 3, 3, 8, 64, Undefined)
@@ -468,3 +521,4 @@ DEFINE_ELEM2D_DYN(elem2d_dyn_float_3x3_in_3x8_64size, float, float, int32_t, 3, 
 DEFINE_ELEM2D_DYN(elem2d_dyn_half_8x16_in_8x16_4x32, aclFloat16, half, int32_t, 8, 16, 8, 16, 4, 32, Undefined)
 DEFINE_ROW_DYN(row_dyn_int32_3x16_8rows, int32_t, int32_t, int32_t, 3, 16, 8, 3, 16, 8, Undefined)
 DEFINE_ROW_DYN(row_dyn_half_4x32_16rows, aclFloat16, half, int32_t, 4, 32, 8, 4, 32, 16, Undefined)
+DEFINE_ROW_DYN_STATIC(row_dyn_bf16_zero_16x32_64rows, uint16_t, bfloat16_t, int32_t, 16, 32, 16, 16, 32, 64, Zero)

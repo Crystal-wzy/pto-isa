@@ -168,6 +168,10 @@ add("MGATHERTest.case_elem_half_zero_32_16size", lambda n: case_elem(n, np.float
 add("MGATHERTest.case_elem2d_float_8x32_256size", lambda n: case_elem2d(n, np.float32, 8, 32, 256))
 add("MGATHERTest.case_elem2d_int32_8x16_256size", lambda n: case_elem2d(n, np.int32, 8, 16, 256))
 add("MGATHERTest.case_elem2d_half_4x32_256size", lambda n: case_elem2d(n, np.float16, 4, 32, 256))
+add(
+    "MGATHERTest.case_elem2d_fp8e4m3_zero_16x32_2048size",
+    lambda n: case_elem2d(n, np.uint8, 16, 32, 2048, oob="zero", idx_kind="oob"),
+)
 
 add("MGATHERTest.case_elem2d_int32_unaligned_3x8_64size", lambda n: case_elem2d(n, np.int32, 3, 8, 64))
 add("MGATHERTest.case_elem2d_uint8_unaligned_3x32_256size", lambda n: case_elem2d(n, np.uint8, 3, 32, 256))
@@ -209,6 +213,10 @@ add(
 )
 add("MGATHERTest.case_row_dyn_int32_3x16_8rows", lambda n: case_row(n, np.int32, 3, 16, 8))
 add("MGATHERTest.case_row_dyn_half_4x32_16rows", lambda n: case_row(n, np.float16, 4, 32, 16))
+add(
+    "MGATHERTest.case_row_dyn_bf16_zero_16x32_64rows",
+    lambda n: case_row(n, np.uint16, 16, 32, 64, oob="zero", idx_kind="oob"),
+)
 
 
 if __name__ == "__main__":

@@ -101,6 +101,19 @@ def case_row(name, dtype, r, c, table_rows, oob="undefined", idx_kind="random"):
     return table.reshape(-1), idx, nd_to_nz(golden_nd, c0_of(dtype))
 
 
+def case_row_zero_mixed(name, dtype, r, c, table_rows):
+    table = make_table(dtype, table_rows * c).reshape(table_rows, c)
+    idx = ((np.arange(r, dtype=np.int32) * 19 + 3 * 17) % np.int32(table_rows)).reshape(r, 1)
+    idx[::11, 0] = np.int32(-1)
+    idx[3::29, 0] = np.int32(table_rows)
+    idx[5::31, 0] = np.int32(2147483647)
+    valid = np.flatnonzero((idx[:, 0] >= 0) & (idx[:, 0] < table_rows))
+    if valid.size >= 2:
+        idx[valid[1], 0] = idx[valid[0], 0]
+    golden_nd = golden_row(table, idx, r, c, "zero")
+    return table.reshape(-1), idx, nd_to_nz(golden_nd, c0_of(dtype))
+
+
 def case_elem(name, dtype, r, c, table_size, oob="undefined", idx_kind="random"):
     rng = np.random.default_rng(hash(name) & 0xFFFFFFFF)
     table = make_table(dtype, table_size)
@@ -139,6 +152,10 @@ add(
 add(
     "MGATHERGM2L1Test.case_row_half_zero_16x16_8rows",
     lambda n: case_row(n, np.float16, 16, 16, 8, oob="zero", idx_kind="oob"),
+)
+add(
+    "MGATHERGM2L1Test.case_row_bfloat16_zero_128x512_193rows",
+    lambda n: case_row_zero_mixed(n, np.uint16, 128, 512, 193),
 )
 
 add("MGATHERGM2L1Test.case_elem_float_16x16_256size", lambda n: case_elem(n, np.float32, 16, 16, 256))
