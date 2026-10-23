@@ -1,5 +1,18 @@
 # THISTOGRAM
 
+## 产品支持情况<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT系列产品：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3系列产品：不支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2系列产品：不支持
+<!-- end id3 -->
+
+
 > **实现状态**：THISTOGRAM已在Ascend 950PR/Ascend 950DT、Kirin9030后端及CPU仿真（`__CPU_SIM`）上提供C++内建实现，并已登记到虚拟ISA索引（`PTOISA`、`isa/README`、`manifest.yaml`、指令族矩阵 `appendix-d` 及mkdocs导航）。仅Ascend 950PR/Ascend 950DT / Kirin9030 / CPU仿真可用（Atlas A2/A3 训练系列产品/Atlas A2/A3 推理系列产品不支持）；尚无公开字节码编码。
 
 ## 简介

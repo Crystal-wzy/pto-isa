@@ -1,5 +1,18 @@
 # SYNCALL
 
+## 产品支持情况<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT系列产品：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3系列产品：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2系列产品：支持
+<!-- end id3 -->
+
+
 ## 指令示意图
 
 > 仓库未提供 `SYNCALL.svg`。`SYNCALL` 是**跨核控制面**原语，不描述单Tile上的数据变换，语义为「全体参与者在同一点汇合后再前进」。

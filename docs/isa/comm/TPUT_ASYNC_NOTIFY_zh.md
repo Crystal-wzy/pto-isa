@@ -1,5 +1,18 @@
 # TPUT_ASYNC_NOTIFY
 
+## 产品支持情况<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT系列产品：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3系列产品：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2系列产品：支持
+<!-- end id3 -->
+
+
 ## 简介
 
 `TPUT_ASYNC_NOTIFY` 是带通知的异步远程写原语。它先将非空payload从本地GM传输到远端GM，再更新一个

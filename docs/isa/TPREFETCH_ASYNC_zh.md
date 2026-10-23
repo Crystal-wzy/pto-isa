@@ -1,5 +1,18 @@
 # TPREFETCH_ASYNC
 
+## 产品支持情况<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT系列产品：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3系列产品：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2系列产品：支持
+<!-- end id3 -->
+
+
 ## 简介
 
 `TPREFETCH_ASYNC` 通过 SDMA CMO（Cache Maintenance Operation, opcode=6）将 Global Memory (GM/HBM) 中的数据异步预取到 NPU L2 Cache。与将数据搬入 UB 的 `TPREFETCH` 不同，`TPREFETCH_ASYNC` 只将数据预热到 L2 Cache，不占用数据对应的 UB 空间，后续依赖的 `TLOAD` 可以从 L2 命中。

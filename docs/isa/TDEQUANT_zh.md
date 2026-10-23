@@ -1,5 +1,18 @@
 # TDEQUANT
 
+## 产品支持情况<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT系列产品：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3系列产品：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2系列产品：支持
+<!-- end id3 -->
+
+
 ## 简介
 
 将低精度量化Tile（`S8` / `S16`）反量化为高精度 `FP32` Tile。对每个元素执行**仿射反量化**（affine dequantization），即 `TQUANT` 整数量化（INT8对称 / 非对称）的逆运算：
