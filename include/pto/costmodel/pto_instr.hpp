@@ -10,6 +10,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #ifndef PTO_INSTR_HPP
 #define PTO_INSTR_HPP
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 
 // Intentionally reuse the common PTO include guard so this header can act as a
@@ -123,6 +124,50 @@ inline void ExtractFirstTileInfo(int& rows, int& cols, std::string& dtype, T&& f
     }
 }
 
+inline constexpr lightweight::TransferTileType MapTransferTileType(TileType tileType)
+{
+    switch (tileType) {
+        case TileType::Vec:
+            return lightweight::TransferTileType::VecTile;
+        case TileType::Mat:
+            return lightweight::TransferTileType::MatTile;
+        case TileType::Acc:
+            return lightweight::TransferTileType::AccTile;
+        case TileType::Left:
+            return lightweight::TransferTileType::LeftTile;
+        case TileType::Right:
+            return lightweight::TransferTileType::RightTile;
+        case TileType::Bias:
+            return lightweight::TransferTileType::BiasTile;
+        case TileType::Scaling:
+            return lightweight::TransferTileType::ScalingTile;
+        default:
+            return lightweight::TransferTileType::Unknown;
+    }
+}
+
+template <typename T>
+inline constexpr lightweight::TransferTileType CostModelTileType()
+{
+    using Tile = std::remove_cvref_t<T>;
+    return MapTransferTileType(perf_sim::SafeGetTileLoc<Tile>());
+}
+
+template <typename First, typename... Rest>
+inline lightweight::TransferTileType ResolveCostModelTransferTileType(const char* opcode)
+{
+    if (std::string_view(opcode) == "TLOAD") {
+        return CostModelTileType<First>();
+    }
+    if constexpr (sizeof...(Rest) > 0) {
+        if (std::string_view(opcode) == "TSTORE") {
+            using Src = std::tuple_element_t<0, std::tuple<Rest...>>;
+            return CostModelTileType<Src>();
+        }
+    }
+    return lightweight::TransferTileType::Unknown;
+}
+
 inline void RecordInstr(const char* opcode, auto&& first_tile, auto&&... rest_tiles)
 {
     // Look up pipeline stage from opcode name and tile types (TLOAD/TSTORE need tile routing)
@@ -167,6 +212,9 @@ inline void RecordInstr(const char* opcode, auto&& first_tile, auto&&... rest_ti
     if constexpr (sizeof...(rest_tiles) > 0) {
         ExtractFirstTileInfo(srcRows, srcCols, srcDtype, rest_tiles...);
     }
+    const auto transferTileType =
+        ResolveCostModelTransferTileType<decltype(first_tile), decltype(rest_tiles)...>(opcode);
+    const int64_t innerDimension = std::string_view(opcode) == "TMATMUL" ? srcCols : 0;
 
     const uint64_t measured_cycles = GetLastPtoInstrCycles();
     uint64_t cycles = measured_cycles;
@@ -184,7 +232,9 @@ inline void RecordInstr(const char* opcode, auto&& first_tile, auto&&... rest_ti
     const uint64_t estimated_cycles =
         hybridEstimate ?
             0 :
-            perf_sim::EstimateInstrCycles(opcode, r.rows, r.cols, r.dtype.empty() ? "unknown" : r.dtype.c_str());
+            perf_sim::EstimateInstrCycles(
+                opcode, r.rows, r.cols, srcDtype.empty() ? (r.dtype.empty() ? "unknown" : r.dtype.c_str()) : srcDtype,
+                dstDtype.empty() ? "unknown" : dstDtype, innerDimension, transferTileType);
     const bool useEstimatedCycles = hybridEstimate || cycles == 0 ||
                                     (std::string_view(opcode) == "TROWEXPAND" && estimated_cycles > cycles) ||
                                     (std::string_view(opcode) == "TDIVS" && (r.dtype == "int16" || r.dtype == "int32"));

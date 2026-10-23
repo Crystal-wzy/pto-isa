@@ -54,6 +54,12 @@ inline std::string_view PtoOpcodeToKey(PtoOpcode op)
         std::pair{PtoOpcode::TSEL, std::string_view("TSEL")},
         std::pair{PtoOpcode::TMAX, std::string_view("TMAX")},
         std::pair{PtoOpcode::TMIN, std::string_view("TMIN")},
+        std::pair{PtoOpcode::TAND, std::string_view("TAND")},
+        std::pair{PtoOpcode::TOR, std::string_view("TOR")},
+        std::pair{PtoOpcode::TANDS, std::string_view("TANDS")},
+        std::pair{PtoOpcode::TORS, std::string_view("TORS")},
+        std::pair{PtoOpcode::TXOR, std::string_view("TXOR")},
+        std::pair{PtoOpcode::TXORS, std::string_view("TXORS")},
         std::pair{PtoOpcode::TFMOD, std::string_view("TFMOD")},
         std::pair{PtoOpcode::TFMODS, std::string_view("TFMODS")},
         std::pair{PtoOpcode::TREM, std::string_view("TREM")},
@@ -68,6 +74,8 @@ inline std::string_view PtoOpcodeToKey(PtoOpcode op)
         std::pair{PtoOpcode::TPARTMAX, std::string_view("TPARTMAX")},
         std::pair{PtoOpcode::TPARTMIN, std::string_view("TPARTMIN")},
         std::pair{PtoOpcode::TAXPY, std::string_view("TAXPY")},
+        std::pair{PtoOpcode::TCMP, std::string_view("TCMP")},
+        std::pair{PtoOpcode::TCMPS, std::string_view("TCMPS")},
         std::pair{PtoOpcode::TROWARGMAX, std::string_view("TROWARGMAX")},
         std::pair{PtoOpcode::TROWARGMIN, std::string_view("TROWARGMIN")},
         std::pair{PtoOpcode::TCOLARGMAX, std::string_view("TCOLARGMAX")},
@@ -97,8 +105,18 @@ inline std::string_view PtoOpcodeToKey(PtoOpcode op)
         std::pair{PtoOpcode::TCOLEXPANDMIN, std::string_view("TCOLEXPANDMIN")},
         std::pair{PtoOpcode::TCOLEXPANDEXPDIF, std::string_view("TCOLEXPANDEXPDIF")},
         std::pair{PtoOpcode::TEXPANDS, std::string_view("TEXPANDS")},
+        std::pair{PtoOpcode::TSELS, std::string_view("TSELS")},
+        std::pair{PtoOpcode::TCONCAT, std::string_view("TCONCAT")},
+        std::pair{PtoOpcode::TGATHER, std::string_view("TGATHER")},
+        std::pair{PtoOpcode::TGATHERB, std::string_view("TGATHERB")},
+        std::pair{PtoOpcode::TSCATTER, std::string_view("TSCATTER")},
+        std::pair{PtoOpcode::TMOV, std::string_view("TMOV")},
         std::pair{PtoOpcode::TSORT32, std::string_view("TSORT32")},
         std::pair{PtoOpcode::TMRGSORT, std::string_view("TMRGSORT")},
+        std::pair{PtoOpcode::TFILLPAD, std::string_view("TFILLPAD")},
+        std::pair{PtoOpcode::TFILLPAD_EXPAND, std::string_view("TFILLPAD_EXPAND")},
+        std::pair{PtoOpcode::TTRI, std::string_view("TTRI")},
+        std::pair{PtoOpcode::TDEQUANT, std::string_view("TDEQUANT")},
     };
     for (const auto& [opcode, key] : kOpcodeKeys) {
         if (opcode == op) {
@@ -243,6 +261,9 @@ inline bool IsA5ScalarVfOp(PtoOpcode op)
         case PtoOpcode::TMINS:
         case PtoOpcode::TMAXS:
         case PtoOpcode::TNEG:
+        case PtoOpcode::TANDS:
+        case PtoOpcode::TORS:
+        case PtoOpcode::TXORS:
         case PtoOpcode::TFMODS:
         case PtoOpcode::TREMS:
         case PtoOpcode::TPOWS:
@@ -254,6 +275,9 @@ inline bool IsA5ScalarVfOp(PtoOpcode op)
 
 inline fit::ShapePath ResolveShapePath(PtoOpcode op, int64_t rows, int64_t cols, int64_t valid_cols)
 {
+    if (op == PtoOpcode::TDEQUANT) {
+        return rows == 1 ? fit::ShapePath::Path1D : fit::ShapePath::Path2D;
+    }
     if (IsA5ScalarVfOp(op)) {
         return valid_cols == cols ? fit::ShapePath::Path1D : fit::ShapePath::Path2D;
     }
@@ -265,6 +289,9 @@ inline fit::ShapePath ResolveShapePath(PtoOpcode op, int64_t rows, int64_t cols,
 
 inline std::string_view ResolveDefaultVfImplKind(PtoOpcode op, fit::ShapePath shape_path)
 {
+    if (op == PtoOpcode::TDEQUANT) {
+        return "POST_UPDATE";
+    }
     if (op == PtoOpcode::TCVT) {
         return (shape_path == fit::ShapePath::Path1D) ? "NO_POST_UPDATE" : "POST_UPDATE";
     }
@@ -322,9 +349,9 @@ inline bool TryInitVfCurveContext(const CostModelInput& input, VfCurveContext& c
 
 inline bool TryResolveVfOpParams(const CostModelInput& input, VfCurveContext& context)
 {
-    if (input.op == PtoOpcode::TCVT) {
+    if (input.op == PtoOpcode::TCVT || input.op == PtoOpcode::TDEQUANT) {
         context.dst_dtype = DTypeToKey(input.dst_dtype);
-        if (context.op_params.empty()) {
+        if (input.op == PtoOpcode::TCVT && context.op_params.empty()) {
             context.op_params =
                 (input.round_mode == RoundMode::CAST_NONE && input.saturation_mode == SaturationMode::ON) ?
                     std::string_view("CAST_RINT_SAT_ON_normal") :
@@ -341,6 +368,9 @@ inline bool TryResolveElementsPerRepeat(const CostModelInput& input, VfCurveCont
     if (input.op == PtoOpcode::TCVT) {
         return TryGetA5CvtElementsPerRepeat(
             context.src_dtype, context.dst_dtype, context.shape_path, context.elements_per_repeat);
+    }
+    if (input.op == PtoOpcode::TDEQUANT) {
+        return TryGetA5ElementsPerRepeat(input.dst_dtype, context.elements_per_repeat);
     }
     return TryGetA5ElementsPerRepeat(input.dtype, context.elements_per_repeat);
 }

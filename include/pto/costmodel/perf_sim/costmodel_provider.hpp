@@ -61,6 +61,12 @@ inline CostModelRuntimeCtx& GetCostModelCtx()
     X(TSUB)                                                                                                           \
     X(TMUL)                                                                                                           \
     X(TDIV)                                                                                                           \
+    X(TMAX)                                                                                                           \
+    X(TMIN)                                                                                                           \
+    X(TAND)                                                                                                           \
+    X(TOR)                                                                                                            \
+    X(TANDS) X(TORS) X(TXOR) X(TXORS) X(TFMOD) X(TFMODS) X(TREM) X(TREMS) X(TPOW) X(TPOWS) X(TMADD) X(TMULA)        \
+        X(TPRELU) X(TPARTADD) X(TPARTMUL) X(TPARTMAX) X(TPARTMIN)                                                     \
     X(TADDS)                                                                                                          \
     X(TSUBS)                                                                                                          \
     X(TMULS)                                                                                                          \
@@ -68,12 +74,11 @@ inline CostModelRuntimeCtx& GetCostModelCtx()
         X(TROWSUM) X(TROWMAX) X(TROWMIN) X(TROWPROD) X(TCOLSUM) X(TCOLMAX) X(TCOLMIN) X(TCOLPROD) X(TMATMUL) X(TGEMV) \
             X(TCVT) X(TMOV) X(TLOAD) X(TSTORE) X(TTRANS) X(TPREFETCH) X(TSORT32) X(TMRGSORT) X(TSEL) X(TSCATTER)      \
                 X(TEXTRACT) X(TINSERT) X(TROWEXPAND) X(TCOLEXPAND) X(TLOADCONV)                                      \
-    X(TMAX) X(TMIN) X(TFMOD) X(TFMODS) X(TREM) X(TREMS) X(TPOW) X(TPOWS) X(TMADD) X(TMULA) X(TPRELU)       \
-        X(TPARTADD) X(TPARTMUL) X(TPARTMAX) X(TPARTMIN) X(TAXPY) X(TROWARGMAX) X(TROWARGMIN)                \
-            X(TCOLARGMAX) X(TCOLARGMIN) X(TROWEXPANDADD) X(TROWEXPANDSUB) X(TROWEXPANDMUL)                  \
-                X(TROWEXPANDDIV) X(TROWEXPANDMAX) X(TROWEXPANDMIN) X(TROWEXPANDEXPDIF) X(TCOLEXPANDADD)     \
-                    X(TCOLEXPANDSUB) X(TCOLEXPANDMUL) X(TCOLEXPANDDIV) X(TCOLEXPANDMAX) X(TCOLEXPANDMIN)    \
-                        X(TCOLEXPANDEXPDIF) X(TEXPANDS)
+    X(TAXPY) X(TCMP) X(TCMPS) X(TROWARGMAX) X(TROWARGMIN) X(TCOLARGMAX) X(TCOLARGMIN)                                \
+        X(TROWEXPANDADD) X(TROWEXPANDSUB) X(TROWEXPANDMUL) X(TROWEXPANDDIV) X(TROWEXPANDMAX)                         \
+            X(TROWEXPANDMIN) X(TROWEXPANDEXPDIF) X(TCOLEXPANDADD) X(TCOLEXPANDSUB) X(TCOLEXPANDMUL)                  \
+                X(TCOLEXPANDDIV) X(TCOLEXPANDMAX) X(TCOLEXPANDMIN) X(TCOLEXPANDEXPDIF) X(TEXPANDS) X(TSELS)          \
+                    X(TCONCAT) X(TGATHER) X(TGATHERB) X(TFILLPAD) X(TFILLPAD_EXPAND) X(TTRI) X(TDEQUANT) X(TRESHAPE)
 // clang-format on
 
 inline bool TryMapOpcode(const std::string& opcode, ::pto::mocker::lightweight::PtoOpcode& out)
@@ -109,7 +114,10 @@ inline ::pto::mocker::lightweight::DType MapDType(const std::string& dtype)
 
 // ── LightweightFormula backend ──
 
-inline uint64_t EstimateLightweightCycles(const std::string& opcode, int rows, int cols, const std::string& dtype)
+inline uint64_t EstimateLightweightCycles(
+    const std::string& opcode, int rows, int cols, const std::string& src_dtype,
+    const std::string& dst_dtype = "unknown", int64_t inner_dimension = 0,
+    ::pto::mocker::lightweight::TransferTileType tile_type = ::pto::mocker::lightweight::TransferTileType::Unknown)
 {
     using namespace ::pto::mocker::lightweight;
 
@@ -122,13 +130,18 @@ inline uint64_t EstimateLightweightCycles(const std::string& opcode, int rows, i
     const uint32_t npu_arch = GetCostModelCtx().npu_arch;
     input.arch =
         (npu_arch == kAscend950Arch || npu_arch == kAscend950UrmaArch) ? CostModelArch::A5 : CostModelArch::A2A3;
-    input.dtype = MapDType(dtype);
+    input.dtype = MapDType(src_dtype);
+    input.dtype2 = input.dtype;
+    if (dst_dtype != "unknown") {
+        input.dst_dtype = MapDType(dst_dtype);
+    }
     input.rows = rows;
     input.cols = cols;
     input.data_size = static_cast<int64_t>(rows) * cols;
+    input.tile_type = tile_type;
 
     if (pto_op == PtoOpcode::TMATMUL || pto_op == PtoOpcode::TGEMV) {
-        input.k = cols;
+        input.k = inner_dimension > 0 ? inner_dimension : cols;
     }
 
     CostModelResult result = EstimateCycles(input);
@@ -167,9 +180,12 @@ inline uint64_t FallbackCycles(const std::string& opcode, int rows, int cols)
 
 // ── Unified estimation entry (used when CCE mock trace is unavailable) ──
 
-inline uint64_t EstimateInstrCycles(const std::string& opcode, int rows, int cols, const std::string& dtype)
+inline uint64_t EstimateInstrCycles(
+    const std::string& opcode, int rows, int cols, const std::string& src_dtype,
+    const std::string& dst_dtype = "unknown", int64_t inner_dimension = 0,
+    ::pto::mocker::lightweight::TransferTileType tile_type = ::pto::mocker::lightweight::TransferTileType::Unknown)
 {
-    uint64_t cycles = EstimateLightweightCycles(opcode, rows, cols, dtype);
+    uint64_t cycles = EstimateLightweightCycles(opcode, rows, cols, src_dtype, dst_dtype, inner_dimension, tile_type);
     return cycles > 0 ? cycles : FallbackCycles(opcode, rows, cols);
 }
 

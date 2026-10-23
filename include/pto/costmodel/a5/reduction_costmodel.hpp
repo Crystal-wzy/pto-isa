@@ -161,7 +161,7 @@ inline bool TryEstimateA5ColReductionCycles(const CostModelInput& input, uint64_
     return true;
 }
 
-inline bool TryEstimateA5SpecialCycles(const CostModelInput& input, uint64_t& cycles)
+inline bool TryEstimateA5ReductionCycles(const CostModelInput& input, uint64_t& cycles)
 {
     return TryEstimateA5RowSumCycles(input, cycles) || TryEstimateA5RowReductionCycles(input, cycles) ||
            TryEstimateA5ColReductionCycles(input, cycles);
