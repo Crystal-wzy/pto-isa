@@ -138,7 +138,7 @@ python3 -m build --wheel
 - S0：query 序列长度（Q/O 的行数）
 - S1：key/value 序列长度（K/V 的行数）
 
-Ascend 910B2 多核对比，基线为 `torch_npu`：
+Huawei Ascend 910B2 多核对比，基线为 `torch_npu`：
 
 | 序列长度 | PTO 时间 (us) | torch_npu 时间 (us) | PTO TFLOPS | torch_npu TFLOPS | PTO 加速比 |
 | --- | --- | --- | --- | --- | --- |

@@ -4,7 +4,7 @@
 
 # PTO Tile Library
 
-Parallel Tile Operation (PTO) is a virtual ISA for tile-oriented programming defined by Ascend CANN. This repository provides PTO Tile instruction implementations, examples, tests, and documentation to help developers migrate and optimize operators more smoothly across different Ascend generations.
+Parallel Tile Operation (PTO) is a virtual ISA for tile-oriented programming defined by Huawei Ascend CANN. This repository provides PTO Tile instruction implementations, examples, tests, and documentation to help developers migrate and optimize operators more smoothly across different Ascend generations.
 
 [![License](https://img.shields.io/badge/License-CANN%20Open%20Software%20License%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Ascend%20A2%20%7C%20A3%20%7C%20A5%20%7C%20CPU-green.svg)](#-platform-support)
