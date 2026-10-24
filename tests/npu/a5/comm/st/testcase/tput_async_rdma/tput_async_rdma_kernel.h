@@ -30,6 +30,10 @@ RdmaTestResult RunPutAsyncRdmaRootPut(int n_ranks, int n_devices, int first_rank
 
 RdmaTestResult RunPutAsyncNotifyRdmaSet(int n_ranks, int n_devices, int first_rank_id, int first_device_id);
 
+RdmaTestResult RunPutAsyncNotifyRdmaAdd(
+    int n_ranks, int n_devices, int first_rank_id, int first_device_id, int32_t signalValue, int operationCount = 1,
+    int blockCount = 1);
+
 RdmaTestResult RunPutAsyncRdmaConcurrent(int n_ranks, int n_devices, int first_rank_id, int first_device_id);
 
 template <typename T, size_t count>

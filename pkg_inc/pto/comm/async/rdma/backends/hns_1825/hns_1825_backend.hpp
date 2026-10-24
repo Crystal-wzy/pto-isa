@@ -12,7 +12,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 //
 // Posts RDMA WRITE / READ from AIV using the RdmaInfo table supplied via RdmaExecContext.
 // WQE/CQE staging uses each AIV's own UB scratch. Local scalar atomics coordinate
-// shared queues; remote RDMA atomic operations are not supported.
+// shared queues. Notify AtomicAdd uses an INT32 SUM Write Reduce.
 
 #ifndef PTO_COMM_ASYNC_RDMA_BACKENDS_HNS_1825_BACKEND_HPP
 #define PTO_COMM_ASYNC_RDMA_BACKENDS_HNS_1825_BACKEND_HPP
@@ -39,6 +39,7 @@ namespace hns_1825 {
 namespace detail {
 
 constexpr uint32_t kCqeReadSize = sizeof(Hns1825Cqe);
+constexpr uint32_t kReduceSumInt32 = (0xAU << 4) | 0x2U;
 
 struct PostSendResult {
     uint32_t curHead;
@@ -316,7 +317,7 @@ AICORE inline __ubuf__ uint8_t* FillInlineWqeCtrlSeg(__ubuf__ uint8_t* ubBase, u
 
 // Fill the 32B RDMA task segment (opcode / len / remote VA / rkey / ulp).
 AICORE inline __ubuf__ uint8_t* FillWqeTaskSeg(
-    __ubuf__ uint8_t* addr, const RdmaSendWr& wr, RdmaOpcode opcode, bool fence = false)
+    __ubuf__ uint8_t* addr, const RdmaSendWr& wr, RdmaOpcode opcode, bool fence = false, bool reduce = false)
 {
     constexpr uint32_t kMsgWrite = 0x04;
     constexpr uint32_t kMsgRead = 0x08;
@@ -338,7 +339,8 @@ AICORE inline __ubuf__ uint8_t* FillWqeTaskSeg(
     }
     task->va = Htobe64((uint64_t)wr.remote_addr);
     task->rkey = Htobe32(wr.rkey);
-    task->ulp = Htobe32(wr.lkey & 0xffffU);
+    // Write Reduce keeps the WRITE opcode and adds SUM (0xA) / INT32 (0x2) to ULP.
+    task->ulp = Htobe32((wr.lkey & 0xffffU) | (reduce ? kReduceSumInt32 : 0U));
     return addr + sizeof(Hns1825WqeRdmaTaskSeg);
 }
 
@@ -367,10 +369,10 @@ AICORE inline uint32_t FillWqeWriteRead(
     return kHns1825WriteReadWqeSize;
 }
 
-// Assemble one fenced 4-byte inline RDMA WRITE. The inline value is payload
+// Assemble one fenced 4-byte inline WRITE. The inline value is payload
 // data and therefore stays in host byte order; only WQE control fields are
 // converted to the NIC's big-endian format.
-AICORE inline void FillWqeInlineSet(
+AICORE inline void FillWqeInlineNotify(
     const RdmaSendWr& wr, int32_t signalValue, __gm__ RoceSqCtx* sqCtx, __gm__ uint8_t* wqeAddr, uint32_t curHead,
     __ubuf__ uint8_t* ub, uint32_t syncId)
 {
@@ -569,11 +571,11 @@ AICORE inline PostSendResult PostSendReadWrite(const RdmaExecContext& ctx, RdmaS
     return {curHead + 1U, SubmitReadyWqes(sqCtx, cqCtx, start, start + 1U, ub, syncId)};
 }
 
-// Post payload WRITE followed by a fenced inline signal WRITE. Both WQEs are
+// Post payload WRITE followed by a fenced inline Set or SGE Write Reduce. Both WQEs are
 // signaled and consume one WQEBB/CQE each, so the existing head/tail mapping
 // remains valid. The SQ is published once after both WQEs are complete.
 AICORE inline PostSendResult PostSendWriteNotify(
-    const RdmaExecContext& ctx, RdmaSendWr& payloadWr, RdmaSendWr& signalWr, int32_t signalValue)
+    const RdmaExecContext& ctx, RdmaSendWr& payloadWr, RdmaSendWr& signalWr, int32_t signalValue, NotifyOp notifyOp)
 {
     __gm__ RdmaInfo* info = reinterpret_cast<__gm__ RdmaInfo*>(ctx.contextGm);
     const uint32_t pe = ctx.destRankId;
@@ -587,26 +589,53 @@ AICORE inline PostSendResult PostSendWriteNotify(
     __gm__ RoceCqCtx* cqCtx = reinterpret_cast<__gm__ RoceCqCtx*>(
         info->scqPtr + (static_cast<uint64_t>(pe) * qpNum + qpIdx) * sizeof(RoceCqCtx));
     const uint32_t depth = sqCtx->depth;
+    __gm__ RdmaMemInfo* localMem = reinterpret_cast<__gm__ RdmaMemInfo*>(info->memPtr + sizeof(RdmaMemInfo) * ctx.myPe);
+    const bool isAdd = notifyOp == NotifyOp::AtomicAdd;
+    // Reject keys that would change the requested Reduce operation before reserving SQ slots.
+    if (isAdd && (sqCtx->amoAddr == 0 || ((sqCtx->amoLkey & 0xffU) | kReduceSumInt32) != kReduceSumInt32)) {
+        return {0, kRdmaUnsupportedOperationError};
+    }
     uint64_t start = 0;
     const uint32_t status = ReserveWqes(ctx, 2, start);
     if (status != 0) {
         return {0, status};
     }
     uint32_t curHead = static_cast<uint32_t>(start);
+    // The operand ring may be smaller than the SQ. A slot cannot be overwritten
+    // until the previous WQE using it has completed, including across ring laps.
+    if (isAdd && curHead + 1U >= kNotifyOperandSlots) {
+        const uint32_t operandStatus = PollCq(info, pe, qpIdx, curHead + 2U - kNotifyOperandSlots, ub, syncId);
+        if (operandStatus != 0) {
+            return {0, operandStatus};
+        }
+    }
 
     __gm__ RdmaMemInfo* remoteMem = reinterpret_cast<__gm__ RdmaMemInfo*>(info->memPtr + sizeof(RdmaMemInfo) * pe);
-    __gm__ RdmaMemInfo* localMem = reinterpret_cast<__gm__ RdmaMemInfo*>(info->memPtr + sizeof(RdmaMemInfo) * ctx.myPe);
     payloadWr.rkey = remoteMem->rkey;
     payloadWr.lkey = localMem->lkey;
     signalWr.rkey = remoteMem->rkey;
-    signalWr.lkey = localMem->lkey;
+    signalWr.lkey = isAdd ? sqCtx->amoLkey : localMem->lkey;
 
     __gm__ uint8_t* payloadWqe = GetSendWqe(sqCtx, curHead & (depth - 1U));
     (void)FillWqeWriteRead(payloadWr, sqCtx, payloadWqe, curHead, RdmaOpcode::OP_RDMA_WRITE, ub, syncId);
 
     ++curHead;
     __gm__ uint8_t* signalWqe = GetSendWqe(sqCtx, curHead & (depth - 1U));
-    FillWqeInlineSet(signalWr, signalValue, sqCtx, signalWqe, curHead, ub, syncId);
+    if (isAdd) {
+        const uint64_t operandAddr =
+            sqCtx->amoAddr + static_cast<uint64_t>(curHead % kNotifyOperandSlots) * sizeof(int32_t);
+        signalWr.local_addr = reinterpret_cast<__gm__ uint8_t*>(operandAddr);
+        // MTE writes only this word; cached scalar stores could write back
+        // adjacent operands owned by other AIVs in the same cache line.
+        *reinterpret_cast<__ubuf__ int32_t*>(ub) = signalValue;
+        WriteUbToGmWithSync(operandAddr, ub, sizeof(int32_t), syncId);
+        __ubuf__ uint8_t* data =
+            FillWqeTaskSeg(FillWqeCtrlSeg(ub, curHead, depth), signalWr, RdmaOpcode::OP_RDMA_WRITE, true, true);
+        (void)FillWqeDataSeg(data, signalWr);
+        WriteUbToGmWithSync(reinterpret_cast<uint64_t>(signalWqe), ub, kHns1825WriteReadWqeSize, syncId);
+    } else {
+        FillWqeInlineNotify(signalWr, signalValue, sqCtx, signalWqe, curHead, ub, syncId);
+    }
 
     ++curHead;
     return {curHead, SubmitReadyWqes(sqCtx, cqCtx, start, start + 2U, ub, syncId)};
@@ -742,11 +771,14 @@ AICORE inline uint64_t Write(const RdmaExecContext& ctx, __gm__ uint8_t* dst, __
     return result.status == 0 ? EncodeHandle(ctx.destRankId, result.curHead) : EncodeErrorHandle(result.status);
 }
 
-// RDMA WRITE followed by a fenced 4-byte inline RDMA WRITE to remoteSignal.
+// RDMA WRITE followed by a fenced 4-byte Set or INT32 SUM to remoteSignal.
 AICORE inline uint64_t WriteNotify(
     const RdmaExecContext& ctx, __gm__ uint8_t* dst, __gm__ uint8_t* src, uint64_t len, __gm__ int32_t* remoteSignal,
-    int32_t signalValue)
+    int32_t signalValue, NotifyOp notifyOp = NotifyOp::Set)
 {
+    if (notifyOp != NotifyOp::Set && notifyOp != NotifyOp::AtomicAdd) {
+        return EncodeErrorHandle(kRdmaUnsupportedOperationError);
+    }
     uint32_t status =
         detail::ValidateTransfer(ctx, reinterpret_cast<uint64_t>(src), reinterpret_cast<uint64_t>(dst), len);
     if (status == 0U) {
@@ -764,7 +796,7 @@ AICORE inline uint64_t WriteNotify(
     signalWr.remote_addr = reinterpret_cast<__gm__ uint8_t*>(remoteSignal);
     signalWr.message_len = sizeof(int32_t);
 
-    const detail::PostSendResult result = detail::PostSendWriteNotify(ctx, payloadWr, signalWr, signalValue);
+    const detail::PostSendResult result = detail::PostSendWriteNotify(ctx, payloadWr, signalWr, signalValue, notifyOp);
     return result.status == 0U ? EncodeHandle(ctx.destRankId, result.curHead) : EncodeErrorHandle(result.status);
 }
 

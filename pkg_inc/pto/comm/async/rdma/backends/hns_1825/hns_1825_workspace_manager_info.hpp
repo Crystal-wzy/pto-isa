@@ -168,21 +168,29 @@ inline bool WorkspaceManager::FillLocalMemoryInfo(RdmaMemInfo* memory)
             std::cerr << "[RoCE] failed to read ChannelEntity while resolving the local MR" << std::endl;
             return false;
         }
-        if (!ValidateChannelEntity(entity, channelPeer_[channel]) || entity.localBufferNum == 0 ||
+        if (!ValidateChannelEntity(entity, channelPeer_[channel]) || entity.localBufferNum < 2 ||
             entity.localBufferAddr == nullptr) {
             std::cerr << "[RoCE] local registered buffer is absent for peer " << channelPeer_[channel] << std::endl;
             return false;
         }
         host::RegedBufferEntity localBuffer{};
-        if (!ReadDeviceStruct(entity.localBufferAddr, &localBuffer, sizeof(localBuffer)) ||
-            !ValidateRegisteredBuffer(
-                localBuffer, reinterpret_cast<uint64_t>(symmetricAddr_), symmetricSize_, "local", rankId_)) {
+        if (!ReadRegisteredBuffer(
+                entity.localBufferAddr, entity.localBufferNum, reinterpret_cast<uint64_t>(symmetricAddr_),
+                symmetricSize_, "local", rankId_, localBuffer)) {
             return false;
         }
         memory[rankId_].addr = localBuffer.bufferInfo.rma.addr;
         memory[rankId_].size = localBuffer.bufferInfo.rma.size;
         memory[rankId_].lkey = localBuffer.bufferInfo.rma.protectionInfo.memInfo.roce.lkey;
         memory[rankId_].rkey = localBuffer.bufferInfo.rma.protectionInfo.memInfo.roce.rkey;
+        host::RegedBufferEntity notifyBuffer{};
+        const uint64_t notifyBytes = static_cast<uint64_t>(rankCount_) * kNotifyOperandSlots * sizeof(int32_t);
+        if (!ReadRegisteredBuffer(
+                entity.localBufferAddr, entity.localBufferNum, reinterpret_cast<uint64_t>(notifyOperands_), notifyBytes,
+                "notify", rankId_, notifyBuffer)) {
+            return false;
+        }
+        notifyLkey_ = notifyBuffer.bufferInfo.rma.protectionInfo.memInfo.roce.lkey;
         localMrRead = true;
     }
     if (!localMrRead) {
@@ -208,8 +216,9 @@ inline bool WorkspaceManager::FillPeerRdmaInfo(size_t channelIndex, RdmaInfoHost
         return false;
     }
     host::RegedBufferEntity remoteBuffer{};
-    if (!ReadDeviceStruct(entity.remoteBufferAddr, &remoteBuffer, sizeof(remoteBuffer)) ||
-        !ValidateRegisteredBuffer(remoteBuffer, peerSymAddrs_[peer], symmetricSize_, "remote", peer)) {
+    if (!ReadRegisteredBuffer(
+            entity.remoteBufferAddr, entity.remoteBufferNum, peerSymAddrs_[peer], symmetricSize_, "remote", peer,
+            remoteBuffer)) {
         return false;
     }
     layout.memory[peer].addr = remoteBuffer.bufferInfo.rma.addr;
@@ -223,6 +232,9 @@ inline bool WorkspaceManager::FillPeerRdmaInfo(size_t channelIndex, RdmaInfoHost
     }
     CopyRoceSq(layout.sq[peer], sq);
     layout.sq[peer].stateAddr = layout.stateDeviceBase + sizeof(QueueState) * peer;
+    layout.sq[peer].amoAddr = reinterpret_cast<uint64_t>(notifyOperands_) +
+                              static_cast<uint64_t>(peer) * kNotifyOperandSlots * sizeof(int32_t);
+    layout.sq[peer].amoLkey = notifyLkey_;
     layout.rq[peer] = layout.sq[peer];
     host::CqContext cq{};
     if (entity.cqNum == 0 || entity.cqContextAddr == nullptr ||
@@ -304,6 +316,24 @@ inline bool WorkspaceManager::ValidateChannelEntity(const host::ChannelEntity& e
         return false;
     }
     return true;
+}
+
+inline bool WorkspaceManager::ReadRegisteredBuffer(
+    const host::RegedBufferEntity* buffers, uint32_t count, uint64_t expectedAddr, uint64_t expectedSize,
+    const char* side, uint32_t rank, host::RegedBufferEntity& output)
+{
+    // Select by address rather than relying on the order of HCOMM's exchanged MRs.
+    for (uint32_t index = 0; index < count; ++index) {
+        if (!ReadDeviceStruct(buffers + index, &output, sizeof(output))) {
+            return false;
+        }
+        if (output.type == host::REGED_BUFFER_TYPE_RMA && output.bufferInfo.rma.addr == expectedAddr) {
+            return ValidateRegisteredBuffer(output, expectedAddr, expectedSize, side, rank);
+        }
+    }
+    std::cerr << "[RoCE] " << side << " MR for rank " << rank << " is absent at address 0x" << std::hex << expectedAddr
+              << std::dec << std::endl;
+    return false;
 }
 
 inline bool WorkspaceManager::ValidateRegisteredBuffer(

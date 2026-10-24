@@ -166,6 +166,9 @@ private:
     static bool IsU32Aligned(uint64_t address);
     static bool IsCacheLineAligned(uint64_t address);
     static bool ValidateChannelEntity(const host::ChannelEntity& entity, uint32_t peer);
+    static bool ReadRegisteredBuffer(
+        const host::RegedBufferEntity* buffers, uint32_t count, uint64_t expectedAddr, uint64_t expectedSize,
+        const char* side, uint32_t rank, host::RegedBufferEntity& output);
     static bool ValidateRegisteredBuffer(
         const host::RegedBufferEntity& buffer, uint64_t expectedAddr, uint64_t expectedSize, const char* side,
         uint32_t rank);
@@ -202,6 +205,9 @@ private:
 
     EndpointHandle endpoint_{nullptr};
     HcommMemHandle memHandle_{nullptr};
+    HcommMemHandle notifyMemHandle_{nullptr};
+    void* notifyOperands_{nullptr};
+    uint32_t notifyLkey_{0};
     std::vector<ChannelHandle> channelHandles_;
     std::vector<uint32_t> channelPeer_;
     void* rdmaInfoDevice_{nullptr};

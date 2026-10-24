@@ -34,7 +34,7 @@ update is required and no payload is transferred.
 |---|---|---|
 | `DmaEngine::SDMA` (default) | A2/A3 and A5 | `Set`, `AtomicAdd` |
 | `DmaEngine::URMA` | Ascend950, NPU_ARCH 3510 only; requires CANN Toolkit >= 9.1.0 | `Set`, `AtomicAdd` |
-| `DmaEngine::RDMA` | Ascend950, NPU_ARCH 3510 only; currently supports HNS1825 RoCE | `Set` only |
+| `DmaEngine::RDMA` | Ascend950, NPU_ARCH 3510 only; currently supports HNS1825 RoCE | `Set`, `AtomicAdd` |
 
 ## C++ Intrinsic
 
@@ -122,8 +122,9 @@ The intrinsic does not guarantee a final value when multiple producers concurren
 Without application-level synchronization, do not concurrently mix `Set`, `AtomicAdd`, or ordinary stores on the
 same signal.
 
-`DmaEngine::RDMA` does not support `NotifyOp::AtomicAdd`. The payload-before-signal order above applies only within
-one invocation and does not define ordering between different sessions or independent execution flows.
+`DmaEngine::RDMA` implements `AtomicAdd` on HNS1825 with an INT32 SUM Write Reduce ordered after the payload WRITE.
+The payload-before-signal order above applies only within one invocation and does not define ordering between
+different sessions or independent execution flows.
 
 ## AsyncSession Construction
 
@@ -234,7 +235,6 @@ be a `pto::Tile` in UB/Vec memory and remain valid until the associated events h
 - For URMA and RDMA, the payload destination and signal must belong to the same target peer. The complete local
   payload, remote payload, and remote signal ranges must lie in memory regions registered during host initialization.
 - A URMA payload has no per-call size cap: a payload larger than 256 MB (the single-WQE transfer limit) is automatically split into multiple WQEs by the implementation, transparently to the caller, and the signal is still guaranteed to complete after all payload chunks. One RDMA payload must not exceed `0x7fffffff` bytes.
-- RDMA supports only `NotifyOp::Set`; do not use `NotifyOp::AtomicAdd`.
 - The SDMA workspace must be initialized by the host-side `SdmaWorkspaceManager`. The URMA workspace must be
   initialized by the host-side `UrmaWorkspaceManager`.
 - The symmetric data buffer passed to `UrmaWorkspaceManager::Init()` must be device memory that HCCL can register;
@@ -370,9 +370,10 @@ if (comm::BuildAsyncSession<comm::DmaEngine::URMA>(
 }
 ```
 
-### RDMA Set
+### RDMA Set and AtomicAdd
 
-RDMA supports only `Set` and uses `peer` to select the target rank:
+RDMA uses `peer` to select the target rank. The example assigns the signal with `Set`; use `NotifyOp::AtomicAdd`
+in the same call to add `signalValue` to the existing signal:
 
 ```cpp
 comm::AsyncSession session;

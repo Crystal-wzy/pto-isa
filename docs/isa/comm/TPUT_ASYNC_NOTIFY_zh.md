@@ -33,7 +33,7 @@
 |---|---|---|
 | `DmaEngine::SDMA`（默认） | A2/A3和A5 | `Set`、`AtomicAdd` |
 | `DmaEngine::URMA` | Ascend 950PR/Ascend 950DT，仅NPU_ARCH 3510；要求CANN Toolkit >= 9.1.0 | `Set`、`AtomicAdd` |
-| `DmaEngine::RDMA` | Ascend 950PR/Ascend 950DT，仅NPU_ARCH 3510；当前支持HNS1825 RoCE | 仅 `Set` |
+| `DmaEngine::RDMA` | Ascend 950PR/Ascend 950DT，仅NPU_ARCH 3510；当前支持HNS1825 RoCE | `Set`、`AtomicAdd` |
 
 ## C++内建接口
 
@@ -117,8 +117,8 @@ $$
 多个生产者并发 `Set` 同一个signal时，接口不保证最终值。缺少应用层同步时，不应在同一个signal上并发
 混用 `Set`、`AtomicAdd` 或普通store。
 
-`DmaEngine::RDMA` 不支持 `NotifyOp::AtomicAdd`。上述payload先于signal的顺序仅适用于同一次调用，不定义
-不同Session或不同执行流之间的顺序。
+`DmaEngine::RDMA` 在HNS1825上通过payload WRITE之后的INT32 SUM Write Reduce实现 `AtomicAdd`。
+上述payload先于signal的顺序仅适用于同一次调用，不定义不同Session或不同执行流之间的顺序。
 
 ## AsyncSession构建
 
@@ -226,7 +226,6 @@ if (comm::BuildAsyncSession<comm::DmaEngine::RDMA>(
 - 对于URMA和RDMA，payload目的地址与signal必须属于同一个目标peer；本地payload、远端payload和远端
   signal的完整地址范围都必须位于Host初始化阶段注册的内存区域内。
 - URMA payload无单次大小上限：超过256 MB（单WQE传输上限）的payload由实现自动拆分为多个WQE，对调用方透明，且signal仍保证在所有payload分片之后最后完成。单次RDMA payload不得超过 `0x7fffffff` 字节。
-- RDMA仅支持 `NotifyOp::Set`，不得使用 `NotifyOp::AtomicAdd`。
 - SDMA workspace必须由Host侧 `SdmaWorkspaceManager` 初始化；URMA workspace必须由Host侧
   `UrmaWorkspaceManager` 初始化。
 - 传给 `UrmaWorkspaceManager::Init()` 的对称数据buffer必须是可由HCCL注册的设备内存；分配方式遵循
@@ -358,9 +357,10 @@ if (comm::BuildAsyncSession<comm::DmaEngine::URMA>(
 }
 ```
 
-### RDMA Set
+### RDMA Set与AtomicAdd
 
-RDMA仅支持 `Set`，并通过 `peer` 选择目标rank：
+RDMA通过 `peer` 选择目标rank。以下示例用 `Set` 赋值；将同一次调用的操作改为 `NotifyOp::AtomicAdd`，
+即可在signal原值上累加 `signalValue`：
 
 ```cpp
 comm::AsyncSession session;

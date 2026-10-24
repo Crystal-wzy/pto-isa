@@ -1,7 +1,7 @@
 # RDMA异步ST（HNS1825目标网卡平台）
 
 本目录包含RDMA异步ST的共享实现。`tput_async_rdma` 验证远程WRITE，`tget_async_rdma` 验证远程READ，
-`tput_async_notify_rdma` 验证带`Set`通知的远程WRITE；三个目标复用同一套RDMA测试Kernel实现。
+`tput_async_notify_rdma` 验证带`Set`或`AtomicAdd`通知的远程WRITE；三个目标复用同一套RDMA测试Kernel实现。
 
 ## 前置条件
 
@@ -32,7 +32,9 @@ python3 tests/script/run_st.py -r npu -v a5 -t comm/tput_async_notify_rdma \
 ```
 
 该用例检查远端payload、远端signal及signal两侧canary，并等待接口返回的`AsyncEvent`完成。接收端观察到
-signal后先维护数据缓存，再校验payload。当前RDMA后端不支持`AtomicAdd`，因此没有对应的RDMA用例。
+signal后先维护数据缓存，再校验payload。首次验证ADD使用 `-g TPutAsyncNotifyRdma.Int32AddAndCanaries`，
+signal从非零初值开始累加。`-g 'TPutAsyncNotifyRdma.Int32Add*'` 还覆盖负增量、零增量，以及4个AIV写入
+互不重叠的payload并更新同一个signal。零增量不会改变signal，payload在完成后由Host校验。
 
 `PTO_RDMA_BACKEND` 仅在CMake配置该ST构建时读取。未设置、空值或不支持的值会构建不含RDMA支持的测试。`run_st.py` 默认重新构建；修改该变量后，不要使用 `-w/--without-build` 复用已有二进制。
 

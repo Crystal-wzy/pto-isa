@@ -231,22 +231,22 @@ inline bool WorkspaceManager::DestroyChannels()
 
 inline bool WorkspaceManager::UnregisterMemory()
 {
-    if (memHandle_ == nullptr) {
-        return true;
-    }
-    const HcommMemHandle memHandle = memHandle_;
+    const HcommMemHandle memories[] = {notifyMemHandle_, memHandle_};
+    notifyMemHandle_ = nullptr;
     memHandle_ = nullptr;
-    if (endpoint_ == nullptr) {
-        std::cerr << "[RoCE] cannot unregister memory without its endpoint" << std::endl;
-        return false;
+    bool ok = true;
+    for (HcommMemHandle memory : memories) {
+        if (memory == nullptr) {
+            continue;
+        }
+        if (endpoint_ == nullptr || HcommMemUnreg(endpoint_, memory) != 0) {
+            std::cerr << "[RoCE] HcommMemUnreg failed" << std::endl;
+            ok = false;
+        } else {
+            Trace("DESTROY mem-unreg API returned success handle=", memory);
+        }
     }
-    const HcommResult result = HcommMemUnreg(endpoint_, memHandle);
-    if (result != 0) {
-        std::cerr << "[RoCE] HcommMemUnreg failed: " << result << std::endl;
-        return false;
-    }
-    Trace("DESTROY mem-unreg API returned success handle=", memHandle);
-    return true;
+    return ok;
 }
 
 inline bool WorkspaceManager::DestroyEndpoint()
@@ -267,24 +267,23 @@ inline bool WorkspaceManager::DestroyEndpoint()
 
 inline bool WorkspaceManager::FreeDeviceInfo()
 {
-    if (rdmaInfoDevice_ == nullptr) {
-        return true;
-    }
-    void* rdmaInfo = rdmaInfoDevice_;
+    void* allocations[] = {rdmaInfoDevice_, notifyOperands_};
     rdmaInfoDevice_ = nullptr;
-    const aclError result = aclrtFree(rdmaInfo);
-    if (result != ACL_SUCCESS) {
-        std::cerr << "[RoCE] aclrtFree(rdmaInfo) failed: " << static_cast<int>(result) << std::endl;
-        return false;
+    notifyOperands_ = nullptr;
+    bool ok = true;
+    for (void* allocation : allocations) {
+        if (allocation != nullptr && aclrtFree(allocation) != ACL_SUCCESS) {
+            std::cerr << "[RoCE] workspace allocation release failed" << std::endl;
+            ok = false;
+        }
     }
-    Trace("DESTROY rdma-info free returned success addr=", rdmaInfo);
-    return true;
+    return ok;
 }
 
 inline bool WorkspaceManager::HasOwnedResources() const
 {
-    return initialized_ || endpoint_ != nullptr || memHandle_ != nullptr || rdmaInfoDevice_ != nullptr ||
-           !channelHandles_.empty();
+    return initialized_ || endpoint_ != nullptr || memHandle_ != nullptr || notifyMemHandle_ != nullptr ||
+           notifyOperands_ != nullptr || rdmaInfoDevice_ != nullptr || !channelHandles_.empty();
 }
 
 inline bool WorkspaceManager::ValidateBasicInitArguments(
@@ -362,6 +361,9 @@ inline void WorkspaceManager::ResetOwnedState()
     peerPhyIds_.clear();
     peerSymAddrs_.clear();
     memHandle_ = nullptr;
+    notifyMemHandle_ = nullptr;
+    notifyOperands_ = nullptr;
+    notifyLkey_ = 0;
     endpoint_ = nullptr;
     rdmaInfoDevice_ = nullptr;
     symmetricAddr_ = nullptr;

@@ -68,6 +68,17 @@ inline bool WorkspaceManager::RegisterMemory()
         std::cerr << "[RoCE][rank " << rankId_ << "] (2/4) MR registered: addr=0x" << std::hex
                   << reinterpret_cast<uint64_t>(symmetricAddr_) << std::dec << " size=" << symmetricSize_ << std::endl;
     }
+    const uint64_t notifyBytes = static_cast<uint64_t>(rankCount_) * kNotifyOperandSlots * sizeof(int32_t);
+    if (aclrtMalloc(&notifyOperands_, notifyBytes, ACL_MEM_MALLOC_HUGE_FIRST) != ACL_SUCCESS) {
+        std::cerr << "[RoCE] notify operand allocation failed" << std::endl;
+        return false;
+    }
+    memory.addr = notifyOperands_;
+    memory.size = notifyBytes;
+    if (HcommMemReg(endpoint_, "PtoRoceNotify", &memory, &notifyMemHandle_) != 0 || notifyMemHandle_ == nullptr) {
+        std::cerr << "[RoCE] notify operand registration failed" << std::endl;
+        return false;
+    }
     return true;
 }
 
@@ -97,6 +108,7 @@ inline bool WorkspaceManager::ConfigureChannelDescription(
     description.remoteEndpoint.loc.locType = ENDPOINT_LOC_TYPE_HOST;
     description.remoteEndpoint.loc.device.devPhyId = peerPhyIds_[remoteRank];
     description.notifyNum = 3;
+    // HCOMM also uses this flag to start the server listener when no socket is supplied.
     description.exchangeAllMems = true;
     description.memHandles = nullptr;
     description.memHandleNum = 0;

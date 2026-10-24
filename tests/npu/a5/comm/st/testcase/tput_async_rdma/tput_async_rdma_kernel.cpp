@@ -79,7 +79,7 @@ static uint32_t gRdmaCaseSequence = 0;
 // Data plane is a true one-sided remote write posted from AIV: root rank writes
 // its send buffer into every peer's recv buffer. The symmetric communication
 // buffer layout matches the URMA test:
-//   [per-block status header][sendBuf: count x T][recvBuf: count x T]
+//   [per-block status][notify cache line][sendBuf: count x T][recvBuf: count x T]
 // The remote target VA is computed from the peer's registered MR base VA
 // (PeerMrBaseAddr) plus the recv-region offset.
 // ============================================================================
@@ -89,11 +89,10 @@ constexpr uint32_t kRdmaPublicEventWaitError = 0x30000;
 constexpr uint32_t kRdmaPublicEventTestError = 0x30001;
 constexpr size_t kRdmaTestStatusStride = 64;
 constexpr int kRdmaTestMaxBlocks = 16;
-constexpr size_t kRdmaTestDataOffset = kRdmaTestMaxBlocks * kRdmaTestStatusStride;
-constexpr size_t kRdmaNotifyCanaryBeforeOffset = sizeof(uint32_t);
-constexpr size_t kRdmaNotifySignalOffset = 2U * sizeof(uint32_t);
-constexpr size_t kRdmaNotifyCanaryAfterOffset = 3U * sizeof(uint32_t);
-constexpr int32_t kRdmaNotifySignalValue = 37;
+constexpr size_t kRdmaNotifyCanaryBeforeOffset = kRdmaTestMaxBlocks * kRdmaTestStatusStride;
+constexpr size_t kRdmaNotifySignalOffset = kRdmaNotifyCanaryBeforeOffset + sizeof(int32_t);
+constexpr size_t kRdmaNotifyCanaryAfterOffset = kRdmaNotifySignalOffset + sizeof(int32_t);
+constexpr size_t kRdmaTestDataOffset = kRdmaNotifyCanaryBeforeOffset + kRdmaTestStatusStride;
 constexpr int32_t kRdmaNotifyCanaryBefore = 0x13572468;
 constexpr int32_t kRdmaNotifyCanaryAfter = 0x24681357;
 constexpr uint32_t kRdmaNotifyPollLimit = 10000000U;
@@ -425,27 +424,34 @@ template <typename T, size_t count>
 
 template <size_t count>
 [[bisheng::core_ratio(0, 1)]] __global__ AICORE void TPutAsyncNotifyRdmaKernelImpl(
-    __gm__ int32_t* localBuf, int myRank, int firstRankId, int rootRank, __gm__ uint8_t* rdmaWorkspace, uint32_t syncId)
+    __gm__ int32_t* localBuf, int myRank, int firstRankId, int rootRank, __gm__ uint8_t* rdmaWorkspace, uint32_t syncId,
+    pto::comm::NotifyOp notifyOp, int32_t signalValue, int32_t expectedSignal, int operationCount)
 {
 #ifdef PTO_RDMA_SUPPORTED
+    const int block = static_cast<int>(get_block_idx());
     __gm__ uint8_t* localBytes = reinterpret_cast<__gm__ uint8_t*>(localBuf);
-    __gm__ uint32_t* deviceStatus = reinterpret_cast<__gm__ uint32_t*>(localBytes);
+    __gm__ uint32_t* deviceStatus = reinterpret_cast<__gm__ uint32_t*>(localBytes + block * kRdmaTestStatusStride);
     __gm__ int32_t* localSignal = reinterpret_cast<__gm__ int32_t*>(localBytes + kRdmaNotifySignalOffset);
     __gm__ int32_t* sendBuf = reinterpret_cast<__gm__ int32_t*>(localBytes + kRdmaTestDataOffset);
     __gm__ int32_t* recvBuf = sendBuf + count;
-    *deviceStatus = 0U;
+    st_dev(uint32_t{0}, deviceStatus, 0);
 
     if (myRank != rootRank) {
+        // Adding zero cannot announce arrival; that case checks payload on the host after completion.
+        if (block != 0 || (notifyOp == pto::comm::NotifyOp::AtomicAdd && signalValue == 0)) {
+            pipe_barrier(PIPE_ALL);
+            return;
+        }
         pto::comm::Signal signal(localSignal);
         bool signaled = false;
         for (uint32_t poll = 0U; poll < kRdmaNotifyPollLimit; ++poll) {
-            if (pto::comm::TTEST(signal, kRdmaNotifySignalValue, pto::comm::WaitCmp::EQ)) {
+            if (pto::comm::TTEST(signal, expectedSignal, pto::comm::WaitCmp::EQ)) {
                 signaled = true;
                 break;
             }
         }
         if (!signaled) {
-            *deviceStatus = kRdmaPublicEventWaitError;
+            st_dev(kRdmaPublicEventWaitError, deviceStatus, 0);
             pipe_barrier(PIPE_ALL);
             return;
         }
@@ -455,7 +461,7 @@ template <size_t count>
         __asm__ __volatile__("");
         for (uint32_t index = 0U; index < count; ++index) {
             if (recvBuf[index] != static_cast<int32_t>(index + static_cast<uint32_t>(rootRank) * 10000U)) {
-                *deviceStatus = kRdmaPublicEventTestError;
+                st_dev(kRdmaPublicEventTestError, deviceStatus, 0);
                 pipe_barrier(PIPE_ALL);
                 return;
             }
@@ -474,16 +480,25 @@ template <size_t count>
     }
 
     const uint64_t peerBase = pto::comm::rdma::PeerMrBaseAddr(rdmaWorkspace, targetPeer);
-    const RdmaTestShape shape(1, 1, 1, 1, static_cast<int>(count));
+    const int elementsPerOperation = static_cast<int>(count) / operationCount;
+    const int operationsPerBlock = operationCount / static_cast<int>(get_block_num());
+    const RdmaTestShape shape(1, 1, 1, 1, elementsPerOperation);
     const RdmaTestStride stride(
-        static_cast<int>(count), static_cast<int>(count), static_cast<int>(count), static_cast<int>(count), 1);
-    RdmaTestGlobal<int32_t> source(sendBuf, shape, stride);
-    RdmaTestGlobal<int32_t> destination(
-        reinterpret_cast<__gm__ int32_t*>(peerBase + kRdmaTestDataOffset) + count, shape, stride);
+        elementsPerOperation, elementsPerOperation, elementsPerOperation, elementsPerOperation, 1);
     pto::comm::Signal remoteSignal(reinterpret_cast<__gm__ int32_t*>(peerBase + kRdmaNotifySignalOffset));
-    pto::comm::AsyncEvent event = pto::comm::TPUT_ASYNC_NOTIFY<pto::comm::DmaEngine::RDMA>(
-        destination, source, remoteSignal, kRdmaNotifySignalValue, pto::comm::NotifyOp::Set, session, targetPeer);
-    *deviceStatus = CompleteRdmaEvent(event, session, RdmaCompletionMode::PUBLIC_EVENT_WAIT_TEST);
+    for (int operation = 0; operation < operationsPerBlock; ++operation) {
+        const int offset = (block * operationsPerBlock + operation) * elementsPerOperation;
+        RdmaTestGlobal<int32_t> source(sendBuf + offset, shape, stride);
+        RdmaTestGlobal<int32_t> destination(
+            reinterpret_cast<__gm__ int32_t*>(peerBase + kRdmaTestDataOffset) + count + offset, shape, stride);
+        pto::comm::AsyncEvent event = pto::comm::TPUT_ASYNC_NOTIFY<pto::comm::DmaEngine::RDMA>(
+            destination, source, remoteSignal, signalValue, notifyOp, session, targetPeer);
+        const uint32_t status = CompleteRdmaEvent(event, session, RdmaCompletionMode::PUBLIC_EVENT_WAIT_TEST);
+        if (status != 0U) {
+            st_dev(status, deviceStatus, 0);
+            break;
+        }
+    }
     pipe_barrier(PIPE_ALL);
 #else
     (void)localBuf;
@@ -492,6 +507,10 @@ template <size_t count>
     (void)rootRank;
     (void)rdmaWorkspace;
     (void)syncId;
+    (void)notifyOp;
+    (void)signalValue;
+    (void)expectedSignal;
+    (void)operationCount;
 #endif
 }
 
@@ -1256,13 +1275,17 @@ RdmaTestResult RunPutAsyncRdmaRootPutKernel(
         operationCount, completionMode, blockCount);
 }
 
-static RdmaTestResult RunPutAsyncNotifyRdmaSetKernel(
-    int rankId, int nRanks, int nDevices, int firstDeviceId, int firstRankId, int rootRank, uint32_t caseId)
+static RdmaTestResult RunPutAsyncNotifyRdmaKernel(
+    int rankId, int nRanks, int nDevices, int firstDeviceId, int firstRankId, int rootRank, uint32_t caseId,
+    pto::comm::NotifyOp notifyOp, int32_t signalValue, int operationCount, int blockCount)
 {
 #ifndef PTO_RDMA_SUPPORTED
     return SkipUnsupportedRdmaKernel(rankId, nRanks, nDevices, firstDeviceId, firstRankId, rootRank, caseId);
 #else
     constexpr size_t kCount = 256U;
+    if (operationCount <= 0 || kCount % static_cast<size_t>(operationCount) != 0) {
+        return RdmaTestResult::FAILED;
+    }
     const auto caseStart = std::chrono::steady_clock::now();
     const RdmaCaseConfig config{
         rankId,
@@ -1273,9 +1296,10 @@ static RdmaTestResult RunPutAsyncNotifyRdmaSetKernel(
         rootRank,
         caseId,
         0,
-        static_cast<int>(kCount),
-        1,
-        RdmaCompletionMode::PUBLIC_EVENT_WAIT_TEST};
+        static_cast<int>(kCount) / operationCount,
+        operationCount,
+        RdmaCompletionMode::PUBLIC_EVENT_WAIT_TEST,
+        blockCount};
     const size_t communicationBytes = kRdmaTestDataOffset + 2U * kCount * sizeof(int32_t);
     RdmaTestContext context;
     const RdmaTestResult preparation =
@@ -1292,7 +1316,9 @@ static RdmaTestResult RunPutAsyncNotifyRdmaSetKernel(
     }
 
     auto* base = static_cast<uint8_t*>(context.devBuf);
-    const int32_t initialSignal = 0;
+    const int32_t initialSignal = notifyOp == pto::comm::NotifyOp::Set ? 0 : 19;
+    const int32_t targetSignal =
+        notifyOp == pto::comm::NotifyOp::Set ? signalValue : initialSignal + signalValue * operationCount;
     bool headerReady =
         aclrtMemcpy(
             base + kRdmaNotifySignalOffset, sizeof(initialSignal), &initialSignal, sizeof(initialSignal),
@@ -1310,9 +1336,10 @@ static RdmaTestResult RunPutAsyncNotifyRdmaSetKernel(
     CommMpiBarrier();
     const auto kernelStart = std::chrono::steady_clock::now();
     // clang-format off
-    TPutAsyncNotifyRdmaKernelImpl<kCount><<<1, nullptr, context.stream>>>(
+    TPutAsyncNotifyRdmaKernelImpl<kCount><<<blockCount, nullptr, context.stream>>>(
         reinterpret_cast<int32_t*>(context.devBuf), rankId, firstRankId, rootRank,
-        reinterpret_cast<uint8_t*>(context.rdmaMgr.GetWorkspaceAddr()), 0U);
+        reinterpret_cast<uint8_t*>(context.rdmaMgr.GetWorkspaceAddr()), 0U,
+        notifyOp, signalValue, targetSignal, operationCount);
     // clang-format on
     const int synchronizeResult = aclrtSynchronizeStream(context.stream);
     const RdmaKernelResult kernelResult = CollectRdmaKernelResult(
@@ -1331,7 +1358,7 @@ static RdmaTestResult RunPutAsyncNotifyRdmaSetKernel(
                        aclrtMemcpy(
                            &canaryAfter, sizeof(canaryAfter), base + kRdmaNotifyCanaryAfterOffset, sizeof(canaryAfter),
                            ACL_MEMCPY_DEVICE_TO_HOST) == ACL_SUCCESS;
-    const int32_t expectedSignal = rankId == rootRank ? initialSignal : kRdmaNotifySignalValue;
+    const int32_t expectedSignal = rankId == rootRank ? initialSignal : targetSignal;
     notifyValid = notifyValid && signal == expectedSignal && canaryBefore == kRdmaNotifyCanaryBefore &&
                   canaryAfter == kRdmaNotifyCanaryAfter;
     if (!notifyValid) {
@@ -1487,7 +1514,9 @@ static RdmaTestResult RunAsyncRdmaPlan(
 #endif
 }
 
-RdmaTestResult RunPutAsyncNotifyRdmaSet(int n_ranks, int n_devices, int first_rank_id, int first_device_id)
+static RdmaTestResult RunPutAsyncNotifyRdma(
+    int n_ranks, int n_devices, int first_rank_id, int first_device_id, pto::comm::NotifyOp notifyOp,
+    int32_t signalValue, int operationCount, int blockCount)
 {
     const RdmaLaunchPreparation preparation = PrepareRdmaLaunch(n_ranks, n_devices, first_device_id);
     if (preparation.result != RdmaTestResult::PASSED) {
@@ -1497,10 +1526,27 @@ RdmaTestResult RunPutAsyncNotifyRdmaSet(int n_ranks, int n_devices, int first_ra
     const int rankId = first_rank_id + preparation.mpiRank;
     const int rootRank = first_rank_id;
     const uint32_t caseId = ++gRdmaCaseSequence;
-    return RunPutAsyncNotifyRdmaSetKernel(rankId, n_ranks, n_devices, first_device_id, first_rank_id, rootRank, caseId);
+    return RunPutAsyncNotifyRdmaKernel(
+        rankId, n_ranks, n_devices, first_device_id, first_rank_id, rootRank, caseId, notifyOp, signalValue,
+        operationCount, blockCount);
 #else
     return RdmaTestResult::SKIPPED;
 #endif
+}
+
+RdmaTestResult RunPutAsyncNotifyRdmaSet(int n_ranks, int n_devices, int first_rank_id, int first_device_id)
+{
+    return RunPutAsyncNotifyRdma(
+        n_ranks, n_devices, first_rank_id, first_device_id, pto::comm::NotifyOp::Set, 37, 1, 1);
+}
+
+RdmaTestResult RunPutAsyncNotifyRdmaAdd(
+    int n_ranks, int n_devices, int first_rank_id, int first_device_id, int32_t signalValue, int operationCount,
+    int blockCount)
+{
+    return RunPutAsyncNotifyRdma(
+        n_ranks, n_devices, first_rank_id, first_device_id, pto::comm::NotifyOp::AtomicAdd, signalValue, operationCount,
+        blockCount);
 }
 
 RdmaTestResult RunPutAsyncRdmaConcurrent(int n_ranks, int n_devices, int first_rank_id, int first_device_id)
