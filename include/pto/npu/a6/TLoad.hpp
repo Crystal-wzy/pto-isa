@@ -537,7 +537,7 @@ PTO_INTERNAL void TLoadMxCubeBDN2NN(
 }
 
 template <typename Op, typename TileData, typename GlobalData>
-__tf__ PTO_INTERNAL void TLoadMxCubeNdDn(
+PTO_INTERNAL void TLoadMxCubeNdDn(
     __cbuf__ typename TileData::DType* dstAddr, typename GlobalData::DType __in__* src, int gShape0, int gShape1,
     int gShape2, int gShape3, int gShape4, int64_t gStride0, int64_t gStride1, int64_t gStride2, int64_t gStride3,
     int64_t gStride4, int validRow, int validCol)
