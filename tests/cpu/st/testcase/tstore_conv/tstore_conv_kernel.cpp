@@ -221,12 +221,77 @@ __global__ AICORE void runTStoreConvDynNDGlobal(__gm__ T __out__* out, __gm__ T 
     TSTORE(dstGlobal, srcTile);
 }
 
+/*-----------------ValidShape cases------------------*/
+// Only the valid box is written to GM; the host pre-fills the output with a sentinel and the golden
+// keeps that sentinel outside the valid box.
+template <typename T, int N, int C1, int H, int W, int vN, int vC1, int vH, int vW, bool Dynamic>
+__global__ AICORE void runTStoreConvValid_NC1HWC0(__gm__ T __out__* out, __gm__ T __in__* src)
+{
+    constexpr size_t kC0 = 32 / sizeof(T);
+    constexpr size_t bufferSize = size_t(N) * C1 * H * W * kC0 * sizeof(T);
+
+    using ShapeDim5 = Shape<N, C1, H, W, kC0>;
+    using StrideDim5 = pto::Stride<(int64_t)C1 * H * W * kC0, (int64_t)H * W * kC0, (int64_t)W * kC0, kC0, 1>;
+    using GlobalData = GlobalTensor<T, ShapeDim5, StrideDim5, Layout::NC1HWC0>;
+
+    using TShape = ConvTileShape<N, C1, H, W>;
+    using VShape = std::conditional_t<
+        Dynamic, ConvTileShape<pto::DYNAMIC, pto::DYNAMIC, pto::DYNAMIC, pto::DYNAMIC>, ConvTileShape<vN, vC1, vH, vW>>;
+    using SrcConvTile = ConvTile<TileType::Mat, T, bufferSize, Layout::NC1HWC0, TShape, VShape>;
+
+    SrcConvTile srcTile;
+    static_assert(srcTile.totalDimCount == 4);
+    TASSIGN(srcTile, 0x0);
+    if constexpr (Dynamic) {
+        srcTile.SetValidShape(int64_t(vN), int64_t(vC1), int64_t(vH), int64_t(vW));
+    }
+
+    GlobalData srcGlobal(src);
+    GlobalData dstGlobal(out);
+    TLOAD(srcTile, srcGlobal);
+    TSTORE(dstGlobal, srcTile);
+}
+
+template <typename T, int N, int D, int C1, int H, int W, int vN, int vD, int vC1, int vH, int vW, bool Dynamic>
+__global__ AICORE void runTStoreConvValid_NDC1HWC0(__gm__ T __out__* out, __gm__ T __in__* src)
+{
+    constexpr size_t kC0 = 32 / sizeof(T);
+    constexpr size_t bufferSize = size_t(N) * D * C1 * H * W * kC0 * sizeof(T);
+
+    using ShapeDim5 = Shape<N, D, C1, H, W>;
+    using StrideDim5 = pto::Stride<
+        (int64_t)D * C1 * H * W * kC0, (int64_t)C1 * H * W * kC0, (int64_t)H * W * kC0, (int64_t)W * kC0, kC0>;
+    using GlobalData = GlobalTensor<T, ShapeDim5, StrideDim5, Layout::NDC1HWC0>;
+
+    using TShape = ConvTileShape<N, D, C1, H, W, kC0>;
+    using VShape = std::conditional_t<
+        Dynamic, ConvTileShape<pto::DYNAMIC, pto::DYNAMIC, pto::DYNAMIC, pto::DYNAMIC, pto::DYNAMIC, pto::DYNAMIC>,
+        ConvTileShape<vN, vD, vC1, vH, vW, kC0>>;
+    using SrcConvTile = ConvTile<TileType::Mat, T, bufferSize, Layout::NDC1HWC0, TShape, VShape>;
+
+    SrcConvTile srcTile;
+    static_assert(srcTile.totalDimCount == 6);
+    TASSIGN(srcTile, 0x0);
+    if constexpr (Dynamic) {
+        srcTile.SetValidShape(int64_t(vN), int64_t(vD), int64_t(vC1), int64_t(vH), int64_t(vW), int64_t(kC0));
+    }
+
+    GlobalData srcGlobal(src);
+    GlobalData dstGlobal(out);
+    TLOAD(srcTile, srcGlobal);
+    TSTORE(dstGlobal, srcTile);
+}
+
 enum class TStoreConvCase {
     NDC1HWC0Static,
     NC1HWC0Static,
     NDC1HWC0DynN,
     NDC1HWC0DynND,
     NDC1HWC0DynNDGlobal,
+    NC1HWC0ValidStatic,
+    NC1HWC0ValidDynamic,
+    NDC1HWC0ValidStatic,
+    NDC1HWC0ValidDynamic,
 };
 
 template <typename T, TStoreConvCase caseKey, int s0, int s1, int s2, int s3, int s4>
@@ -252,6 +317,24 @@ void LaunchTStoreConv(T* out, T* src, int64_t n, int64_t d, void* stream)
     }
 }
 
+template <
+    typename T, TStoreConvCase caseKey, int s0, int s1, int s2, int s3, int s4, int v0, int v1, int v2, int v3, int v4>
+void LaunchTStoreConvValid(T* out, T* src, void* stream)
+{
+    (void)stream;
+    if constexpr (caseKey == TStoreConvCase::NC1HWC0ValidStatic) {
+        (void)v4;
+        runTStoreConvValid_NC1HWC0<T, s0, s1, s2, s3, v0, v1, v2, v3, false>(out, src);
+    } else if constexpr (caseKey == TStoreConvCase::NC1HWC0ValidDynamic) {
+        (void)v4;
+        runTStoreConvValid_NC1HWC0<T, s0, s1, s2, s3, v0, v1, v2, v3, true>(out, src);
+    } else if constexpr (caseKey == TStoreConvCase::NDC1HWC0ValidStatic) {
+        runTStoreConvValid_NDC1HWC0<T, s0, s1, s2, s3, s4, v0, v1, v2, v3, v4, false>(out, src);
+    } else if constexpr (caseKey == TStoreConvCase::NDC1HWC0ValidDynamic) {
+        runTStoreConvValid_NDC1HWC0<T, s0, s1, s2, s3, s4, v0, v1, v2, v3, v4, true>(out, src);
+    }
+}
+
 template void LaunchTStoreConv<float, TStoreConvCase::NDC1HWC0Static, 1, 1, 1, 2, 8>(
     float* out, float* src, int64_t n, int64_t d, void* stream);
 template void LaunchTStoreConv<float, TStoreConvCase::NDC1HWC0Static, 2, 3, 4, 1, 7>(
@@ -274,3 +357,13 @@ template void LaunchTStoreConv<float, TStoreConvCase::NDC1HWC0DynNDGlobal, 4, 3,
     float* out, float* src, int64_t n, int64_t d, void* stream);
 template void LaunchTStoreConv<float, TStoreConvCase::NDC1HWC0DynN, 4, 3, 3, 3, 5>(
     float* out, float* src, int64_t n, int64_t d, void* stream);
+
+// ValidShape instantiations
+template void LaunchTStoreConvValid<float, TStoreConvCase::NC1HWC0ValidStatic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>(
+    float* out, float* src, void* stream);
+template void LaunchTStoreConvValid<int32_t, TStoreConvCase::NC1HWC0ValidDynamic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>(
+    int32_t* out, int32_t* src, void* stream);
+template void LaunchTStoreConvValid<float, TStoreConvCase::NDC1HWC0ValidStatic, 2, 3, 2, 4, 5, 1, 2, 1, 3, 4>(
+    float* out, float* src, void* stream);
+template void LaunchTStoreConvValid<int32_t, TStoreConvCase::NDC1HWC0ValidDynamic, 2, 3, 2, 4, 5, 1, 2, 1, 3, 4>(
+    int32_t* out, int32_t* src, void* stream);

@@ -80,5 +80,58 @@ test_cases = [
 if ENABLE_BF16:
     test_cases.append(("case_5HD_fused_bf16", (1, 2, 4, 4, 16), "bf16"))
 
+
+VALID_SENTINEL = -7
+
+# (suffix, raw_shape, dtype, valid_shape): the kernel must leave everything outside the
+# valid box untouched, so the golden starts from the sentinel and only fills the box.
+valid_test_cases = [
+    ("case_5HD_valid_static_fp16", (2, 3, 4, 5, 16), "float16", (1, 2, 3, 4, 16)),
+    ("case_5HD_valid_dynamic_fp32", (2, 3, 4, 5, 8), "float32", (1, 2, 3, 4, 8)),
+    ("case_ND_5HD_valid_static_fp16", (2, 3, 2, 4, 5, 16), "float16", (1, 2, 1, 3, 4, 16)),
+    ("case_FracZ_4D_valid_static_fp16", (8, 2, 16, 16), "float16", (6, 1, 10, 16)),
+    ("case_FracZ_5D_valid_static_int8", (4, 2, 6, 16, 32), "int8", (3, 1, 4, 10, 32)),
+    ("case_FracZ_5D_valid_dynamic_int8", (2, 3, 4, 8, 32), "int8", (1, 2, 3, 6, 32)),
+]
+
+if ENABLE_BF16:
+    valid_test_cases.append(("case_5HD_valid_bf16", (1, 2, 4, 4, 16), "bf16", (1, 1, 3, 3, 16)))
+
+
+def generate_cpu_valid_suite(prefix, cases):
+    type_map = {
+        "float16": np.float16,
+        "half": np.float16,
+        "float32": np.float32,
+        "float": np.float32,
+        "bf16": NumExt.bf16,
+        "int8": np.int8,
+        "int32": np.int32,
+    }
+
+    for suffix, raw_shape, dtype_str, valid_shape in cases:
+        folder_name = f"{prefix}.{suffix}"
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+
+        np_type = type_map[dtype_str.lower()]
+        total_elements = int(np.prod(raw_shape))
+        data = NumExt.astype((np.arange(total_elements) % 100).reshape(raw_shape), np_type)
+
+        golden_dtype = np.float32 if NumExt.is_bf16(np_type) else np_type
+        golden = np.full(raw_shape, VALID_SENTINEL, dtype=golden_dtype)
+        valid_slice = tuple(slice(0, int(v)) for v in valid_shape)
+        golden[valid_slice] = data[valid_slice]
+
+        input_path = os.path.join(folder_name, "input.bin")
+        golden_path = os.path.join(folder_name, "golden.bin")
+        NumExt.write_array(input_path, data, np_type)
+        NumExt.write_array(golden_path, golden, np_type)
+
+        print(f"Generated: {folder_name}")
+        print(f"  -> Shape: {raw_shape} | Valid: {valid_shape} | DType: {dtype_str}")
+
+
 if __name__ == "__main__":
     generate_cpu_test_suite("TLoadConvTest", test_cases)
+    generate_cpu_valid_suite("TLoadConvTest", valid_test_cases)

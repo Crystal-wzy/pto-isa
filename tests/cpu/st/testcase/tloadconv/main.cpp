@@ -22,10 +22,20 @@ enum class TLoadConvCase {
     NDC1HWC0Static,
     FRACTAL_Z4DStatic,
     FRACTAL_Z5DStatic,
+    NC1HWC0ValidStatic,
+    NC1HWC0ValidDynamic,
+    NDC1HWC0ValidStatic,
+    FRACTAL_Z4DValidStatic,
+    FRACTAL_Z5DValidStatic,
+    FRACTAL_Z5DValidDynamic,
 };
 
 template <typename T, TLoadConvCase caseKey, int s0, int s1, int s2, int s3, int s4>
 void LaunchTLoadConv(uint8_t* out, uint8_t* src, int64_t n, uint64_t* gLog, void* stream);
+
+template <
+    typename T, TLoadConvCase caseKey, int s0, int s1, int s2, int s3, int s4, int v0, int v1, int v2, int v3, int v4>
+void LaunchTLoadConvValid(uint8_t* out, uint8_t* src);
 
 class TLoadConvTest : public testing::Test {
 protected:
@@ -53,7 +63,9 @@ std::string GetGoldenDir()
 #define PRINTLOG 4
 #define MAXBLOCK 64
 
-template <typename T, TLoadConvCase caseKey, int s0, int s1, int s2, int s3, int s4>
+template <
+    typename T, TLoadConvCase caseKey, int s0, int s1, int s2, int s3, int s4, int v0 = -1, int v1 = -1, int v2 = -1,
+    int v3 = -1, int v4 = -1>
 void tload_test(int64_t n = 0)
 {
     aclInit(nullptr);
@@ -85,8 +97,14 @@ void tload_test(int64_t n = 0)
     aclrtMalloc((void**)&logDevice, MAXBLOCK * LOGSIZE * 8, ACL_MEM_MALLOC_HUGE_FIRST);
 #endif
 
-    LaunchTLoadConv<T, caseKey, s0, s1, s2, s3, s4>(
-        (uint8_t*)dstDevice, (uint8_t*)srcDevice, n, (uint64_t*)logDevice, stream);
+    if constexpr (v0 < 0) {
+        LaunchTLoadConv<T, caseKey, s0, s1, s2, s3, s4>(
+            (uint8_t*)dstDevice, (uint8_t*)srcDevice, n, (uint64_t*)logDevice, stream);
+    } else {
+        (void)n;
+        LaunchTLoadConvValid<T, caseKey, s0, s1, s2, s3, s4, v0, v1, v2, v3, v4>(
+            (uint8_t*)dstDevice, (uint8_t*)srcDevice);
+    }
     aclrtSynchronizeStream(stream);
 
     aclrtMemcpy(dstHost, gold_byteSize, dstDevice, gold_byteSize, ACL_MEMCPY_DEVICE_TO_HOST);
@@ -135,3 +153,41 @@ TEST_F(TLoadConvTest, case_5HD_dynNGlobal_fp32)
 {
     tload_test<float, TLoadConvCase::NC1HWC0DynNGlobal, 4, 2, 3, 5, 1>(3);
 }
+
+// ValidShape: only the valid box is loaded, the rest of the tile keeps the sentinel.
+TEST_F(TLoadConvTest, case_5HD_valid_static_fp16)
+{
+    tload_test<half, TLoadConvCase::NC1HWC0ValidStatic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>();
+}
+
+TEST_F(TLoadConvTest, case_5HD_valid_dynamic_fp32)
+{
+    tload_test<float, TLoadConvCase::NC1HWC0ValidDynamic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>();
+}
+
+TEST_F(TLoadConvTest, case_ND_5HD_valid_static_fp16)
+{
+    tload_test<half, TLoadConvCase::NDC1HWC0ValidStatic, 2, 3, 2, 4, 5, 1, 2, 1, 3, 4>();
+}
+
+TEST_F(TLoadConvTest, case_FracZ_4D_valid_static_fp16)
+{
+    tload_test<half, TLoadConvCase::FRACTAL_Z4DValidStatic, 8, 2, 1, 1, 1, 6, 1, 10, 1, 1>();
+}
+
+TEST_F(TLoadConvTest, case_FracZ_5D_valid_static_int8)
+{
+    tload_test<int8_t, TLoadConvCase::FRACTAL_Z5DValidStatic, 4, 2, 6, 16, 1, 3, 1, 4, 10, 1>();
+}
+
+TEST_F(TLoadConvTest, case_FracZ_5D_valid_dynamic_int8)
+{
+    tload_test<int8_t, TLoadConvCase::FRACTAL_Z5DValidDynamic, 2, 3, 4, 8, 1, 1, 2, 3, 6, 1>();
+}
+
+#ifdef CPU_SIM_BFLOAT_ENABLED
+TEST_F(TLoadConvTest, case_5HD_valid_bf16)
+{
+    tload_test<bfloat16_t, TLoadConvCase::NC1HWC0ValidStatic, 1, 2, 4, 4, 1, 1, 1, 3, 3, 1>();
+}
+#endif

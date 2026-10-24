@@ -165,6 +165,7 @@ tmaxs
 tmins
 tmin
 tmax
+tload_conv_valid
 tload_gm2mat
 tload_l2hint_mat
 tstore_acc2gm
@@ -192,6 +193,7 @@ tcolprod
 tcmp
 tassign
 tstore_mat2gm
+tstore_conv_valid
 tcolscatter
 tscatter
 tcolexpand
@@ -273,6 +275,7 @@ if (AUTO_MODE)
     trowprod
     tscatter
     ttrans_3d
+    tload_conv_valid
     ttri
     tcvt
     tcmp
@@ -281,6 +284,7 @@ if (AUTO_MODE)
     textract
     ttrans
     ttrans_conv
+    tstore_conv_valid
     tci
     tquant
     texpands_mat

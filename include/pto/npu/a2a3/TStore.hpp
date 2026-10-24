@@ -11,6 +11,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #ifndef TSTORE_HPP
 #define TSTORE_HPP
 #include "common.hpp"
+#include <pto/common/pto_tile.hpp>
 
 namespace pto {
 
@@ -169,53 +170,353 @@ PTO_INTERNAL void CheckAcc2gm(GlobalData& dst, TileData& src)
         "The shape of src and dst must be greater than 0!");
 }
 
+// -----------------------------------------------------------------------------
+// ConvTile TSTORE: only the source valid box (anchored at the logical origin) is copied to GM; GM outside
+// the box is left untouched. DMA bursts move whole 32-byte blocks, so the valid C0 extent must stay the
+// full C0 block. Valid extents drive the loop counts / burst lengths, the declared tile extents provide
+// every L1 pitch, and the GlobalTensor strides provide every GM address.
+// -----------------------------------------------------------------------------
+template <typename GlobalData, typename TileData>
+PTO_INTERNAL void TStoreInstrL1ToGm(
+    typename GlobalData::DType* dst, __cbuf__ typename TileData::DType* src, uint16_t nBurst, uint16_t lenBurst,
+    uint16_t l1Gap, uint64_t gmGap)
+{
+    if (gmGap <= UINT16_MAX) {
+        copy_cbuf_to_gm(dst, src, (uint8_t)0, nBurst, lenBurst, l1Gap, static_cast<uint16_t>(gmGap));
+        return;
+    }
+    // Advance full-width addresses when the gap cannot be encoded by the DMA instruction.
+    constexpr uint32_t BLOCK_ELEMENTS = BLOCK_BYTE_SIZE / sizeof(typename TileData::DType);
+    for (uint16_t i = 0; i < nBurst; i++) {
+        copy_cbuf_to_gm(
+            dst + uint64_t(i) * (lenBurst + gmGap) * BLOCK_ELEMENTS,
+            src + uint64_t(i) * (lenBurst + l1Gap) * BLOCK_ELEMENTS, (uint8_t)0, 1, lenBurst, 0, 0);
+    }
+}
+
+template <typename GlobalData, typename TileData>
+PTO_INTERNAL void CheckConvTileDataStore(GlobalData& dst, TileData& src)
+{
+    static_assert(
+        std::is_same_v<typename TileData::DType, int8_t> || std::is_same_v<typename TileData::DType, uint8_t> ||
+            std::is_same_v<typename TileData::DType, int16_t> || std::is_same_v<typename TileData::DType, uint16_t> ||
+            std::is_same_v<typename TileData::DType, int32_t> || std::is_same_v<typename TileData::DType, uint32_t> ||
+            std::is_same_v<typename TileData::DType, half> || std::is_same_v<typename TileData::DType, bfloat16_t> ||
+            std::is_same_v<typename TileData::DType, float>,
+        "Fix: Data type must be int8_t/uint8_t/int16_t/uint16_t/int32_t/uint32_t/half/bfloat16_t/float!");
+    static_assert(TileData::Loc == pto::TileType::Mat, "Fix: Source TileType must be Mat!");
+    static_assert(
+        sizeof(typename TileData::DType) == sizeof(typename GlobalData::DType),
+        "Fix: Source dtype must be same with dst dtype!");
+
+    constexpr bool isSameLayout =
+        (GlobalData::layout == pto::Layout::NC1HWC0 && TileData::layout == pto::Layout::NC1HWC0) ||
+        (GlobalData::layout == pto::Layout::FRACTAL_Z && TileData::layout == pto::Layout::FRACTAL_Z) ||
+        (GlobalData::layout == pto::Layout::FRACTAL_Z_3D && TileData::layout == pto::Layout::FRACTAL_Z_3D) ||
+        (GlobalData::layout == pto::Layout::NDC1HWC0 && TileData::layout == pto::Layout::NDC1HWC0);
+    static_assert(
+        isSameLayout == true, "Fix: Src Dst layout must be NC1HWC0 or FRACTAL_Z or FRACTAL_Z_3D or NDC1HWC0!");
+
+    constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
+    if constexpr (GlobalData::layout == pto::Layout::FRACTAL_Z || GlobalData::layout == pto::Layout::FRACTAL_Z_3D) {
+        if constexpr (TileData::totalDimCount == 4) { // ConvTile layout is [C1HW,N/16,16,C0]
+            static_assert(
+                TileData::staticShape[2] == FRACTAL_NZ_ROW && TileData::staticShape[3] == c0ElemCount,
+                "Fix: The TileData last 2 dim must be static and satisfy [16, 32 / sizeof(DataType)]");
+            static_assert(
+                GlobalData::staticShape[3] == FRACTAL_NZ_ROW && GlobalData::staticShape[4] == c0ElemCount,
+                "Fix: The GlobalTensor last 2 dim must be static and satisfy [16, 32 / sizeof(DataType)]");
+        } else { // [C1,H,W,N,C0]
+            PTO_ASSERT(
+                src.GetShape(GlobalTensorDim::DIM_1) == dst.GetShape(GlobalTensorDim::DIM_1) &&
+                    src.GetShape(GlobalTensorDim::DIM_2) == dst.GetShape(GlobalTensorDim::DIM_2),
+                "Fix: layout is Fractal_Z, [srcH,srcW] && [dstH,dstW] should be same!");
+            PTO_ASSERT(dst.GetShape(GlobalTensorDim::DIM_3) <= UINT16_MAX, "Fix: max support dstN is UINT16_MAX!");
+        }
+    }
+}
+
+template <typename GlobalData, typename TileData>
+__tf__ PTO_INTERNAL void TStore5HDValid(
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
+    int64_t gStride1, int64_t gStride2, int srcC1, int srcH, int srcW, int vN, int vC1, int vH, int vW)
+{
+    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
+    constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
+    constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
+
+    PTO_ASSERT(vN > 0 && vC1 > 0 && vH > 0 && vW > 0, "Fix: ConvTile valid extents must be positive!");
+    PTO_ASSERT(
+        vW <= srcW && vH <= srcH && vC1 <= srcC1, "Fix: ConvTile valid W/H/C1 must not exceed the declared extent!");
+    PTO_ASSERT(
+        gStride1 >= int64_t(vH) * vW * c0ElemCount && gStride2 >= int64_t(vW) * c0ElemCount,
+        "Fix: destination stride is smaller than the valid H*W box!");
+
+    const int64_t gStride1Blocks = (gStride1 * elemBytes) >> SHIFT_BLOCK_BYTE;
+    const int64_t gStride2Blocks = (gStride2 * elemBytes) >> SHIFT_BLOCK_BYTE;
+    const int64_t declPlane = int64_t(srcH) * srcW;         // 32B blocks in one declared H*W plane
+    const int64_t validPlane = int64_t(vH) * vW;            // 32B blocks in one valid H*W plane
+    const int64_t declPlaneElems = declPlane * c0ElemCount; // elements in one declared H*W plane
+    const int64_t declNPitch = int64_t(srcC1) * declPlaneElems;
+
+    typename GlobalData::DType* dstAddrP = dst;
+    __cbuf__ typename TileData::DType* srcAddrP = srcAddr;
+    const bool fastPath = (vH == 1 || (vW == srcW && gStride2 == int64_t(vW) * c0ElemCount)) && vC1 <= 4095 &&
+                          validPlane <= UINT16_MAX && declPlane <= UINT16_MAX;
+    if (fastPath) {
+        const uint16_t nBurst = static_cast<uint16_t>(vC1);
+        const uint16_t lenBurst = static_cast<uint16_t>(validPlane);
+        const uint16_t l1Gap = static_cast<uint16_t>(declPlane - validPlane);
+        const uint64_t gmGap = static_cast<uint64_t>(gStride1Blocks - validPlane);
+        for (int n = 0; n < vN; ++n) {
+            TStoreInstrL1ToGm<GlobalData, TileData>(
+                dstAddrP + int64_t(n) * gStride0, srcAddrP + int64_t(n) * declNPitch, nBurst, lenBurst, l1Gap, gmGap);
+        }
+        return;
+    }
+
+    PTO_ASSERT(vH <= 4095 && vW <= UINT16_MAX && srcW <= UINT16_MAX, "Fix: valid H/W exceeds the DMA range!");
+    const uint16_t nBurst = static_cast<uint16_t>(vH);
+    const uint16_t lenBurst = static_cast<uint16_t>(vW);
+    const uint16_t l1Gap = static_cast<uint16_t>(srcW - vW);
+    const uint64_t gmGap = static_cast<uint64_t>(gStride2Blocks - vW);
+    for (int n = 0; n < vN; ++n) {
+        for (int c1 = 0; c1 < vC1; ++c1) {
+            TStoreInstrL1ToGm<GlobalData, TileData>(
+                dstAddrP + int64_t(n) * gStride0 + int64_t(c1) * gStride1,
+                srcAddrP + int64_t(n) * declNPitch + int64_t(c1) * declPlaneElems, nBurst, lenBurst, l1Gap, gmGap);
+        }
+    }
+}
+
+template <typename GlobalData, typename TileData>
+__tf__ PTO_INTERNAL void TStoreNDC1HWC0Valid(
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
+    int64_t gStride1, int64_t gStride2, int64_t gStride3, int srcD, int srcC1, int srcH, int srcW, int vN, int vD,
+    int vC1, int vH, int vW)
+{
+    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
+    constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
+    constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
+
+    PTO_ASSERT(vN > 0 && vD > 0 && vC1 > 0 && vH > 0 && vW > 0, "Fix: ConvTile valid extents must be positive!");
+    PTO_ASSERT(vW <= srcW && vH <= srcH && vD <= srcD && vC1 <= srcC1, "Fix: valid extent exceeds declared!");
+    PTO_ASSERT(
+        gStride2 >= int64_t(vH) * vW * c0ElemCount && gStride3 >= int64_t(vW) * c0ElemCount,
+        "Fix: destination stride is smaller than the valid H*W box!");
+
+    const int64_t gStride2Blocks = (gStride2 * elemBytes) >> SHIFT_BLOCK_BYTE;
+    const int64_t gStride3Blocks = (gStride3 * elemBytes) >> SHIFT_BLOCK_BYTE;
+    const int64_t declPlane = int64_t(srcH) * srcW;
+    const int64_t validPlane = int64_t(vH) * vW;
+    const int64_t declPlaneElems = declPlane * c0ElemCount;
+    const int64_t declDpitch = int64_t(srcC1) * declPlaneElems;
+    const int64_t declNPitch = int64_t(srcD) * declDpitch;
+
+    typename GlobalData::DType* dstAddrP = dst;
+    __cbuf__ typename TileData::DType* srcAddrP = srcAddr;
+    const bool fastPath = (vH == 1 || (vW == srcW && gStride3 == int64_t(vW) * c0ElemCount)) && vC1 <= 4095 &&
+                          validPlane <= UINT16_MAX && declPlane <= UINT16_MAX;
+    if (fastPath) {
+        const uint16_t nBurst = static_cast<uint16_t>(vC1);
+        const uint16_t lenBurst = static_cast<uint16_t>(validPlane);
+        const uint16_t l1Gap = static_cast<uint16_t>(declPlane - validPlane);
+        const uint64_t gmGap = static_cast<uint64_t>(gStride2Blocks - validPlane);
+        for (int n = 0; n < vN; ++n) {
+            for (int d = 0; d < vD; ++d) {
+                TStoreInstrL1ToGm<GlobalData, TileData>(
+                    dstAddrP + int64_t(n) * gStride0 + int64_t(d) * gStride1,
+                    srcAddrP + int64_t(n) * declNPitch + int64_t(d) * declDpitch, nBurst, lenBurst, l1Gap, gmGap);
+            }
+        }
+        return;
+    }
+
+    PTO_ASSERT(vH <= 4095 && vW <= UINT16_MAX && srcW <= UINT16_MAX, "Fix: valid H/W exceeds the DMA range!");
+    const uint16_t nBurst = static_cast<uint16_t>(vH);
+    const uint16_t lenBurst = static_cast<uint16_t>(vW);
+    const uint16_t l1Gap = static_cast<uint16_t>(srcW - vW);
+    const uint64_t gmGap = static_cast<uint64_t>(gStride3Blocks - vW);
+    for (int n = 0; n < vN; ++n) {
+        for (int d = 0; d < vD; ++d) {
+            for (int c1 = 0; c1 < vC1; ++c1) {
+                TStoreInstrL1ToGm<GlobalData, TileData>(
+                    dstAddrP + int64_t(n) * gStride0 + int64_t(d) * gStride1 + int64_t(c1) * gStride2,
+                    srcAddrP + int64_t(n) * declNPitch + int64_t(d) * declDpitch + int64_t(c1) * declPlaneElems, nBurst,
+                    lenBurst, l1Gap, gmGap);
+            }
+        }
+    }
+}
+
+template <typename GlobalData, typename TileData>
+__tf__ PTO_INTERNAL void TStoreFractalZ4DValid(
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride1,
+    int64_t gStride2, int srcD1, int srcD2, int srcD3, int v0, int v1, int v2, int v3)
+{
+    constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
+    constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
+    static_assert(
+        TileData::staticShape[2] == FRACTAL_NZ_ROW && TileData::staticShape[3] == c0ElemCount,
+        "Fix: The TileData last 2 dim must be static and satisfy [16, 32 / sizeof(DataType)]");
+    static_assert(
+        GlobalData::staticShape[3] == FRACTAL_NZ_ROW && GlobalData::staticShape[4] == c0ElemCount,
+        "Fix: The GlobalTensor last 2 dim must be static and satisfy [16, 32 / sizeof(DataType)]");
+
+    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
+
+    PTO_ASSERT(v0 > 0 && v1 > 0 && v2 > 0, "Fix: ConvTile valid extents must be positive!");
+    PTO_ASSERT(v1 <= srcD1 && v2 <= srcD2, "Fix: ConvTile valid N1/N0 must not exceed the declared extent!");
+    PTO_ASSERT(v3 == srcD3 && srcD3 == int(c0ElemCount), "Fix: valid C0 must stay the full 32-byte C0 block!");
+    PTO_ASSERT(v1 <= UINT16_MAX && v2 <= UINT16_MAX, "Fix: valid N1/N0 exceeds the DMA range!");
+    PTO_ASSERT(gStride2 >= int64_t(v2) * c0ElemCount, "Fix: destination stride is smaller than the valid N0 box!");
+
+    const int64_t gStride2Blocks = (gStride2 * elemBytes) >> SHIFT_BLOCK_BYTE;
+    const int64_t declPlaneElems = int64_t(srcD1) * srcD2 * c0ElemCount;
+    const uint16_t nBurst = static_cast<uint16_t>(v1);
+    const uint16_t lenBurst = static_cast<uint16_t>(v2);
+    const uint16_t l1Gap = static_cast<uint16_t>(srcD2 - v2);
+    const uint64_t gmGap = static_cast<uint64_t>(gStride2Blocks - v2);
+
+    for (int i0 = 0; i0 < v0; ++i0) {
+        TStoreInstrL1ToGm<GlobalData, TileData>(
+            dst + int64_t(i0) * gStride1, srcAddr + int64_t(i0) * declPlaneElems, nBurst, lenBurst, l1Gap, gmGap);
+    }
+}
+
+template <typename GlobalData, typename TileData>
+__tf__ PTO_INTERNAL void TStoreFractalZ5DValid(
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
+    int64_t gStride1, int64_t gStride2, int srcC1, int srcH, int srcW, int srcN, int srcC0, int vC1, int vH, int vW,
+    int vN, int vC0)
+{
+    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
+    constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
+    constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
+
+    PTO_ASSERT(vC1 > 0 && vH > 0 && vW > 0 && vN > 0, "Fix: ConvTile valid extents must be positive!");
+    PTO_ASSERT(vC1 <= srcC1 && vH <= srcH && vW <= srcW && vN <= srcN, "Fix: ConvTile valid extents exceed declared!");
+    PTO_ASSERT(vC0 == srcC0 && srcC0 == int(c0ElemCount), "Fix: valid C0 must stay the full 32-byte C0 block!");
+    PTO_ASSERT(vW <= UINT16_MAX && vN <= UINT16_MAX && srcN <= UINT16_MAX, "Fix: valid W/N exceeds the DMA range!");
+    PTO_ASSERT(gStride2 >= int64_t(vN) * c0ElemCount, "Fix: destination stride is smaller than the valid N box!");
+
+    const int64_t gStride2Blocks = (gStride2 * elemBytes) >> SHIFT_BLOCK_BYTE;
+    const int64_t declHPitch = int64_t(srcW) * srcN * srcC0;
+    const uint16_t lenBurst = static_cast<uint16_t>(vN);
+    const uint16_t l1Gap = static_cast<uint16_t>(srcN - vN);
+    const uint64_t gmGap = static_cast<uint64_t>(gStride2Blocks - vN);
+
+    constexpr int maxBurst = 4095;
+    for (int c1 = 0; c1 < vC1; ++c1) {
+        for (int h = 0; h < vH; ++h) {
+            const int64_t dstBase = int64_t(c1) * gStride0 + int64_t(h) * gStride1;
+            const int64_t srcBase = (int64_t(c1) * srcH + h) * declHPitch;
+            for (int w0 = 0; w0 < vW; w0 += maxBurst) {
+                const int wCount = (vW - w0 > maxBurst) ? maxBurst : (vW - w0);
+                TStoreInstrL1ToGm<GlobalData, TileData>(
+                    dst + dstBase + int64_t(w0) * gStride2, srcAddr + srcBase + int64_t(w0) * srcN * srcC0,
+                    static_cast<uint16_t>(wCount), lenBurst, l1Gap, gmGap);
+            }
+        }
+    }
+}
+
+template <typename GlobalData, typename TileData, AtomicType atomicType = AtomicType::AtomicNone>
+PTO_INTERNAL void TSTORE_CONVTILE_IMPL(GlobalData& dst, TileData& src)
+{
+    CheckConvTileDataStore<GlobalData, TileData>(dst, src);
+    constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
+
+    if constexpr (atomicType == AtomicType::AtomicAdd) {
+        SetAtomicAdd<typename GlobalData::DType>();
+    }
+    if constexpr (GlobalData::layout == pto::Layout::NC1HWC0) {
+        if constexpr (TileData::totalDimCount >= 5) {
+            PTO_ASSERT(src.GetValidShape(4) == int(c0ElemCount), "Fix: valid C0 must stay the full 32-byte C0 block!");
+        }
+        TStore5HDValid<GlobalData, TileData>(
+            dst.data(), src.data(), dst.GetStride(0), dst.GetStride(1), dst.GetStride(2), src.GetShape(1),
+            src.GetShape(2), src.GetShape(3), src.GetValidShape(0), src.GetValidShape(1), src.GetValidShape(2),
+            src.GetValidShape(3));
+    } else if constexpr (
+        GlobalData::layout == pto::Layout::FRACTAL_Z || GlobalData::layout == pto::Layout::FRACTAL_Z_3D) {
+        if constexpr (TileData::totalDimCount == 4) {
+            TStoreFractalZ4DValid<GlobalData, TileData>(
+                dst.data(), src.data(), dst.GetStride(1), dst.GetStride(2), src.GetShape(1), src.GetShape(2),
+                src.GetShape(3), src.GetValidShape(0), src.GetValidShape(1), src.GetValidShape(2),
+                src.GetValidShape(3));
+        } else {
+            TStoreFractalZ5DValid<GlobalData, TileData>(
+                dst.data(), src.data(), dst.GetStride(0), dst.GetStride(1), dst.GetStride(2), src.GetShape(0),
+                src.GetShape(1), src.GetShape(2), src.GetShape(3), src.GetShape(4), src.GetValidShape(0),
+                src.GetValidShape(1), src.GetValidShape(2), src.GetValidShape(3), src.GetValidShape(4));
+        }
+    } else {
+        if constexpr (TileData::totalDimCount >= 6) {
+            PTO_ASSERT(src.GetValidShape(5) == int(c0ElemCount), "Fix: valid C0 must stay the full 32-byte C0 block!");
+        }
+        TStoreNDC1HWC0Valid<GlobalData, TileData>(
+            dst.data(), src.data(), dst.GetStride(0), dst.GetStride(1), dst.GetStride(2), dst.GetStride(3),
+            src.GetShape(1), src.GetShape(2), src.GetShape(3), src.GetShape(4), src.GetValidShape(0),
+            src.GetValidShape(1), src.GetValidShape(2), src.GetValidShape(3), src.GetValidShape(4));
+    }
+    if constexpr (atomicType == AtomicType::AtomicAdd) {
+        SetAtomicNone();
+    }
+}
+
 template <
     typename TileData, typename GlobalData, AtomicType currentAtomicType = AtomicType::AtomicNone,
     STPhase Phase = STPhase::Unspecified, TStoreL2Hint l2Control = TStoreL2Hint::NormalFirstVictim>
 PTO_INTERNAL void TSTORE_IMPL(GlobalData& dst, TileData& src)
 {
-    static_assert(
-        TileData::Loc == TileType::Vec || TileData::Loc == TileType::Acc || TileData::Loc == TileType::Mat,
-        "Source TileType only support Vec/Acc/Mat!");
-    PTO_ASSERT(
-        dst.GetShape(GlobalTensorDim::DIM_0) > 0 && dst.GetShape(GlobalTensorDim::DIM_1) > 0 &&
-            dst.GetShape(GlobalTensorDim::DIM_2) > 0 && dst.GetShape(GlobalTensorDim::DIM_3) > 0 &&
-            dst.GetShape(GlobalTensorDim::DIM_4) > 0 && src.GetValidRow() > 0 && src.GetValidCol() > 0,
-        "The shape of src and dst must be greater than 0!");
-    if constexpr (currentAtomicType == AtomicType::AtomicAdd) {
-        SetAtomicAdd<typename GlobalData::DType>();
-    }
-    if constexpr (TileData::Loc == TileType::Vec) {
-        CheckStaticForVecAndMat<TileData, GlobalData>();
-        TStore<GlobalData, TileData, l2Control>(
-            dst.data(), src.data(), dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
-            dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
-            dst.GetShape(GlobalTensorDim::DIM_4), dst.GetStride(GlobalTensorDim::DIM_0),
-            dst.GetStride(GlobalTensorDim::DIM_1), dst.GetStride(GlobalTensorDim::DIM_2),
-            dst.GetStride(GlobalTensorDim::DIM_3), dst.GetStride(GlobalTensorDim::DIM_4), src.GetValidRow(),
-            src.GetValidCol());
-    } else if constexpr (TileData::Loc == TileType::Acc) {
-        CheckAcc2gm<TileData, GlobalData, false>(dst, src);
-        constexpr QuantMode_t quantMode = GetCastPreQuantMode<typename TileData::DType, typename GlobalData::DType>();
-        TStoreAcc<GlobalData, TileData, quantMode, ReluPreMode::NoRelu, Phase>(
-            dst.data(), src.data(), dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
-            dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
-            dst.GetShape(GlobalTensorDim::DIM_4), dst.GetStride(GlobalTensorDim::DIM_0),
-            dst.GetStride(GlobalTensorDim::DIM_1), dst.GetStride(GlobalTensorDim::DIM_2),
-            dst.GetStride(GlobalTensorDim::DIM_3), dst.GetStride(GlobalTensorDim::DIM_4), src.GetValidRow(),
-            src.GetValidCol());
-    } else if constexpr (TileData::Loc == TileType::Mat) {
-        CheckStaticForVecAndMat<TileData, GlobalData>();
-        TStoreMat<GlobalData, TileData>(
-            dst.data(), src.data(), dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
-            dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
-            dst.GetShape(GlobalTensorDim::DIM_4), dst.GetStride(GlobalTensorDim::DIM_0),
-            dst.GetStride(GlobalTensorDim::DIM_1), dst.GetStride(GlobalTensorDim::DIM_2),
-            dst.GetStride(GlobalTensorDim::DIM_3), dst.GetStride(GlobalTensorDim::DIM_4), src.GetValidRow(),
-            src.GetValidCol());
-    }
-    if constexpr (currentAtomicType == AtomicType::AtomicAdd) {
-        SetAtomicNone();
+    if constexpr (is_conv_tile_v<TileData>) {
+        TSTORE_CONVTILE_IMPL<GlobalData, TileData, currentAtomicType>(dst, src);
+    } else {
+        static_assert(
+            TileData::Loc == TileType::Vec || TileData::Loc == TileType::Acc || TileData::Loc == TileType::Mat,
+            "Source TileType only support Vec/Acc/Mat!");
+        PTO_ASSERT(
+            dst.GetShape(GlobalTensorDim::DIM_0) > 0 && dst.GetShape(GlobalTensorDim::DIM_1) > 0 &&
+                dst.GetShape(GlobalTensorDim::DIM_2) > 0 && dst.GetShape(GlobalTensorDim::DIM_3) > 0 &&
+                dst.GetShape(GlobalTensorDim::DIM_4) > 0 && src.GetValidRow() > 0 && src.GetValidCol() > 0,
+            "The shape of src and dst must be greater than 0!");
+        if constexpr (currentAtomicType == AtomicType::AtomicAdd) {
+            SetAtomicAdd<typename GlobalData::DType>();
+        }
+        if constexpr (TileData::Loc == TileType::Vec) {
+            CheckStaticForVecAndMat<TileData, GlobalData>();
+            TStore<GlobalData, TileData, l2Control>(
+                dst.data(), src.data(), dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
+                dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
+                dst.GetShape(GlobalTensorDim::DIM_4), dst.GetStride(GlobalTensorDim::DIM_0),
+                dst.GetStride(GlobalTensorDim::DIM_1), dst.GetStride(GlobalTensorDim::DIM_2),
+                dst.GetStride(GlobalTensorDim::DIM_3), dst.GetStride(GlobalTensorDim::DIM_4), src.GetValidRow(),
+                src.GetValidCol());
+        } else if constexpr (TileData::Loc == TileType::Acc) {
+            CheckAcc2gm<TileData, GlobalData, false>(dst, src);
+            constexpr QuantMode_t quantMode =
+                GetCastPreQuantMode<typename TileData::DType, typename GlobalData::DType>();
+            TStoreAcc<GlobalData, TileData, quantMode, ReluPreMode::NoRelu, Phase>(
+                dst.data(), src.data(), dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
+                dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
+                dst.GetShape(GlobalTensorDim::DIM_4), dst.GetStride(GlobalTensorDim::DIM_0),
+                dst.GetStride(GlobalTensorDim::DIM_1), dst.GetStride(GlobalTensorDim::DIM_2),
+                dst.GetStride(GlobalTensorDim::DIM_3), dst.GetStride(GlobalTensorDim::DIM_4), src.GetValidRow(),
+                src.GetValidCol());
+        } else if constexpr (TileData::Loc == TileType::Mat) {
+            CheckStaticForVecAndMat<TileData, GlobalData>();
+            TStoreMat<GlobalData, TileData>(
+                dst.data(), src.data(), dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
+                dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
+                dst.GetShape(GlobalTensorDim::DIM_4), dst.GetStride(GlobalTensorDim::DIM_0),
+                dst.GetStride(GlobalTensorDim::DIM_1), dst.GetStride(GlobalTensorDim::DIM_2),
+                dst.GetStride(GlobalTensorDim::DIM_3), dst.GetStride(GlobalTensorDim::DIM_4), src.GetValidRow(),
+                src.GetValidCol());
+        }
+        if constexpr (currentAtomicType == AtomicType::AtomicAdd) {
+            SetAtomicNone();
+        }
     }
 }
 

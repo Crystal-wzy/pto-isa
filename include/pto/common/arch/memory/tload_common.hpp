@@ -468,6 +468,18 @@ template <typename TileData, typename GlobalData, TLoadL2Hint l2Control = TLoadL
 PTO_INTERNAL void TLOAD_CONVTILE_IMPL(TileData& dst, GlobalData& src)
 {
     CheckConvTileData<TileData, GlobalData>(dst, src);
+#if defined(PTO_NPU_ARCH_A2A3)
+    constexpr ConvTileValidStaticKind validKind = GetConvTileValidStaticKind<TileData>();
+    if constexpr (validKind == ConvTileValidStaticKind::Cropped) {
+        TLOAD_CONVTILE_VALID_IMPL<TileData, GlobalData>(dst, TLoadSrcAddrWithL2Hint<l2Control>(src.data()), src);
+        return;
+    } else if constexpr (validKind == ConvTileValidStaticKind::Runtime) {
+        if (!ConvTileValidEqualsDeclared(dst)) {
+            TLOAD_CONVTILE_VALID_IMPL<TileData, GlobalData>(dst, TLoadSrcAddrWithL2Hint<l2Control>(src.data()), src);
+            return;
+        }
+    }
+#endif
     if constexpr (GlobalData::layout == pto::Layout::NC1HWC0) {
         TLoad5HD<TileData, GlobalData>(
             dst.data(), TLoadSrcAddrWithL2Hint<l2Control>(src.data()), src.GetShape(0), src.GetShape(1),

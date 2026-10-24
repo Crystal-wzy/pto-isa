@@ -324,33 +324,204 @@ PTO_INTERNAL void TLOAD_TILE_IMPL(TileData& dst, GlobalData& src)
     FillTLoadPadding<TileData, GlobalData>(dst, validRow, validCol);
 }
 
+// ConvTile TLOAD copies only the destination valid box. The box is always anchored at the logical origin,
+// and everything outside it is left untouched. Declared Shape still provides every stride/pitch: (row, col)
+// is packed with the declared dims so GetConvTileElementOffset/MapTileIndicesToGlobalOffset keep their
+// existing meaning, while the loop bounds come from GetValidShape.
+template <typename ConTile>
+PTO_INLINE void CheckConvTileValidShape(ConTile& dst)
+{
+    for (int i = 0; i < ConTile::totalDimCount; ++i) {
+        assert(dst.GetShape(i) >= dst.GetValidShape(i) && "ConvTile valid extent must not exceed the declared extent!");
+    }
+}
+
+// The destination tile and the source GlobalTensor are packed with their own declared shapes: a cropped
+// GlobalTensor declaration changes the source packing without touching the tile placement.
+template <typename ConTile, typename GlobalData>
+PTO_INLINE void TLoadConvTileElement(
+    ConTile& dst, GlobalData& src, int64_t dstRow, int64_t dstCol, int64_t srcRow, int64_t srcCol,
+    const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& srcShapes,
+    const std::vector<int64_t>& srcStrides)
+{
+    const size_t srcOffset = MapTileIndicesToGlobalOffset<GlobalData>(srcRow, srcCol, srcShapes, srcStrides);
+    dst.SetElement(GetConvTileElementOffset<ConTile>(dstRow, dstCol, tile_shapes), src.GetElement(srcOffset));
+}
+
+template <typename ConTile, typename GlobalData>
+PTO_INLINE void TLoadConvTileNC1HWC0(
+    ConTile& dst, GlobalData& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& srcShapes,
+    const std::vector<int64_t>& srcStrides)
+{
+    using T = typename ConTile::DType;
+    constexpr int64_t c0 = static_cast<int64_t>(GetC0ElemCount<T>());
+
+    const int64_t dH = dst.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t dW = dst.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t sH = src.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t sW = src.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t sC0 = src.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t vN = dst.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t vC1 = dst.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t vH = dst.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t vW = dst.GetValidShape(GlobalTensorDim::DIM_3);
+    int64_t vC0 = c0;
+    if constexpr (ConTile::totalDimCount >= 5) {
+        vC0 = dst.GetValidShape(GlobalTensorDim::DIM_4);
+    }
+    assert(vC0 <= c0 && "ConvTile valid C0 must not exceed the 32-byte C0 block!");
+    assert(sC0 == c0 && "NC1HWC0 GlobalTensor C0 must equal the 32-byte C0 block!");
+
+    for (int64_t n = 0; n < vN; ++n) {
+        for (int64_t c1 = 0; c1 < vC1; ++c1) {
+            for (int64_t h = 0; h < vH; ++h) {
+                for (int64_t w = 0; w < vW; ++w) {
+                    const int64_t dstRow = (n * dH + h) * dW + w;
+                    const int64_t srcRow = (n * sH + h) * sW + w;
+                    for (int64_t c = 0; c < vC0; ++c) {
+                        TLoadConvTileElement<ConTile, GlobalData>(
+                            dst, src, dstRow, c1 * c0 + c, srcRow, c1 * sC0 + c, tile_shapes, srcShapes, srcStrides);
+                    }
+                }
+            }
+        }
+    }
+}
+
+template <typename ConTile, typename GlobalData>
+PTO_INLINE void TLoadConvTileNDC1HWC0(
+    ConTile& dst, GlobalData& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& srcShapes,
+    const std::vector<int64_t>& srcStrides)
+{
+    using T = typename ConTile::DType;
+    constexpr int64_t c0 = static_cast<int64_t>(GetC0ElemCount<T>());
+
+    const int64_t dC1 = dst.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t dH = dst.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t dW = dst.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t sC1 = src.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t sH = src.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t sW = src.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t vN = dst.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t vD = dst.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t vC1 = dst.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t vH = dst.GetValidShape(GlobalTensorDim::DIM_3);
+    const int64_t vW = dst.GetValidShape(GlobalTensorDim::DIM_4);
+    int64_t vC0 = c0;
+    if constexpr (ConTile::totalDimCount >= 6) {
+        vC0 = dst.GetValidShape(5);
+    }
+    assert(vC0 <= c0 && "ConvTile valid C0 must not exceed the 32-byte C0 block!");
+
+    for (int64_t n = 0; n < vN; ++n) {
+        for (int64_t d = 0; d < vD; ++d) {
+            for (int64_t c1 = 0; c1 < vC1; ++c1) {
+                for (int64_t h = 0; h < vH; ++h) {
+                    for (int64_t w = 0; w < vW; ++w) {
+                        const int64_t dstRow = (n * dH + h) * dW + w;
+                        const int64_t srcRow = (n * sH + h) * sW + w;
+                        const int64_t dstColBase = (d * dC1 + c1) * c0;
+                        const int64_t srcColBase = (d * sC1 + c1) * c0;
+                        for (int64_t c = 0; c < vC0; ++c) {
+                            TLoadConvTileElement<ConTile, GlobalData>(
+                                dst, src, dstRow, dstColBase + c, srcRow, srcColBase + c, tile_shapes, srcShapes,
+                                srcStrides);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+template <typename ConTile, typename GlobalData>
+PTO_INLINE void TLoadConvTileFractalZ4D(
+    ConTile& dst, GlobalData& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& srcShapes,
+    const std::vector<int64_t>& srcStrides)
+{
+    const int64_t d1 = dst.GetShape(GlobalTensorDim::DIM_1);
+    const int64_t d3 = dst.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t v0 = dst.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t v1 = dst.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t v2 = dst.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t v3 = dst.GetValidShape(GlobalTensorDim::DIM_3);
+
+    for (int64_t i0 = 0; i0 < v0; ++i0) {
+        for (int64_t i1 = 0; i1 < v1; ++i1) {
+            const int64_t rowBase = (i0 * d1 + i1) * d3;
+            for (int64_t i2 = 0; i2 < v2; ++i2) {
+                for (int64_t i3 = 0; i3 < v3; ++i3) {
+                    // The FRACTAL_Z (row, col) packing is shared by the tile and the two supported source
+                    // views ([C1,H,W,N,C0] with N1 == 1, or the flat [1,C1HW,N1,16,C0] view).
+                    TLoadConvTileElement<ConTile, GlobalData>(
+                        dst, src, rowBase + i3, i2, rowBase + i3, i2, tile_shapes, srcShapes, srcStrides);
+                }
+            }
+        }
+    }
+}
+
+template <typename ConTile, typename GlobalData>
+PTO_INLINE void TLoadConvTileFractalZ5D(
+    ConTile& dst, GlobalData& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& srcShapes,
+    const std::vector<int64_t>& srcStrides)
+{
+    const int64_t dH = dst.GetShape(GlobalTensorDim::DIM_1);
+    const int64_t dW = dst.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t dC0 = dst.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t sH = src.GetShape(GlobalTensorDim::DIM_1);
+    const int64_t sW = src.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t sC0 = src.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t vC1 = dst.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t vH = dst.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t vW = dst.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t vN = dst.GetValidShape(GlobalTensorDim::DIM_3);
+    const int64_t vC0 = dst.GetValidShape(GlobalTensorDim::DIM_4);
+
+    for (int64_t c1 = 0; c1 < vC1; ++c1) {
+        for (int64_t h = 0; h < vH; ++h) {
+            for (int64_t w = 0; w < vW; ++w) {
+                const int64_t dstRowBase = ((c1 * dH + h) * dW + w) * dC0;
+                const int64_t srcRowBase = ((c1 * sH + h) * sW + w) * sC0;
+                for (int64_t n = 0; n < vN; ++n) {
+                    for (int64_t c = 0; c < vC0; ++c) {
+                        TLoadConvTileElement<ConTile, GlobalData>(
+                            dst, src, dstRowBase + c, n, srcRowBase + c, n, tile_shapes, srcShapes, srcStrides);
+                    }
+                }
+            }
+        }
+    }
+}
+
 template <TLoadL2Hint l2Control = TLoadL2Hint::NormalFirstVictim, typename ConTile, typename GlobalData>
 __tf__ PTO_INLINE void TLOAD_CONVTILE_IMPL(ConTile& dst, GlobalData& src)
 {
     CheckConvTileData<ConTile, GlobalData>(dst, src);
-
-    using T = typename ConTile::DType;
-    const size_t validRow = CalculateValidRowFromTile(dst);
-    const size_t validCol = CalculateValidColFromTile(dst);
+    CheckConvTileValidShape(dst);
 
     const std::vector<int64_t> tile_shapes = {
         dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
         dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
         dst.GetShape(GlobalTensorDim::DIM_4)};
-
-    const std::vector<int64_t> shapes = {
+    const std::vector<int64_t> srcShapes = {
         src.GetShape(GlobalTensorDim::DIM_0), src.GetShape(GlobalTensorDim::DIM_1),
         src.GetShape(GlobalTensorDim::DIM_2), src.GetShape(GlobalTensorDim::DIM_3),
         src.GetShape(GlobalTensorDim::DIM_4)};
-    const std::vector<int64_t> strides = {
+    const std::vector<int64_t> srcStrides = {
         src.GetStride(GlobalTensorDim::DIM_0), src.GetStride(GlobalTensorDim::DIM_1),
         src.GetStride(GlobalTensorDim::DIM_2), src.GetStride(GlobalTensorDim::DIM_3),
         src.GetStride(GlobalTensorDim::DIM_4)};
 
-    for (size_t row = 0; row < validRow; ++row) {
-        for (size_t col = 0; col < validCol; ++col) {
-            const size_t srcOffset = MapTileIndicesToGlobalOffset<GlobalData>(row, col, shapes, strides);
-            dst.SetElement(GetConvTileElementOffset<ConTile>(row, col, tile_shapes), src.GetElement(srcOffset));
+    if constexpr (GlobalData::layout == pto::Layout::NC1HWC0) {
+        TLoadConvTileNC1HWC0<ConTile, GlobalData>(dst, src, tile_shapes, srcShapes, srcStrides);
+    } else if constexpr (GlobalData::layout == pto::Layout::NDC1HWC0) {
+        TLoadConvTileNDC1HWC0<ConTile, GlobalData>(dst, src, tile_shapes, srcShapes, srcStrides);
+    } else if constexpr (GlobalData::layout == pto::Layout::FRACTAL_Z) {
+        if constexpr (ConTile::totalDimCount == 4) {
+            TLoadConvTileFractalZ4D<ConTile, GlobalData>(dst, src, tile_shapes, srcShapes, srcStrides);
+        } else {
+            TLoadConvTileFractalZ5D<ConTile, GlobalData>(dst, src, tile_shapes, srcShapes, srcStrides);
         }
     }
 }

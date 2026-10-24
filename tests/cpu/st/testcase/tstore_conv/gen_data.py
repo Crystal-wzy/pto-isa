@@ -24,17 +24,17 @@ def get_c0_size(data_type):
     return BLOCK_SIZE_BYTES // elem_size
 
 
-def gen_golden_data(data_type, whole_shape, actual_shape):
+def gen_golden_data(data_type, whole_shape, actual_shape, pad_value=0):
     """Generates input and golden data for a single case.
 
     whole_shape and actual_shape are full element tuples INCLUDING C0, e.g.
     NDC1HWC0 -> (N, D, C1, H, W, C0) 6D, NC1HWC0 -> (N, C1, H, W, C0) 5D.
     For static cases actual_shape == whole_shape and the golden is an identity
-    copy of the input. For dynamic cases the golden keeps zeros outside the
+    copy of the input. For dynamic cases the golden keeps pad_value outside the
     leading [actual_shape] sub-block.
     """
     input_arr = np.random.randint(-5, 5, size=whole_shape).astype(data_type)
-    output_arr = np.zeros(shape=whole_shape, dtype=data_type)
+    output_arr = np.full(whole_shape, pad_value, dtype=data_type)
 
     slice_window = tuple(slice(0, a) for a in actual_shape)
     output_arr[slice_window] = input_arr[slice_window]
@@ -44,13 +44,15 @@ def gen_golden_data(data_type, whole_shape, actual_shape):
 
 
 def gen_cases(case_list):
-    """Generates input/golden data for (case_name, data_type, whole_shape, actual_shape) cases."""
-    for i, (case_name, data_type, whole_shape, actual_shape) in enumerate(case_list):
+    """Generates input/golden data for (case_name, data_type, whole_shape, actual_shape[, pad_value]) cases."""
+    for i, case in enumerate(case_list):
+        case_name, data_type, whole_shape, actual_shape = case[:4]
+        pad_value = case[4] if len(case) > 4 else 0
         np.random.seed(19 + i)
         if not os.path.exists(case_name):
             os.makedirs(case_name)
         os.chdir(case_name)
-        gen_golden_data(data_type, whole_shape, actual_shape)
+        gen_golden_data(data_type, whole_shape, actual_shape, pad_value)
         os.chdir("..")
 
 
@@ -79,5 +81,34 @@ if __name__ == "__main__":
         ("TStoreConvTest.NDC1HWC0_Dyn4", np.float32, (4, 3, 2, 4, 8, c0_float), (3, 2, 2, 4, 8, c0_float)),
         # Unaligned size with dynamic tile dim N: N=3 < whole N=4, D=3, C1=3, H=3, W=5
         ("TStoreConvTest.NDC1HWC0_Dyn5", np.float32, (4, 3, 3, 3, 5, c0_float), (3, 3, 3, 3, 5, c0_float)),
+        # ValidShape cases: only the valid box is written; GM outside it keeps the sentinel.
+        (
+            "TStoreConvTest.NC1HWC0_valid_static",
+            np.float32,
+            (2, 3, 4, 5, c0_float),
+            (1, 2, 3, 4, c0_float),
+            -7,
+        ),
+        (
+            "TStoreConvTest.NC1HWC0_valid_dynamic",
+            np.int32,
+            (2, 3, 4, 5, c0_int32),
+            (1, 2, 3, 4, c0_int32),
+            -7,
+        ),
+        (
+            "TStoreConvTest.NDC1HWC0_valid_static",
+            np.float32,
+            (2, 3, 2, 4, 5, c0_float),
+            (1, 2, 1, 3, 4, c0_float),
+            -7,
+        ),
+        (
+            "TStoreConvTest.NDC1HWC0_valid_dynamic",
+            np.int32,
+            (2, 3, 2, 4, 5, c0_int32),
+            (1, 2, 1, 3, 4, c0_int32),
+            -7,
+        ),
     ]
     gen_cases(case_list)
