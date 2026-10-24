@@ -59,17 +59,18 @@ PTO_INTERNAL bool BuildAsyncSession(__gm__ uint8_t* workspace, AsyncSession& ses
         return false;
     }
     __gm__ urma::UrmaInfo* info = reinterpret_cast<__gm__ urma::UrmaInfo*>(workspace);
-    if (info->layout != urma::UrmaLayout::SHARED_POOL) {
-        session.valid = true;
-        return session.valid;
-    }
     const uint32_t perCore = info->jettiesPerCore;
     if (perCore == 0U || perCore > urma::kUrmaMaxJettiesPerCore) {
         return false;
     }
-    session.qpIdxBase = static_cast<uint32_t>(get_block_idx()) * perCore;
+    session.qpIdxBase = 0;
     session.cfg.urma.qpCount = perCore;
-    session.valid = (session.qpIdxBase + perCore <= urma::detail::UrmaJettyIdxBound(info));
+    const uint32_t block = static_cast<uint32_t>(get_block_idx());
+    const uint32_t bound = urma::detail::UrmaJettyIdxBound(info);
+    session.valid = (perCore <= bound) && (block <= (bound - perCore) / perCore);
+    if (session.valid) {
+        session.qpIdxBase = block * perCore;
+    }
     return session.valid;
 }
 
@@ -140,6 +141,9 @@ PTO_INTERNAL bool UrmaEventComplete(const AsyncEvent& event, const AsyncSession&
 
 PTO_INTERNAL bool AsyncEvent::Wait(const AsyncSession& session) const
 {
+    if (postFailed) {
+        return false;
+    }
     if (handle == 0) {
         return true;
     }
@@ -161,6 +165,9 @@ PTO_INTERNAL bool AsyncEvent::Wait(const AsyncSession& session) const
 
 PTO_INTERNAL bool AsyncEvent::Test(const AsyncSession& session) const
 {
+    if (postFailed) {
+        return false;
+    }
     if (handle == 0) {
         return true;
     }

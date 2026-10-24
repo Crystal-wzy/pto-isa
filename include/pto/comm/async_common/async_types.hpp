@@ -139,6 +139,7 @@ struct UrmaRuntimeContext {
     // physical submissions so Jetty selection keeps rotating.
     uint32_t batchLogicalWqeCount;
     uint32_t batchPeer;
+    uint32_t railCycleCursor;
 };
 
 } // namespace detail

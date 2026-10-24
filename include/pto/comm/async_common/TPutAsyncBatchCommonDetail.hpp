@@ -20,6 +20,13 @@ namespace pto {
 namespace comm {
 namespace detail {
 
+PTO_INTERNAL void DiscardPendingUrmaBatch(const AsyncSession& session)
+{
+    const uint32_t railCycleCursor = session.rt.urma.railCycleCursor;
+    session.rt.urma = {};
+    session.rt.urma.railCycleCursor = railCycleCursor;
+}
+
 PTO_INTERNAL void DiscardPendingAsyncPutBatch(const AsyncSession& session)
 {
     if (session.engine == DmaEngine::SDMA) {
@@ -28,7 +35,7 @@ PTO_INTERNAL void DiscardPendingAsyncPutBatch(const AsyncSession& session)
         return;
     }
     if (session.engine == DmaEngine::URMA) {
-        session.rt.urma = {};
+        DiscardPendingUrmaBatch(session);
         return;
     }
     // Any other engine (RDMA) keeps no staged batch state, and session.rt holds

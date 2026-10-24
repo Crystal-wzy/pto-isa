@@ -62,7 +62,7 @@ PTO_INTERNAL AsyncEvent TPUT_ASYNC_NOTIFY_URMA(
         reinterpret_cast<__gm__ uint8_t*>(dstGlobalData.data()),
         reinterpret_cast<__gm__ uint8_t*>(srcGlobalData.data()), transferSize,
         reinterpret_cast<__gm__ int32_t*>(dstSignalData.data()), signalValue, notifyOp, session, peer);
-    return AsyncEvent(result.handle, DmaEngine::URMA, result.targetCqe);
+    return urma::MakeUrmaNotifyEvent(result);
 }
 #endif
 

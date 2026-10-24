@@ -554,7 +554,12 @@ struct UrmaTestContext {
     {
         CommMpiBarrier();
         if (comm) {
-            HcclCommDestroy(comm);
+            const HcclResult destroyed = HcclCommDestroy(comm);
+            if (destroyed != HCCL_SUCCESS) {
+                std::cerr << "[ERROR] HcclCommDestroy failed: " << static_cast<int>(destroyed)
+                          << " -- the communicator is still alive, so the next one in this process will fail to init"
+                          << std::endl;
+            }
             comm = nullptr;
         }
         notifyDeviceCtx = nullptr;

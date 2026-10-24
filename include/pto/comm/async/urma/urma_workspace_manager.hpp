@@ -15,7 +15,9 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #error "urma_workspace_manager.hpp is a host-only header and cannot be included in device code."
 #endif
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <limits>
@@ -87,9 +89,14 @@ public:
         if (initialized_) {
             return true;
         }
-        uint32_t resolvedAivCount = 0;
-        uint32_t resolvedJettiesPerCore = 1;
-        if (!ResolveLayoutConfig(layout, aivCount, jettiesPerCore, resolvedAivCount, resolvedJettiesPerCore)) {
+        if (rankCount < 2U || rankId >= rankCount) {
+            std::cerr << "[URMA] rankId=" << rankId << " rankCount=" << rankCount
+                      << " is not a usable group; need rankCount >= 2 and rankId < rankCount" << std::endl;
+            return false;
+        }
+        if (symmetricAddr == nullptr || symmetricSize == 0U) {
+            std::cerr << "[URMA] symmetric memory must be a non-empty device region, addr=" << symmetricAddr
+                      << " size=" << symmetricSize << std::endl;
             return false;
         }
 
@@ -98,10 +105,27 @@ public:
         rankCount_ = rankCount;
         symmetricAddr_ = symmetricAddr;
         symmetricSize_ = symmetricSize;
-        aivCount_ = resolvedAivCount;
-        jettiesPerCore_ = resolvedJettiesPerCore;
+        layout_ = layout;
         sqDepth_ = sqDepth;
         sharedTagPrefix_ = (sharedTagPrefix != nullptr) ? sharedTagPrefix : kDefaultSharedTagPrefix;
+        railPeerLinks_.clear();
+        railCount_ = 1U;
+        netLayer_ = 0U;
+
+        if (layout == UrmaLayout::SHARED_POOL && !BuildRailPlan()) {
+            return false;
+        }
+
+        uint32_t resolvedAivCount = 0;
+        uint32_t resolvedJettiesPerCore = 1;
+        uint32_t resolvedRowsPerPeer = 1;
+        if (!ResolveLayoutConfig(
+                layout, aivCount, jettiesPerCore, resolvedAivCount, resolvedJettiesPerCore, resolvedRowsPerPeer)) {
+            return false;
+        }
+        aivCount_ = resolvedAivCount;
+        jettiesPerCore_ = resolvedJettiesPerCore;
+        rowsPerPeer_ = resolvedRowsPerPeer;
 
         if (!AllocateNotifyPool()) {
             return false;
@@ -130,7 +154,11 @@ public:
         channelHandles_.clear();
         peerBaseAddrs_.clear();
         sharedPeerOrder_.clear();
+        railPeerLinks_.clear();
+        railCount_ = 1U;
+        netLayer_ = 0U;
         channelsPerJetty_ = 0;
+        rowsPerPeer_ = 1;
         initialized_ = false;
     }
 
@@ -144,12 +172,13 @@ public:
         return peerBaseAddrs_[peer];
     }
 
-    UrmaLayout Layout() const { return (aivCount_ == 0) ? UrmaLayout::PER_PEER : UrmaLayout::SHARED_POOL; }
-    uint32_t JettyCount() const { return (aivCount_ == 0) ? rankCount_ : aivCount_ * jettiesPerCore_; }
-    uint32_t JettiesPerCore() const { return (aivCount_ == 0) ? 1U : jettiesPerCore_; }
+    UrmaLayout Layout() const { return layout_; }
+    bool IsPerPeer() const { return layout_ == UrmaLayout::PER_PEER; }
 
-    // Size of the table BuildAndCopyUrmaInfoTable allocates, derived from the resolved layout so a
-    // caller need not re-derive it from rankCount and the jetty shape. Zero before a successful Init.
+    uint32_t JettyCount() const { return IsPerPeer() ? rankCount_ * rowsPerPeer_ : aivCount_ * jettiesPerCore_; }
+    uint32_t JettiesPerCore() const { return jettiesPerCore_; }
+    uint32_t RowsPerPeer() const { return IsPerPeer() ? rowsPerPeer_ : 1U; }
+
     uint64_t GetWorkspaceSize() const
     {
         if (!initialized_) {
@@ -159,11 +188,40 @@ public:
     }
 
 private:
-    static bool ResolveLayoutConfig(
+    bool ResolveLayoutConfig(
         UrmaLayout layout, uint32_t aivCount, uint32_t jettiesPerCore, uint32_t& resolvedAivCount,
-        uint32_t& resolvedJettiesPerCore)
+        uint32_t& resolvedJettiesPerCore, uint32_t& resolvedRowsPerPeer) const
     {
         if (layout == UrmaLayout::PER_PEER) {
+            resolvedAivCount = aivCount;
+            if (resolvedAivCount == kUrmaAutoAivCount) {
+                resolvedAivCount = QueryDeviceAivCount();
+                if (resolvedAivCount == 0U) {
+                    std::cerr << "[URMA] cannot query the device AIV count; pass aivCount explicitly" << std::endl;
+                    return false;
+                }
+            } else if (resolvedAivCount == 0U) {
+                std::cerr << "[URMA] aivCount=0 is not a PerPeer size; omit it for the device AIV count or pass N >= 1"
+                          << std::endl;
+                return false;
+            }
+            if (jettiesPerCore > kUrmaMaxJettiesPerCore) {
+                std::cerr << "[URMA] jettiesPerCore=" << jettiesPerCore << " must be in [1, " << kUrmaMaxJettiesPerCore
+                          << "] or " << kUrmaAutoJettiesPerCore << " for one queue per AIV per peer" << std::endl;
+                return false;
+            }
+            resolvedJettiesPerCore = (jettiesPerCore == kUrmaAutoJettiesPerCore) ? 1U : jettiesPerCore;
+            if (resolvedAivCount > std::numeric_limits<uint32_t>::max() / resolvedJettiesPerCore) {
+                std::cerr << "[URMA] aivCount=" << resolvedAivCount << " * jettiesPerCore=" << resolvedJettiesPerCore
+                          << " overflows the per-peer queue count" << std::endl;
+                return false;
+            }
+            resolvedRowsPerPeer = resolvedAivCount * resolvedJettiesPerCore;
+            if (resolvedRowsPerPeer == 0U || resolvedRowsPerPeer > kUrmaMaxRowsPerPeer) {
+                std::cerr << "[URMA] PerPeer queues per peer=" << resolvedRowsPerPeer << " must be in [1, "
+                          << kUrmaMaxRowsPerPeer << "]" << std::endl;
+                return false;
+            }
             return true;
         }
         if (layout != UrmaLayout::SHARED_POOL) {
@@ -178,31 +236,38 @@ private:
                 std::cerr << "[URMA] cannot query the device AIV count; pass aivCount explicitly" << std::endl;
                 return false;
             }
-            std::cout << "[URMA] aivCount resolved from device AIV count: " << resolvedAivCount << std::endl;
         } else if (resolvedAivCount == 0U) {
             std::cerr << "[URMA] aivCount=0 is not a SharedPool size; omit it for the device AIV "
                          "count, pass N >= 1, or use UrmaLayout::PER_PEER"
                       << std::endl;
             return false;
         }
-        if (jettiesPerCore == 0 || jettiesPerCore > kUrmaMaxJettiesPerCore) {
+        if (jettiesPerCore > kUrmaMaxJettiesPerCore) {
             std::cerr << "[URMA] jettiesPerCore=" << jettiesPerCore << " must be in [1, " << kUrmaMaxJettiesPerCore
-                      << "]" << std::endl;
+                      << "] or " << kUrmaAutoJettiesPerCore << " to take the rail count" << std::endl;
             return false;
         }
-        if (resolvedAivCount > std::numeric_limits<uint32_t>::max() / jettiesPerCore) {
-            std::cerr << "[URMA] aivCount=" << resolvedAivCount << " * jettiesPerCore=" << jettiesPerCore
+        if (jettiesPerCore == kUrmaAutoJettiesPerCore && railCount_ > kUrmaMaxJettiesPerCore) {
+            std::cerr << "[URMA] rail plan found " << railCount_ << " ports but a core may own at most "
+                      << kUrmaMaxJettiesPerCore
+                      << " jetties; pass jettiesPerCore explicitly or raise kUrmaMaxJettiesPerCore (it sizes "
+                         "AsyncEvent's per-jetty targets)"
+                      << std::endl;
+            return false;
+        }
+        resolvedJettiesPerCore = (jettiesPerCore == kUrmaAutoJettiesPerCore) ? railCount_ : jettiesPerCore;
+        if (resolvedAivCount > std::numeric_limits<uint32_t>::max() / resolvedJettiesPerCore) {
+            std::cerr << "[URMA] aivCount=" << resolvedAivCount << " * jettiesPerCore=" << resolvedJettiesPerCore
                       << " overflows the jetty count" << std::endl;
             return false;
         }
-        resolvedJettiesPerCore = jettiesPerCore;
         return true;
     }
 
-    uint64_t CtxRowCount() const { return (aivCount_ == 0) ? rankCount_ : JettyCount(); }
+    uint64_t CtxRowCount() const { return JettyCount(); }
     uint64_t TargetRowCount() const
     {
-        return (aivCount_ == 0) ? rankCount_ : static_cast<uint64_t>(JettyCount()) * rankCount_;
+        return IsPerPeer() ? JettyCount() : static_cast<uint64_t>(JettyCount()) * rankCount_;
     }
 
     uint64_t ComputeWorkspaceBytes() const
@@ -361,7 +426,6 @@ private:
 
     static constexpr const char* kUrmaSymMemTag = "pto_urma_sym";
     static constexpr const char* kUrmaNotifyMemTag = "pto_urma_notify";
-    static constexpr uint32_t kUrmaQpNum = 1U;
     static constexpr uint32_t kUrmaRegisteredMemCount = 2U;
     static constexpr uint64_t kDeviceVaThreshold = 0x100000000000ULL;
     static constexpr CommProtocol kCommProtocolUbcCtp = static_cast<CommProtocol>(4);
@@ -376,15 +440,18 @@ private:
     HcclMemHandle notifyMemHandle_{nullptr};
     HcclMemHandle memHandles_[kUrmaRegisteredMemCount]{};
 
-    // 0 after Init means PerPeer (layout was PER_PEER). Otherwise the SharedPool
-    // holds aivCount_ * jettiesPerCore_ jetties, run j of AIV k being
-    // jetty k * jettiesPerCore_ + j.
+    UrmaLayout layout_{UrmaLayout::PER_PEER};
     uint32_t aivCount_{0};
     uint32_t jettiesPerCore_{1};
+    uint32_t rowsPerPeer_{1};
     uint32_t sqDepth_{0};
     std::string sharedTagPrefix_{kDefaultSharedTagPrefix};
     uint32_t channelsPerJetty_{0};
     std::vector<uint32_t> sharedPeerOrder_;
+    uint32_t railCount_{1};
+    uint32_t netLayer_{0};
+
+    std::vector<std::vector<PeerLink>> railPeerLinks_;
 
     std::vector<ChannelHandle> channelHandles_;
 

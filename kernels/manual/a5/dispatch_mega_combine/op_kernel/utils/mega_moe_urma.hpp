@@ -82,14 +82,15 @@ public:
     // Queue ownership never crosses AIVs; refresh this core after kernel relaunch.
     AICORE inline void RefreshSubmitQueue() const
     {
-        pto::comm::AsyncSession session;
-        BuildSubmitSession(0U, session);
-        auto* wq = pto::comm::urma::detail::GetWqContext(session, 0U);
-        auto* cq = pto::comm::urma::detail::GetCqContext(session, 0U);
-        // UrmaInfo precedes these tables without cache-line padding. A WQ row
-        // can straddle two lines; its submittedWqeCount is near the row end.
-        pto::comm::urma::DcciCachelines(reinterpret_cast<__gm__ uint8_t*>(wq), sizeof(*wq));
-        pto::comm::urma::DcciCachelines(reinterpret_cast<__gm__ uint8_t*>(cq), sizeof(*cq));
+        const pto::comm::AsyncSession& session = SubmitSession(0U);
+        for (uint32_t slot = 0U; slot < session.cfg.urma.qpCount; ++slot) {
+            auto* wq = pto::comm::urma::detail::GetWqContextAt(session, 0U, session.qpIdxBase + slot);
+            auto* cq = pto::comm::urma::detail::GetCqContextAt(session, 0U, session.qpIdxBase + slot);
+            // UrmaInfo precedes these tables without cache-line padding. A WQ row
+            // can straddle two lines; its submittedWqeCount is near the row end.
+            pto::comm::urma::DcciCachelines(reinterpret_cast<__gm__ uint8_t*>(wq), sizeof(*wq));
+            pto::comm::urma::DcciCachelines(reinterpret_cast<__gm__ uint8_t*>(cq), sizeof(*cq));
+        }
         dsb(DSB_DDR);
     }
 
@@ -155,9 +156,8 @@ public:
 
     AICORE inline bool WaitEvent(const pto::comm::AsyncEvent& event, uint32_t peer) const
     {
-        pto::comm::AsyncSession session;
-        BuildSubmitSession(peer, session);
-        if (event.engine != pto::comm::DmaEngine::URMA || event.urmaJettyCount != 1U ||
+        const pto::comm::AsyncSession& session = SubmitSession(peer);
+        if (event.engine != pto::comm::DmaEngine::URMA || event.urmaJettyCount != session.cfg.urma.qpCount ||
             event.urmaJettyBase != session.qpIdxBase || static_cast<uint32_t>(event.handle >> 32U) != peer)
             trap();
         while (!event.Wait(session)) {
@@ -330,13 +330,23 @@ private:
             peer >= rankSize_)
             trap();
         auto* info = reinterpret_cast<__gm__ urma::UrmaInfo*>(urmaWorkspace_);
-        if (info->layout != urma::UrmaLayout::SHARED_POOL || info->jettiesPerCore != 1U ||
+        const uint32_t perCore = info->jettiesPerCore;
+        if (info->layout != urma::UrmaLayout::SHARED_POOL || perCore == 0U || perCore > urma::kUrmaMaxJettiesPerCore ||
             info->jettyCount != tilingData_->multiServerTiling.urmaJettyCount ||
-            info->jettyCount != tilingData_->fixedGroupTiling.physicalAicNum || info->rankCount != rankSize_)
+            info->jettyCount != tilingData_->fixedGroupTiling.physicalAicNum * perCore || info->rankCount != rankSize_)
             trap();
-        if (!BuildAsyncSession<DmaEngine::URMA>(urmaWorkspace_, peer, session) || session.cfg.urma.qpCount != 1U ||
-            session.qpIdxBase != get_block_idx() || !urma::detail::ValidateUrmaSession(session, peer))
+        if (!BuildAsyncSession<DmaEngine::URMA>(urmaWorkspace_, peer, session) || session.cfg.urma.qpCount != perCore ||
+            session.qpIdxBase != get_block_idx() * perCore || !urma::detail::ValidateUrmaSession(session, peer))
             trap();
+    }
+
+    AICORE inline const pto::comm::AsyncSession& SubmitSession(uint32_t peer) const
+    {
+        if (peer >= rankSize_)
+            trap();
+        if (!submitSession_.valid)
+            BuildSubmitSession(peer, submitSession_);
+        return submitSession_;
     }
 
     AICORE inline pto::comm::AsyncEvent PostBytes(
@@ -344,15 +354,14 @@ private:
         pto::comm::urma::UrmaOpcode opcode) const
     {
         namespace urma = pto::comm::urma;
-        pto::comm::AsyncSession session;
-        BuildSubmitSession(peer, session);
+        const pto::comm::AsyncSession& session = SubmitSession(peer);
         auto* info = reinterpret_cast<__gm__ urma::UrmaInfo*>(urmaWorkspace_);
         auto* mem = urma::detail::GetRemoteMemInfo(info, peer, session.qpIdxBase);
         if (peer == rank_ || bytes == 0U || remoteOffset > mem->len || bytes > mem->len - remoteOffset)
             trap();
         const auto result = urma::detail::UrmaPostSend(
             reinterpret_cast<__gm__ uint8_t*>(mem->addr) + remoteOffset, localAddr, bytes, opcode, session, peer);
-        if (result.jettyCount != 1U || result.jettyBase != session.qpIdxBase)
+        if (result.jettyCount != session.cfg.urma.qpCount || result.jettyBase != session.qpIdxBase)
             trap();
         return urma::MakeUrmaMultiJettyEvent(result);
     }
@@ -366,6 +375,7 @@ private:
     uint32_t serverNum_ = 1U;
     uint32_t serverId_ = 0U;
     int32_t epoch_ = 1;
+    mutable pto::comm::AsyncSession submitSession_{};
 };
 
 #endif // DISPATCH_MEGA_COMBINE_MEGA_MOE_URMA_HPP

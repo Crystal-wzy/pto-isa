@@ -112,7 +112,8 @@ AICORE inline AsyncEvent MakeUrmaBatchCompletionEvent(const AsyncSession& sessio
     result.handle = UrmaBatchEventHandle(peer, result.targetBb, result.jettyCount);
     if (result.handle == 0U) {
         PTO_ASSERT(false, "TPUT_ASYNC URMA: failed to encode a valid completion event.");
-        return {};
+        result.failed = true;
+        return ::pto::comm::urma::MakeUrmaMultiJettyEvent(result);
     }
     return ::pto::comm::urma::MakeUrmaMultiJettyEvent(result);
 }
@@ -243,7 +244,9 @@ AICORE inline AsyncEvent FinishUrmaAsyncPutBatch(const AsyncSession& session, ui
     } else if (session.rt.urma.batchLogicalWqeCount != 0U) {
         event = MakeUrmaBatchCompletionEvent(session, peer, false);
     }
+    const uint32_t railCycleCursor = session.rt.urma.railCycleCursor;
     session.rt.urma = {};
+    session.rt.urma.railCycleCursor = railCycleCursor;
     return event;
 }
 

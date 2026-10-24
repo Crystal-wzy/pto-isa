@@ -518,15 +518,13 @@ bool InitStandaloneUrmaRuntime(StandaloneRankRuntime& runtime, uint32_t ranksPer
     }
     runtime.urma_workspace = runtime.urma_manager->GetWorkspaceAddr();
     runtime.urma_jetty_count = runtime.urma_manager->QueueCount();
-    if (runtime.urma_workspace == nullptr || runtime.urma_jetty_count != submittingAivs) {
+    const uint32_t jettiesPerCore = runtime.urma_manager->JettiesPerCore();
+    if (runtime.urma_workspace == nullptr || jettiesPerCore == 0U ||
+        runtime.urma_jetty_count != submittingAivs * jettiesPerCore) {
         return ReportRuntimeInitFailure(runtime.hccl.rank_id, "URMA workspace/queue pool", -1);
     }
     runtime.rank_num_per_server = ranksPerServer;
     runtime.urma_enabled = true;
-    std::cout << "rank=" << rank << " URMA enabled ranks_per_server=" << ranksPerServer
-              << " servers=" << ranks / ranksPerServer << " registered_window_bytes=" << bytes
-              << " layout=SHARED_POOL queue_owner=AIV0 jetties=" << runtime.urma_jetty_count << " jetties_per_core=1"
-              << std::endl;
     return true;
 }
 

@@ -21,25 +21,30 @@ namespace urma {
 // ============================================================================
 // Constants
 // ============================================================================
-constexpr uint32_t kUrmaMaxPollTimes = 1000000;
+constexpr uint64_t kUrmaCyclesPerUs = 1000ULL;
+constexpr uint64_t kUrmaPollCqTimeoutUs = 10ULL * 1000ULL * 1000ULL;
+constexpr uint64_t kUrmaPollCqTimeoutCycles = kUrmaPollCqTimeoutUs * kUrmaCyclesPerUs;
+
+constexpr uint32_t kUrmaPollCycleStride = 256U;
 constexpr uint64_t kCacheLineSize = 64;
 constexpr size_t kUrmaEidBytes = 16;
 
-// Upper bound on the jetties a single AIV may own. Lives here rather than in
-// comm_types.hpp so the host-side workspace facade — which must not pull AICORE-decorated
-// headers — can still reach it: it is what sizes AsyncEvent's per-jetty target arrays.
+// Sizes the per-AIV jetty arrays. Kept here so a host translation unit can
+// include the URMA workspace types without pulling the AICORE tile headers
+// that comm_types.hpp includes.
 constexpr uint32_t kUrmaMaxJettiesPerCore = 8U;
 
-// Completion records use the CQ owner bit, so CQ depths smaller than 128 do not
-// provide the required completion window for this path.
 constexpr uint32_t kUrmaCompletionRecordMinCqDepth = 128U;
 
 constexpr uint64_t kUrmaMaxWqeTransferBytes = 256ULL * 1024ULL * 1024ULL;
 
-constexpr uint64_t kUrmaMinSliceBytes = kUrmaMaxWqeTransferBytes;
-constexpr uint64_t kUrmaSliceAlignBytes = 512ULL;
+constexpr uint32_t kUrmaMaxJettyShareTotal = 16U;
 
 constexpr uint32_t kUrmaAutoAivCount = UINT32_MAX;
+
+constexpr uint32_t kUrmaAutoJettiesPerCore = 0U;
+
+constexpr uint32_t kUrmaMaxRowsPerPeer = 256;
 
 constexpr uint32_t kUrmaSqeSizeBytes = 48;
 constexpr uint32_t kUrmaSgeSizeBytes = 16;
@@ -51,9 +56,6 @@ constexpr uint32_t kUrmaSqeRmtAddrHOffset = 44;
 constexpr uint32_t kUrmaNotifySetSlotCount = 8U;
 constexpr uint32_t kUrmaNotifyResourceCachelineBytes = 64U;
 
-// One cache-line-aligned region is owned by one (peer, QP). SET sources are
-// reused in batches after draining the queue. FAA writes its ignored old value
-// to a fixed sink in the same cache line.
 struct alignas(kUrmaNotifyResourceCachelineBytes) UrmaNotifyResourceRegion {
     int32_t setValues[kUrmaNotifySetSlotCount];
     uint32_t nextSetSlot;
@@ -93,12 +95,20 @@ enum class UrmaOpcode : uint32_t {
 // ============================================================================
 // UrmaLayout — how the SQ/CQ context table is indexed
 //
-// PER_PEER:    one jetty per peer, jetty i only reaches peer i. Selecting a peer
-//              is the same act as selecting a queue, so a ctx row is a peer, and
-//              concurrency is capped at one AIV per peer.
+// PER_PEER:    one private run of jettiesPerCore queues per AIV on every peer.
+//              Queue aiv * jettiesPerCore + slot reaches only that peer. The
+//              runs are created at init, so a block never shares a WQ. A ctx
+//              row is (peer, queue).
 // SHARED_POOL: a pool of jetties, each reaching every peer. Peer and queue are
-//              chosen independently, so a ctx row is a jetty. The pool is carved
-//              into one exclusive run of jettiesPerCore jetties per AIV, so a
+//              chosen independently, so a ctx row is a jetty. The pool is
+//              carved into one exclusive run per AIV. At the default width the
+//              run holds one jetty per rail, so slot j is rail j and one AIV
+//              on its own reaches all of them; puts then walk the weighted
+//              rail cycle a call at a time, while a notify stays on the single
+//              slot its block index names, because its payload and signal are
+//              only ordered against each other while they share a queue. An
+//              explicit width instead pins the whole run to the one rail the
+//              cycle gave that AIV, and puts just rotate the run. Either way a
 //              session derives its run from get_block_idx() and no caller ever
 //              names a jetty.
 // ============================================================================
@@ -119,6 +129,8 @@ struct UrmaInfo {
     UrmaLayout layout;
     uint32_t jettyCount;
     uint32_t jettiesPerCore;
+    uint32_t railCycleLen;
+    uint8_t railCycle[kUrmaMaxJettyShareTotal];
 };
 
 // ============================================================================

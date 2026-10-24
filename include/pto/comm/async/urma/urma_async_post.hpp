@@ -112,24 +112,34 @@ AICORE inline void CommitPostedWqes(__gm__ UrmaWQCtx* wq, uint32_t head, uint32_
     pipe_barrier(PIPE_ALL);
 }
 
-AICORE inline uint32_t UrmaJettiesForMessage(uint32_t qpCount, uint64_t messageLen)
+AICORE inline bool UrmaAwaitOneCqe(const AsyncSession& session, uint32_t peer, uint32_t jetty)
 {
-    if (qpCount <= 1U) {
-        return 1U;
+    __gm__ UrmaWQCtx* wq = GetWqContextAt(session, peer, jetty);
+    __gm__ UrmaCqCtx* cq = GetCqContextAt(session, peer, jetty);
+    const uint32_t postedCqe = wq->submittedWqeCount;
+    const uint32_t retiredCqe = ld_dev(reinterpret_cast<__gm__ uint32_t*>(cq->tailAddr), 0);
+    if (SequenceReached(retiredCqe, postedCqe)) {
+        return false;
     }
-    const uint64_t affordable = messageLen / kUrmaMinSliceBytes;
-    if (affordable <= 1U) {
-        return 1U;
+    const uint32_t cqeSize = 1U << cq->cqeShiftSize;
+    __gm__ UrmaJfcCqeCtx* cqe = nullptr;
+    if (!WaitForUrmaCqe(cq, retiredCqe, cqeSize, cqe)) {
+        dsb(DSB_DDR);
+        UrmaPostSendUpdateInfo(ld_dev(reinterpret_cast<__gm__ uint32_t*>(wq->headAddr), 0), wq);
+        pipe_barrier(PIPE_ALL);
+        if (!WaitForUrmaCqe(cq, retiredCqe, cqeSize, cqe)) {
+            return false;
+        }
     }
-    return (affordable < static_cast<uint64_t>(qpCount)) ? static_cast<uint32_t>(affordable) : qpCount;
-}
-
-AICORE inline uint64_t UrmaSliceBytes(uint32_t jettiesToUse, uint64_t messageLen)
-{
-    if (jettiesToUse <= 1U) {
-        return messageLen;
+    constexpr uint32_t kStatusShift = 8U;
+    const uint32_t cqeError =
+        (static_cast<uint32_t>(cqe->status) << kStatusShift) | static_cast<uint32_t>(cqe->substatus);
+    if (cqeError != 0U) {
+        return false;
     }
-    return (messageLen / jettiesToUse) & ~(kUrmaSliceAlignBytes - 1ULL);
+    const uint32_t completedBb = ld_dev(reinterpret_cast<__gm__ uint32_t*>(wq->tailAddr), 0);
+    PublishCqAndWqTails(completedBb + 1U, retiredCqe + 1U, cq, wq);
+    return true;
 }
 
 AICORE inline UrmaSlicePostResult UrmaPostSliceOnJetty(
@@ -142,18 +152,20 @@ AICORE inline UrmaSlicePostResult UrmaPostSliceOnJetty(
     __gm__ UrmaCqCtx* cq = GetCqContextAt(session, peer, jetty);
     __gm__ UrmaMemInfo* remoteMem = GetRemoteMemInfo(info, peer, jetty);
 
-    const uint32_t announcedHead =
+    uint32_t announcedHead =
         ld_dev(reinterpret_cast<__gm__ uint32_t*>(wq->headAddr), 0); // head the hardware already knows
     uint32_t pendingHead = announcedHead; // head of WQEs filled but not yet rung in this call
     uint32_t submittedWqeCount = wq->submittedWqeCount;
     uint64_t offset = 0U;
     while (offset < sliceLen) {
-        if (!UrmaRingHasRoom(wq, cq, pendingHead, submittedWqeCount, 1U, 1U)) {
+        while (!UrmaRingHasRoom(wq, cq, pendingHead, submittedWqeCount, 1U, 1U)) {
             if (pendingHead != announcedHead) {
                 CommitPostedWqes(wq, pendingHead, submittedWqeCount);
+                announcedHead = pendingHead;
             }
-            bool completed = false;
-            if (!UrmaPollCqAt(session, peer, jetty, pendingHead, submittedWqeCount, true, completed) || !completed) {
+            if (!UrmaAwaitOneCqe(session, peer, jetty)) {
+                result.targetBb = announcedHead;
+                result.targetCqe = submittedWqeCount;
                 return result;
             }
         }
@@ -181,6 +193,7 @@ AICORE inline UrmaMultiPostResult UrmaPostSend(
     result.jettyBase = session.qpIdxBase;
 
     if (!ValidateUrmaSession(session, peer) || (opcode != UrmaOpcode::WRITE && opcode != UrmaOpcode::READ)) {
+        result.failed = true;
         return result;
     }
 
@@ -188,30 +201,52 @@ AICORE inline UrmaMultiPostResult UrmaPostSend(
         return result;
     }
 
-    const uint32_t jettiesToUse = UrmaJettiesForMessage(session.cfg.urma.qpCount, messageLen);
-    const uint64_t sliceBytes = UrmaSliceBytes(jettiesToUse, messageLen);
-
-    for (uint32_t slot = 0U; slot < jettiesToUse; ++slot) {
-        const uint64_t sliceOffset = static_cast<uint64_t>(slot) * sliceBytes;
-        const uint64_t sliceLen = (slot + 1U == jettiesToUse) ? (messageLen - sliceOffset) : sliceBytes;
-        const UrmaSlicePostResult slice = UrmaPostSliceOnJetty(
-            remoteAddr + sliceOffset, localAddr + sliceOffset, sliceLen, opcode, session, peer,
-            session.qpIdxBase + slot);
-        if (!slice.ok) {
-            result.jettyCount = 0U;
-            result.handle = 0U;
-            return result;
+    __gm__ UrmaInfo* info = reinterpret_cast<__gm__ UrmaInfo*>(session.contextGm);
+    const bool onRails = info->railCycleLen != 0U;
+    uint32_t cursor = onRails ? session.rt.urma.railCycleCursor : 0U;
+    bool postedOk = true;
+    uint64_t offset = 0U;
+    while (offset < messageLen) {
+        const uint64_t remaining = messageLen - offset;
+        const uint64_t chunk = remaining < kUrmaMaxWqeTransferBytes ? remaining : kUrmaMaxWqeTransferBytes;
+        const uint32_t slot =
+            onRails ? info->railCycle[cursor % info->railCycleLen] : cursor % session.cfg.urma.qpCount;
+        const uint32_t jetty = session.qpIdxBase + slot;
+        cursor += 1U;
+        if (!UrmaPostSliceOnJetty(remoteAddr + offset, localAddr + offset, chunk, opcode, session, peer, jetty).ok) {
+            // The drain this failed on already timed out, so retrying it here
+            // would only time out again; later slices are skipped and the event
+            // still marks every jetty so Wait can drain what did post.
+            postedOk = false;
+            break;
         }
-        result.targetBb[slot] = slice.targetBb;
-        result.targetCqe[slot] = slice.targetCqe;
+        offset += chunk;
     }
-    result.jettyCount = jettiesToUse;
-    result.handle = EncodeHandle(peer, result.targetBb[0]);
+
+    if (onRails) {
+        session.rt.urma.railCycleCursor = cursor;
+    }
+
+    for (uint32_t slot = 0U; slot < session.cfg.urma.qpCount; ++slot) {
+        __gm__ UrmaWQCtx* wq = GetWqContextAt(session, peer, session.qpIdxBase + slot);
+        result.targetBb[slot] = ld_dev(reinterpret_cast<__gm__ uint32_t*>(wq->headAddr), 0);
+        result.targetCqe[slot] = wq->submittedWqeCount;
+    }
+    result.jettyCount = session.cfg.urma.qpCount;
+
+    uint32_t markerTargetBb = result.targetBb[0];
+    for (uint32_t slot = 1U; peer == 0U && markerTargetBb == 0U && slot < session.cfg.urma.qpCount; ++slot) {
+        markerTargetBb = result.targetBb[slot];
+    }
+    result.handle = EncodeHandle(peer, markerTargetBb);
+    if (!postedOk) {
+        result.failed = true;
+    }
     return result;
 }
 
 AICORE inline bool PrepareNotifySetSlot(
-    const AsyncSession& session, uint32_t peer, __gm__ UrmaNotifyResourceRegion* region, bool isAdd,
+    const AsyncSession& session, uint32_t peer, uint32_t jetty, __gm__ UrmaNotifyResourceRegion* region, bool isAdd,
     uint32_t& setSlotIndex)
 {
     if (!isAdd && region->nextSetSlot >= kUrmaNotifySetSlotCount) {
@@ -222,15 +257,15 @@ AICORE inline bool PrepareNotifySetSlot(
     if (!reusingSetSlotZero) {
         return true;
     }
-    __gm__ UrmaCqCtx* cq = GetCqContext(session, peer);
-    __gm__ UrmaWQCtx* wq = GetWqContext(session, peer);
+    __gm__ UrmaCqCtx* cq = GetCqContextAt(session, peer, jetty);
+    __gm__ UrmaWQCtx* wq = GetWqContextAt(session, peer, jetty);
     const uint32_t completedCqe = ld_dev(reinterpret_cast<__gm__ uint32_t*>(cq->tailAddr), 0);
     if (wq->submittedWqeCount == completedCqe) {
         return true;
     }
     bool completed = false;
     const uint32_t submittedBb = ld_dev(reinterpret_cast<__gm__ uint32_t*>(wq->headAddr), 0);
-    return UrmaPollCq(session, peer, submittedBb, wq->submittedWqeCount, true, completed) && completed;
+    return UrmaPollCqAt(session, peer, jetty, submittedBb, wq->submittedWqeCount, true, completed) && completed;
 }
 
 AICORE inline uint32_t UrmaNotifyPayloadWqeCount(uint64_t messageLen)
@@ -270,6 +305,7 @@ struct UrmaNotifyPostState {
     __gm__ UrmaWQCtx* wq;
     __gm__ UrmaCqCtx* cq;
     __gm__ UrmaMemInfo* remoteMem;
+    uint32_t jetty;
     uint32_t announcedHead;
     uint32_t pendingHead;
     uint32_t submittedWqeCount;
@@ -285,7 +321,8 @@ AICORE inline bool EnsureNotifyRingRoom(
         CommitPostedWqes(state.wq, state.pendingHead, state.submittedWqeCount);
     }
     bool completed = false;
-    return UrmaPollCq(session, peer, state.pendingHead, state.submittedWqeCount, true, completed) && completed;
+    return UrmaPollCqAt(session, peer, state.jetty, state.pendingHead, state.submittedWqeCount, true, completed) &&
+           completed;
 }
 
 AICORE inline bool PostNotifyPayload(
@@ -316,26 +353,36 @@ AICORE inline UrmaPostResult UrmaPostNotify(
     int32_t signalValue, NotifyOp notifyOp, const AsyncSession& session, uint32_t peer)
 {
     UrmaPostResult result{};
+    result.jetty = session.qpIdxBase;
 
-    if (!ValidateUrmaSessionAt(session, peer, session.qpIdxBase)) {
+    // Covers every jetty in the run, so the one picked below is known good and
+    // contextGm is known non-null before info is read.
+    if (!ValidateUrmaSession(session, peer)) {
+        result.failed = true;
         return result;
     }
     __gm__ UrmaInfo* info = reinterpret_cast<__gm__ UrmaInfo*>(session.contextGm);
     if (info->notifyPoolPtr == 0U) {
+        result.failed = true;
         return result;
     }
 
+    const uint32_t aiv = session.qpIdxBase / session.cfg.urma.qpCount;
+    const uint32_t jetty = session.qpIdxBase + UrmaRailCycleSlot(info, aiv);
+    result.jetty = jetty;
+
     const bool isAtomicAdd = notifyOp == NotifyOp::AtomicAdd;
     const uint32_t signalBb = isAtomicAdd ? 2U : 1U; // FAA occupies SQE + immediate BB; SET a single BB.
-    const uint32_t jetty = session.qpIdxBase;
-    __gm__ UrmaNotifyResourceRegion* region = GetUrmaNotifyResourceRegion(session, peer);
+    __gm__ UrmaNotifyResourceRegion* region = GetUrmaNotifyResourceRegionAt(session, peer, jetty);
     UrmaNotifyPostState state{};
+    state.jetty = jetty;
     state.wq = GetWqContextAt(session, peer, jetty);
     state.cq = GetCqContextAt(session, peer, jetty);
     state.remoteMem = GetRemoteMemInfo(info, peer, jetty);
 
     uint32_t setSlotIndex = 0U;
-    if (!PrepareNotifySetSlot(session, peer, region, isAtomicAdd, setSlotIndex)) {
+    if (!PrepareNotifySetSlot(session, peer, jetty, region, isAtomicAdd, setSlotIndex)) {
+        result.failed = true;
         return result;
     }
 
@@ -344,6 +391,7 @@ AICORE inline UrmaPostResult UrmaPostNotify(
     state.submittedWqeCount = state.wq->submittedWqeCount;
     if (!PostNotifyPayload(remotePayload, localPayload, messageLen, session, peer, state) ||
         !EnsureNotifyRingRoom(session, peer, state, signalBb)) {
+        result.failed = true;
         return result;
     }
 
