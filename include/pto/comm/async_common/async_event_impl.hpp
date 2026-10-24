@@ -89,9 +89,11 @@ PTO_INTERNAL bool BuildAsyncSession(__gm__ uint8_t* workspace, uint32_t destRank
 #ifdef PTO_RDMA_SUPPORTED
 // Peer-independent RDMA session builder. The explicit-peer TPUT_ASYNC and
 // TGET_ASYNC overloads can reuse this session for multiple remote ranks.
+// qpIdx selects one of the workspace's QPs for every peer; existing calls use QP0.
 template <DmaEngine engine, typename ScratchTile>
 PTO_INTERNAL bool BuildAsyncSession(
-    ScratchTile& scratchTile, __gm__ uint8_t* workspace, uint32_t myPe, AsyncSession& session, uint32_t syncId = 0)
+    ScratchTile& scratchTile, __gm__ uint8_t* workspace, uint32_t myPe, AsyncSession& session, uint32_t syncId = 0,
+    uint32_t qpIdx = 0)
 {
     static_assert(engine == DmaEngine::RDMA, "This overload is for RDMA only");
     rdma::RdmaTmpBuffer tmpBuf{};
@@ -99,7 +101,7 @@ PTO_INTERNAL bool BuildAsyncSession(
         session = AsyncSession{};
         return false;
     }
-    return rdma::BuildSession(workspace, myPe, tmpBuf, syncId, session);
+    return rdma::BuildSession(workspace, myPe, tmpBuf, syncId, session, qpIdx);
 }
 
 // Peer-bound RDMA builder retained for callers that use the original async
@@ -107,7 +109,7 @@ PTO_INTERNAL bool BuildAsyncSession(
 template <DmaEngine engine, typename ScratchTile>
 PTO_INTERNAL bool BuildAsyncSession(
     ScratchTile& scratchTile, __gm__ uint8_t* workspace, uint32_t destRankId, uint32_t myPe, AsyncSession& session,
-    uint32_t syncId = 0)
+    uint32_t syncId = 0, uint32_t qpIdx = 0)
 {
     static_assert(engine == DmaEngine::RDMA, "This overload is for RDMA only");
     rdma::RdmaTmpBuffer tmpBuf{};
@@ -115,7 +117,7 @@ PTO_INTERNAL bool BuildAsyncSession(
         session = AsyncSession{};
         return false;
     }
-    return rdma::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session);
+    return rdma::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session, qpIdx);
 }
 #endif
 

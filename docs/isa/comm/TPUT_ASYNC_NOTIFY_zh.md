@@ -180,7 +180,8 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
                                     __gm__ uint8_t *workspace,
                                     uint32_t myPe,
                                     AsyncSession &session,
-                                    uint32_t syncId = 0);
+                                    uint32_t syncId = 0,
+                                    uint32_t qpIdx = 0);
 #endif
 ```
 
@@ -191,6 +192,7 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
 | `myPe` | 本地rank id。 |
 | `session` | 输出的 `AsyncSession`。 |
 | `syncId` | MTE/Scalar同步事件ID，取值范围为0-7。 |
+| `qpIdx` | 每个peer选用的QP编号，默认0，需小于Host配置的 [`qpNum`](TPUT_ASYNC_zh.md#rdma构建仅npu_arch-3510)。 |
 
 RDMA Session不绑定目标peer。调用指令时通过 `peer` 选择目标rank：
 

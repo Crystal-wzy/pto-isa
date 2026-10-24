@@ -25,7 +25,8 @@ namespace comm {
 namespace rdma {
 
 AICORE inline bool BuildSession(
-    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, RdmaSession& session)
+    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, RdmaSession& session,
+    uint32_t qpIdx = 0)
 {
     session = {};
     __gm__ RdmaInfo* info = reinterpret_cast<__gm__ RdmaInfo*>(workspace);
@@ -35,7 +36,7 @@ AICORE inline bool BuildSession(
     switch (info->backend) {
 #ifdef PTO_RDMA_BACKEND_HNS_1825_SUPPORTED
         case RdmaBackend::HNS_1825:
-            return hns_1825::BuildSession(workspace, myPe, tmpBuf, syncId, session);
+            return hns_1825::BuildSession(workspace, myPe, tmpBuf, syncId, session, qpIdx);
 #endif
         default:
             return false;
@@ -44,7 +45,7 @@ AICORE inline bool BuildSession(
 
 AICORE inline bool BuildSession(
     __gm__ uint8_t* workspace, uint32_t destRankId, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId,
-    RdmaSession& session)
+    RdmaSession& session, uint32_t qpIdx = 0)
 {
     session = {};
     __gm__ RdmaInfo* info = reinterpret_cast<__gm__ RdmaInfo*>(workspace);
@@ -54,7 +55,7 @@ AICORE inline bool BuildSession(
     switch (info->backend) {
 #ifdef PTO_RDMA_BACKEND_HNS_1825_SUPPORTED
         case RdmaBackend::HNS_1825:
-            return hns_1825::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session);
+            return hns_1825::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session, qpIdx);
 #endif
         default:
             return false;
@@ -79,10 +80,11 @@ AICORE inline void StoreSession(const RdmaSession& rdmaSession, AsyncSession& se
 }
 
 AICORE inline bool BuildSession(
-    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, AsyncSession& session)
+    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, AsyncSession& session,
+    uint32_t qpIdx = 0)
 {
     RdmaSession rdmaSession{};
-    const bool valid = BuildSession(workspace, myPe, tmpBuf, syncId, rdmaSession);
+    const bool valid = BuildSession(workspace, myPe, tmpBuf, syncId, rdmaSession, qpIdx);
     StoreSession(rdmaSession, session);
     session.valid = valid;
     return valid;
@@ -90,10 +92,10 @@ AICORE inline bool BuildSession(
 
 AICORE inline bool BuildSession(
     __gm__ uint8_t* workspace, uint32_t destRankId, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId,
-    AsyncSession& session)
+    AsyncSession& session, uint32_t qpIdx = 0)
 {
     RdmaSession rdmaSession{};
-    const bool valid = BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, rdmaSession);
+    const bool valid = BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, rdmaSession, qpIdx);
     StoreSession(rdmaSession, session);
     session.valid = valid;
     return valid;

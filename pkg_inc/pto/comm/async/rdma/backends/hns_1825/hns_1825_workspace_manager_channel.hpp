@@ -68,7 +68,7 @@ inline bool WorkspaceManager::RegisterMemory()
         std::cerr << "[RoCE][rank " << rankId_ << "] (2/4) MR registered: addr=0x" << std::hex
                   << reinterpret_cast<uint64_t>(symmetricAddr_) << std::dec << " size=" << symmetricSize_ << std::endl;
     }
-    const uint64_t notifyBytes = static_cast<uint64_t>(rankCount_) * kNotifyOperandSlots * sizeof(int32_t);
+    const uint64_t notifyBytes = static_cast<uint64_t>(rankCount_) * qpNum_ * kNotifyOperandSlots * sizeof(int32_t);
     if (aclrtMalloc(&notifyOperands_, notifyBytes, ACL_MEM_MALLOC_HUGE_FIRST) != ACL_SUCCESS) {
         std::cerr << "[RoCE] notify operand allocation failed" << std::endl;
         return false;
@@ -96,8 +96,8 @@ inline bool WorkspaceManager::InitializeChannelDescriptions(std::vector<HcommCha
 }
 
 inline bool WorkspaceManager::ConfigureChannelDescription(
-    HcommChannelDesc& description, std::string& channelName, uint32_t channelIndex, uint32_t remoteRank, uint8_t tc,
-    uint8_t sl) const
+    HcommChannelDesc& description, std::string& channelName, uint32_t channelIndex, uint32_t remoteRank, uint32_t qpIdx,
+    uint8_t tc, uint8_t sl) const
 {
     description.remoteEndpoint.protocol = COMM_PROTOCOL_ROCE;
     description.remoteEndpoint.commAddr.type = COMM_ADDR_TYPE_IP_V4;
@@ -126,7 +126,8 @@ inline bool WorkspaceManager::ConfigureChannelDescription(
     const uint32_t clientRank = isServer ? remoteRank : rankId_;
     const uint32_t lowRank = std::min(rankId_, remoteRank);
     const uint32_t highRank = std::max(rankId_, remoteRank);
-    channelName = "pto-rdma/" + std::to_string(lowRank) + "-" + std::to_string(highRank) + "/ch0";
+    channelName =
+        "pto-rdma/" + std::to_string(lowRank) + "-" + std::to_string(highRank) + "/ch" + std::to_string(qpIdx);
     description.channelName = channelName.c_str();
     description.port = static_cast<uint16_t>(
         basePort_ + (serverRank % kMaxRanksPerNic) * kMaxRanksPerNic + (clientRank % kMaxRanksPerNic));
@@ -152,12 +153,14 @@ inline bool WorkspaceManager::ConfigureChannelDescriptions(
         if (remoteRank == rankId_) {
             continue;
         }
-        if (!ConfigureChannelDescription(
-                descriptions[channelIndex], channelNames[channelIndex], channelIndex, remoteRank, tc, sl)) {
-            return false;
+        for (uint32_t qpIdx = 0; qpIdx < qpNum_; ++qpIdx) {
+            if (!ConfigureChannelDescription(
+                    descriptions[channelIndex], channelNames[channelIndex], channelIndex, remoteRank, qpIdx, tc, sl)) {
+                return false;
+            }
+            channelPeer_.push_back(remoteRank);
+            ++channelIndex;
         }
-        channelPeer_.push_back(remoteRank);
-        ++channelIndex;
     }
     return true;
 }
@@ -200,7 +203,7 @@ inline bool WorkspaceManager::BuildChannels()
     if (rankCount_ <= 1) {
         return true;
     }
-    const uint32_t channelNum = rankCount_ - 1;
+    const uint32_t channelNum = (rankCount_ - 1) * qpNum_;
     std::vector<HcommChannelDesc> descriptions(channelNum);
     std::vector<std::string> channelNames(channelNum);
     return InitializeChannelDescriptions(descriptions) && ConfigureChannelDescriptions(descriptions, channelNames) &&
@@ -217,10 +220,10 @@ inline bool WorkspaceManager::WaitChannelsReady()
     constexpr int32_t kChannelFailed = 2;
     constexpr int32_t kChannelTimeout = 3;
     const uint32_t channelNum = static_cast<uint32_t>(channelHandles_.size());
-    const uint32_t pollIntervalMs = channelNum * kChannelStatusPollIntervalPerChannelMs;
-    const uint32_t pollTimeoutMs = channelNum * kChannelStatusPollTimeoutPerChannelMs;
+    const uint64_t pollIntervalMs = static_cast<uint64_t>(channelNum) * kChannelStatusPollIntervalPerChannelMs;
+    const uint64_t pollTimeoutMs = static_cast<uint64_t>(channelNum) * kChannelStatusPollTimeoutPerChannelMs;
     std::vector<int32_t> statuses(channelNum, kChannelConnecting);
-    uint32_t elapsedMs = 0;
+    uint64_t elapsedMs = 0;
     while (elapsedMs <= pollTimeoutMs) {
         const HcommResult result = HcommChannelGetStatus(channelHandles_.data(), channelNum, statuses.data());
         if (result != 0) {

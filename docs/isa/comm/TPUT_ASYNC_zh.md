@@ -104,7 +104,8 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
                                     __gm__ uint8_t *workspace,
                                     uint32_t myPe,
                                     AsyncSession &session,
-                                    uint32_t syncId = 0);
+                                    uint32_t syncId = 0,
+                                    uint32_t qpIdx = 0);
 #endif
 ```
 
@@ -115,6 +116,10 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
 | `myPe` | 本地 rank id，用于选择已注册的本地内存区域。|
 | `session` | 输出的 `AsyncSession` 对象。|
 | `syncId` | MTE/Scalar 同步事件 ID，取值范围为 0-7。|
+| `qpIdx` | 每个peer选用的QP编号，默认0，需小于Host配置的 `qpNum`。 |
+
+Host通过 `RdmaTransportConfig::qpNum` 设置每个peer的QP数（默认1，各rank须一致）；直接使用后端管理器时设置
+`rdma::WorkspaceConfig::qpNum`。不同QP独立完成，需分别等待其Event。
 
 构建一次不绑定 peer 的Session，再通过显式 `peer` 参数选择目标rank：
 

@@ -83,6 +83,16 @@ TEST(TGetAsyncRdma, Vec_Int32_MultiWqe_WaitLast)
     ExpectGetPlan<int32_t, 4096>(0, 256, 16, RdmaCompletionMode::STATUS_WAIT_LAST);
 }
 
+TEST(TGetAsyncRdma, Vec_Int32_MultiAivMultiQp)
+{
+    SKIP_IF_RANKS_LT(2);
+    const RdmaTestResult result = RunGetAsyncRdmaConcurrent(2, 2, 0, 0, 4);
+    if (result == RdmaTestResult::SKIPPED) {
+        GTEST_SKIP() << "RDMA runtime prerequisites are unavailable on at least one rank";
+    }
+    ASSERT_EQ(result, RdmaTestResult::PASSED);
+}
+
 TEST(TGetAsyncRdma, Vec_Float_PublicEventWaitTest)
 {
     SKIP_IF_RANKS_LT(2);

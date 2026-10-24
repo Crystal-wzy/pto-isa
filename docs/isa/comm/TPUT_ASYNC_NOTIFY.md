@@ -188,7 +188,8 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
                                     __gm__ uint8_t *workspace,
                                     uint32_t myPe,
                                     AsyncSession &session,
-                                    uint32_t syncId = 0);
+                                    uint32_t syncId = 0,
+                                    uint32_t qpIdx = 0);
 #endif
 ```
 
@@ -199,6 +200,7 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
 | `myPe` | Local rank ID. |
 | `session` | Output `AsyncSession`. |
 | `syncId` | MTE/scalar synchronization event ID in the range 0-7. |
+| `qpIdx` | QP index for each peer; defaults to 0 and must be less than the host-configured [`qpNum`](TPUT_ASYNC.md#rdma-construction-npu_arch-3510-only). |
 
 An RDMA session does not bind a destination peer. Select the target rank with the intrinsic's `peer` parameter:
 

@@ -25,11 +25,15 @@ inline WorkspaceManager::~WorkspaceManager() { (void)Finalize(); }
 inline bool WorkspaceManager::Init(
     uint32_t rankId, uint32_t rankCount, uint32_t phyId, const std::string& localIp, uint16_t basePort,
     const std::vector<std::string>& peerIps, const std::vector<uint32_t>& peerPhyIds,
-    const std::vector<uint64_t>& peerSymAddrs, void* symmetricAddr, uint64_t symmetricSize)
+    const std::vector<uint64_t>& peerSymAddrs, void* symmetricAddr, uint64_t symmetricSize, uint32_t qpNum)
 {
     if (HasOwnedResources() && !Finalize()) {
         std::cerr << "[RoCE] previous session cleanup reported errors; continuing with a fresh HCOMM session"
                   << std::endl;
+    }
+    if (qpNum == 0 || static_cast<uint64_t>(rankCount) * qpNum > UINT32_MAX) {
+        std::cerr << "[RoCE] invalid QP count or queue index overflow" << std::endl;
+        return false;
     }
     if (!ValidateInitArguments(
             rankId, rankCount, phyId, localIp, basePort, peerIps, peerPhyIds, peerSymAddrs, symmetricAddr,
@@ -38,6 +42,7 @@ inline bool WorkspaceManager::Init(
     }
     AssignInitArguments(
         rankId, rankCount, phyId, localIp, basePort, peerIps, peerPhyIds, peerSymAddrs, symmetricAddr, symmetricSize);
+    qpNum_ = qpNum;
     const auto initStart = std::chrono::steady_clock::now();
     Trace(
         "INIT begin manager=", static_cast<const void*>(this), " endpoint=", endpoint_, " memHandle=", memHandle_,
@@ -371,6 +376,7 @@ inline void WorkspaceManager::ResetOwnedState()
     localIp_.clear();
     rankId_ = 0;
     rankCount_ = 1;
+    qpNum_ = 1;
     phyId_ = 0;
     basePort_ = 60032;
     initialized_ = false;

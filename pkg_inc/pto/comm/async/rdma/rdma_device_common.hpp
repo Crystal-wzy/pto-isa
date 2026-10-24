@@ -18,12 +18,13 @@ namespace pto {
 namespace comm {
 namespace rdma {
 
+// The high word identifies peer * qpNum + qpIdx; the low word is the SQ head.
 constexpr uint32_t kHandleRankShift = 32;
 constexpr uint32_t kErrorHandleRank = 0xffffffffU;
 
-AICORE inline uint64_t EncodeHandle(uint32_t destRankId, uint32_t queueHead)
+AICORE inline uint64_t EncodeHandle(uint32_t queueIndex, uint32_t queueHead)
 {
-    return (static_cast<uint64_t>(destRankId) << kHandleRankShift) | static_cast<uint64_t>(queueHead);
+    return (static_cast<uint64_t>(queueIndex) << kHandleRankShift) | static_cast<uint64_t>(queueHead);
 }
 
 AICORE inline uint64_t EncodeErrorHandle(uint32_t status)
@@ -31,9 +32,9 @@ AICORE inline uint64_t EncodeErrorHandle(uint32_t status)
     return EncodeHandle(kErrorHandleRank, status == 0 ? kRdmaInvalidWorkspaceError : status);
 }
 
-AICORE inline void DecodeHandle(uint64_t handle, uint32_t& destRankId, uint32_t& queueHead)
+AICORE inline void DecodeHandle(uint64_t handle, uint32_t& queueIndex, uint32_t& queueHead)
 {
-    destRankId = static_cast<uint32_t>(handle >> kHandleRankShift);
+    queueIndex = static_cast<uint32_t>(handle >> kHandleRankShift);
     queueHead = static_cast<uint32_t>(handle & 0xffffffffULL);
 }
 
@@ -45,7 +46,27 @@ AICORE inline bool IsErrorHandle(uint64_t handle)
 AICORE inline bool IsWorkspaceHeaderValid(__gm__ const RdmaInfo* info)
 {
     return info != nullptr && info->magic == kRdmaWorkspaceMagic && info->version == kRdmaWorkspaceVersion &&
-           info->backend != RdmaBackend::NONE && info->rankCount > 0 && info->qpNum > 0;
+           info->backend != RdmaBackend::NONE && info->rankCount > 0 && info->qpNum > 0 &&
+           static_cast<uint64_t>(info->rankCount) * info->qpNum <= kErrorHandleRank;
+}
+
+AICORE inline uint64_t EncodeHandle(const RdmaExecContext& ctx, uint32_t queueHead)
+{
+    __gm__ const RdmaInfo* info = reinterpret_cast<__gm__ const RdmaInfo*>(ctx.contextGm);
+    return EncodeHandle(ctx.destRankId * info->qpNum + ctx.qpIdx, queueHead);
+}
+
+AICORE inline bool DecodeHandle(
+    uint64_t handle, __gm__ const RdmaInfo* info, uint32_t& peer, uint32_t& qpIdx, uint32_t& queueHead)
+{
+    uint32_t queueIndex = 0;
+    DecodeHandle(handle, queueIndex, queueHead);
+    if (!IsWorkspaceHeaderValid(info) || queueIndex >= static_cast<uint64_t>(info->rankCount) * info->qpNum) {
+        return false;
+    }
+    peer = queueIndex / info->qpNum;
+    qpIdx = queueIndex % info->qpNum;
+    return true;
 }
 
 } // namespace rdma

@@ -704,13 +704,14 @@ AICORE inline uint32_t ValidateNotifySignal(const RdmaExecContext& ctx, uint64_t
 // ============================================================================
 
 AICORE inline bool BuildSession(
-    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, RdmaSession& session)
+    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, RdmaSession& session,
+    uint32_t qpIdx = 0)
 {
     session = {};
     __gm__ RdmaInfo* info = reinterpret_cast<__gm__ RdmaInfo*>(workspace);
     bool valid = IsWorkspaceHeaderValid(info) && info->backend == RdmaBackend::HNS_1825 && tmpBuf.addr != nullptr &&
                  tmpBuf.size >= kHns1825WriteReadWqeSize && syncId <= kHns1825MaxSyncId && myPe < info->rankCount &&
-                 info->sqPtr != 0 && info->scqPtr != 0 && info->memPtr != 0;
+                 info->sqPtr != 0 && info->scqPtr != 0 && info->memPtr != 0 && qpIdx < info->qpNum;
     if (!valid) {
         return false;
     }
@@ -718,7 +719,7 @@ AICORE inline bool BuildSession(
     session.execCtx.contextGm = workspace;
     session.execCtx.backend = RdmaBackend::HNS_1825;
     session.execCtx.destRankId = 0;
-    session.execCtx.qpIdx = 0;
+    session.execCtx.qpIdx = qpIdx;
     session.execCtx.myPe = myPe;
     session.execCtx.tmpBuf = tmpBuf;
     session.execCtx.syncId = syncId;
@@ -732,9 +733,9 @@ AICORE inline bool BuildSession(
 
 AICORE inline bool BuildSession(
     __gm__ uint8_t* workspace, uint32_t destRankId, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId,
-    RdmaSession& session)
+    RdmaSession& session, uint32_t qpIdx = 0)
 {
-    if (!BuildSession(workspace, myPe, tmpBuf, syncId, session)) {
+    if (!BuildSession(workspace, myPe, tmpBuf, syncId, session, qpIdx)) {
         return false;
     }
 
@@ -742,7 +743,7 @@ AICORE inline bool BuildSession(
     bool valid = destRankId < info->rankCount;
     if (valid) {
         __gm__ RoceCqCtx* cqCtx = reinterpret_cast<__gm__ RoceCqCtx*>(
-            info->scqPtr + static_cast<uint64_t>(destRankId) * info->qpNum * sizeof(RoceCqCtx));
+            info->scqPtr + (static_cast<uint64_t>(destRankId) * info->qpNum + qpIdx) * sizeof(RoceCqCtx));
         const uint32_t cqeSize = cqCtx->cqeSize == 0 ? kHns1825DefaultCqeSize : cqCtx->cqeSize;
         valid = cqeSize >= sizeof(Hns1825Cqe) && cqeSize <= tmpBuf.size;
     }
@@ -768,7 +769,7 @@ AICORE inline uint64_t Write(const RdmaExecContext& ctx, __gm__ uint8_t* dst, __
     wr.local_addr = src;
     wr.message_len = len;
     detail::PostSendResult result = detail::PostSendReadWrite<RdmaOpcode::OP_RDMA_WRITE>(ctx, wr);
-    return result.status == 0 ? EncodeHandle(ctx.destRankId, result.curHead) : EncodeErrorHandle(result.status);
+    return result.status == 0 ? EncodeHandle(ctx, result.curHead) : EncodeErrorHandle(result.status);
 }
 
 // RDMA WRITE followed by a fenced 4-byte Set or INT32 SUM to remoteSignal.
@@ -797,7 +798,7 @@ AICORE inline uint64_t WriteNotify(
     signalWr.message_len = sizeof(int32_t);
 
     const detail::PostSendResult result = detail::PostSendWriteNotify(ctx, payloadWr, signalWr, signalValue, notifyOp);
-    return result.status == 0U ? EncodeHandle(ctx.destRankId, result.curHead) : EncodeErrorHandle(result.status);
+    return result.status == 0U ? EncodeHandle(ctx, result.curHead) : EncodeErrorHandle(result.status);
 }
 
 // RDMA READ: dst is local, src is remote (remote goes into wr.remote_addr).
@@ -813,7 +814,7 @@ AICORE inline uint64_t Read(const RdmaExecContext& ctx, __gm__ uint8_t* dst, __g
     wr.local_addr = dst;
     wr.message_len = len;
     detail::PostSendResult result = detail::PostSendReadWrite<RdmaOpcode::OP_RDMA_READ>(ctx, wr);
-    return result.status == 0 ? EncodeHandle(ctx.destRankId, result.curHead) : EncodeErrorHandle(result.status);
+    return result.status == 0 ? EncodeHandle(ctx, result.curHead) : EncodeErrorHandle(result.status);
 }
 
 // Symmetric MR base VA of a peer (device VA), read from the RdmaInfo mem table.
@@ -840,13 +841,15 @@ AICORE inline uint32_t WaitEventStatus(uint64_t handle, const RdmaEventContext& 
         return static_cast<uint32_t>(handle);
     }
     uint32_t destRankId = 0;
+    uint32_t qpIdx = 0;
     uint32_t curHead = 0;
-    DecodeHandle(handle, destRankId, curHead);
     __gm__ RdmaInfo* info = (__gm__ RdmaInfo*)ctx.contextGm;
-    if (!detail::IsQueueValid(info, destRankId, 0, ctx.tmpBuf, ctx.syncId) || ctx.backend != RdmaBackend::HNS_1825) {
+    if (!DecodeHandle(handle, info, destRankId, qpIdx, curHead) ||
+        !detail::IsQueueValid(info, destRankId, qpIdx, ctx.tmpBuf, ctx.syncId) ||
+        ctx.backend != RdmaBackend::HNS_1825) {
         return kHns1825InvalidContextError;
     }
-    return detail::PollCq(info, destRankId, /*qpIdx*/ 0, curHead, ctx.tmpBuf.addr, ctx.syncId);
+    return detail::PollCq(info, destRankId, qpIdx, curHead, ctx.tmpBuf.addr, ctx.syncId);
 }
 
 AICORE inline bool WaitEvent(uint64_t handle, const RdmaEventContext& ctx) { return WaitEventStatus(handle, ctx) == 0; }
@@ -863,19 +866,20 @@ AICORE inline bool TestEvent(uint64_t handle, const RdmaEventContext& ctx)
         return true;
     }
     uint32_t destRankId = 0;
+    uint32_t qpIdx = 0;
     uint32_t curHead = 0;
-    DecodeHandle(handle, destRankId, curHead);
-
     __gm__ RdmaInfo* info = (__gm__ RdmaInfo*)ctx.contextGm;
-    if (!detail::IsQueueValid(info, destRankId, 0, ctx.tmpBuf, ctx.syncId) || ctx.backend != RdmaBackend::HNS_1825) {
+    if (!DecodeHandle(handle, info, destRankId, qpIdx, curHead) ||
+        !detail::IsQueueValid(info, destRankId, qpIdx, ctx.tmpBuf, ctx.syncId) ||
+        ctx.backend != RdmaBackend::HNS_1825) {
         return true;
     }
     __gm__ RoceSqCtx* sq =
-        reinterpret_cast<__gm__ RoceSqCtx*>(info->sqPtr) + static_cast<uint64_t>(destRankId) * info->qpNum;
+        reinterpret_cast<__gm__ RoceSqCtx*>(info->sqPtr) + static_cast<uint64_t>(destRankId) * info->qpNum + qpIdx;
     __gm__ QueueState* state = detail::GetQueueState(sq);
     if (detail::AtomicLoad(&state->completedHead) < curHead && detail::QueueError(state) == 0) {
         detail::SubmitReady(sq, ctx.tmpBuf.addr, ctx.syncId);
-        detail::ProgressCq(info, destRankId, 0, ctx.tmpBuf.addr, ctx.syncId);
+        detail::ProgressCq(info, destRankId, qpIdx, ctx.tmpBuf.addr, ctx.syncId);
     }
     const bool terminal = detail::AtomicLoad(&state->completedHead) >= curHead || detail::QueueError(state) != 0;
     if (terminal) {
@@ -895,19 +899,17 @@ AICORE inline bool GetRdmaCompletionRecord(uint64_t handle, const RdmaEventConte
         return false;
     }
     uint32_t destRankId = 0;
+    uint32_t qpIdx = 0;
     uint32_t curHead = 0;
-    DecodeHandle(handle, destRankId, curHead);
-    if (curHead == 0U) {
-        return false;
-    }
-
     __gm__ RdmaInfo* info = (__gm__ RdmaInfo*)ctx.contextGm;
-    if (!IsWorkspaceHeaderValid(info)) {
+    if (!DecodeHandle(handle, info, destRankId, qpIdx, curHead) || curHead == 0U ||
+        !detail::IsQueueValid(info, destRankId, qpIdx, ctx.tmpBuf, ctx.syncId) ||
+        ctx.backend != RdmaBackend::HNS_1825) {
         return false;
     }
     uint32_t qpNum = info->qpNum;
     __gm__ RoceCqCtx* cqCtx =
-        (__gm__ RoceCqCtx*)(info->scqPtr + ((uint64_t)destRankId * qpNum + 0) * sizeof(RoceCqCtx));
+        (__gm__ RoceCqCtx*)(info->scqPtr + ((uint64_t)destRankId * qpNum + qpIdx) * sizeof(RoceCqCtx));
 
     uint32_t cqeSize = cqCtx->cqeSize == 0 ? kHns1825DefaultCqeSize : cqCtx->cqeSize;
     uint32_t cqRing = cqCtx->depth;

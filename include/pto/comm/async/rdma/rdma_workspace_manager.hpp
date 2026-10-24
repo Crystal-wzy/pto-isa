@@ -50,6 +50,8 @@ struct WorkspaceConfig {
     std::vector<uint64_t> peerSymAddrs;
     void* symmetricAddr{nullptr};
     uint64_t symmetricSize{0};
+    // Number of QPs per peer; all ranks must use the same value.
+    uint32_t qpNum{1};
 };
 
 class RdmaWorkspaceManager {
@@ -117,7 +119,7 @@ public:
                 hns1825Backend_.SetTraceId(traceId_);
                 const bool initialized = hns1825Backend_.Init(
                     config.rankId, config.rankCount, config.phyId, config.localIp, config.basePort, config.peerIps,
-                    config.peerPhyIds, config.peerSymAddrs, config.symmetricAddr, config.symmetricSize);
+                    config.peerPhyIds, config.peerSymAddrs, config.symmetricAddr, config.symmetricSize, config.qpNum);
                 activeBackend_ = initialized ? RdmaBackend::HNS_1825 : RdmaBackend::NONE;
                 return initialized ? WorkspaceInitResult::READY : WorkspaceInitResult::ERROR;
             }
