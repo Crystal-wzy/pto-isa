@@ -33,7 +33,7 @@ std::string GetGoldenDir()
 template <typename T, int kTRows_, int kTCols_, int vRows, int vCols, bool isHalf, bool highPrecision = false>
 void LaunchTRem(T* out, T* src0, T* src1, void* stream);
 
-template <typename T, int tileH, int tileW, int vRows, int vCols>
+template <typename T, int tileH, int tileW, int vRows, int vCols, bool highPrecision = false>
 void LaunchTRemInplace(T* out, T* src1, void* stream);
 
 template <typename T, int kTRows_, int kTCols_, int vRows, int vCols, bool isHalf, bool highPrecision = false>
@@ -101,7 +101,7 @@ void test_trem()
     EXPECT_TRUE(ret);
 }
 
-template <typename T, int tileH, int tileW, int vRows, int vCols>
+template <typename T, int tileH, int tileW, int vRows, int vCols, bool highPrecision = false>
 void test_trem_inplace()
 {
     size_t fileSize = tileH * tileW * sizeof(T);
@@ -125,7 +125,7 @@ void test_trem_inplace()
 
     aclrtMemcpy(dstDevice, fileSize, dstHost, fileSize, ACL_MEMCPY_HOST_TO_DEVICE);
     aclrtMemcpy(src1Device, fileSize, src1Host, fileSize, ACL_MEMCPY_HOST_TO_DEVICE);
-    LaunchTRemInplace<T, tileH, tileW, vRows, vCols>(dstDevice, src1Device, stream);
+    LaunchTRemInplace<T, tileH, tileW, vRows, vCols, highPrecision>(dstDevice, src1Device, stream);
 
     aclrtSynchronizeStream(stream);
     aclrtMemcpy(dstHost, fileSize, dstDevice, fileSize, ACL_MEMCPY_DEVICE_TO_HOST);
@@ -147,10 +147,11 @@ void test_trem_inplace()
     ReadFile(GetGoldenDir() + "/output.bin", fileSize, devFinal.data(), fileSize);
 
     bool ret;
+    float eps = highPrecision ? 0.0000001f : 0.001f;
     if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
         ret = ResultCmpExact(golden, devFinal.data());
     } else {
-        ret = ResultCmp<T>(golden, devFinal, 0.001f);
+        ret = ResultCmp<T>(golden, devFinal, eps);
     }
 
     EXPECT_TRUE(ret);
@@ -193,3 +194,29 @@ TEST_F(TREMTest, case_int64_floor_4x64_40_inplace) { test_trem_inplace<int64_t, 
 
 TEST_F(TREMTest, case_uint64_edge_4x64) { test_trem<uint64_t, 4, 64, 4, 64, false>(); }
 TEST_F(TREMTest, case_uint64_edge_4x64_40_inplace) { test_trem_inplace<uint64_t, 4, 64, 4, 40>(); }
+
+TEST_F(TREMTest, case_hp_vec1) { test_trem<float, 1, 64, 1, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_vec2) { test_trem<float, 2, 64, 2, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_vec4) { test_trem<float, 4, 64, 4, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_vec8) { test_trem<float, 8, 64, 8, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_row1) { test_trem<float, 1, 512, 1, 512, false, true>(); }
+
+TEST_F(TREMTest, case_hp_tail) { test_trem<float, 4, 128, 4, 65, false, true>(); }
+
+TEST_F(TREMTest, case_hp_edge_8x64) { test_trem<float, 8, 64, 8, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_edge_1x64) { test_trem<float, 1, 64, 1, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_inplace) { test_trem_inplace<float, 8, 64, 8, 64, true>(); }
+
+TEST_F(TREMTest, case_hp_v16) { test_trem<float, 16, 64, 16, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_v24) { test_trem<float, 24, 64, 24, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_v32) { test_trem<float, 32, 64, 32, 64, false, true>(); }
+
+TEST_F(TREMTest, case_hp_v48) { test_trem<float, 48, 64, 48, 64, false, true>(); }

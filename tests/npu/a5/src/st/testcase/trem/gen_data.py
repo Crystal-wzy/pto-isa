@@ -109,8 +109,21 @@ def gen_golden_data_trem(case_name, param):
         nonzero = input2 != 0
         golden[nonzero] = input1[nonzero] % input2[nonzero]
     else:
-        input1 = np.random.uniform(low=value_min, high=value_max, size=(h_valid, w_valid)).astype(dtype)
-        input2 = np.random.uniform(low=value_min, high=value_max, size=(h_valid, w_valid)).astype(dtype)
+        if dtype == np.float32 and param.use_edge_cases:
+            # finite-result edge pairs: +-0, subnormals, huge/tiny ratios,
+            # sign-flip remainders (x % +-inf is a known upstream gap, left out)
+            vals1 = [
+                0.0, -0.0, 1e-40, -1e-40, np.finfo(np.float32).max, 7.0, -7.0, 511.5, 1e-30, -256.75,
+                1.1754944e-38, 8388608.5, 5.25, -13.5,
+            ]
+            vals2 = [
+                3.0, -3.0, 1e-40, 2e-40, 1e-30, -3.0, 3.0, 512.0, 1e-40, 255.5, 7.0, 4096.0, 2.5, -0.125,
+            ]
+            input1 = np.resize(np.array(vals1, dtype=np.float32), (h_valid, w_valid))
+            input2 = np.resize(np.array(vals2, dtype=np.float32), (h_valid, w_valid))
+        else:
+            input1 = np.random.uniform(low=value_min, high=value_max, size=(h_valid, w_valid)).astype(dtype)
+            input2 = np.random.uniform(low=value_min, high=value_max, size=(h_valid, w_valid)).astype(dtype)
         golden = input1 % input2
 
     if "inplace" in case_name and (w_valid < tile_col or h_valid < tile_row):
@@ -183,6 +196,19 @@ if __name__ == "__main__":
         TremParams("TREMTest.case_uint64_edge_4x64_40_inplace", np.uint64, 4, 64, 4, 40, use_edge_cases=True),
         TremParams("TREMTest.case_int64_floor_4x64", np.int64, 4, 64, 4, 64, use_edge_cases=True),
         TremParams("TREMTest.case_int64_floor_4x64_40_inplace", np.int64, 4, 64, 4, 40, use_edge_cases=True),
+        TremParams("TREMTest.case_hp_vec1", np.float32, 1, 64, 1, 64),
+        TremParams("TREMTest.case_hp_vec2", np.float32, 2, 64, 2, 64),
+        TremParams("TREMTest.case_hp_vec4", np.float32, 4, 64, 4, 64),
+        TremParams("TREMTest.case_hp_vec8", np.float32, 8, 64, 8, 64),
+        TremParams("TREMTest.case_hp_row1", np.float32, 1, 512, 1, 512),
+        TremParams("TREMTest.case_hp_tail", np.float32, 4, 128, 4, 65),
+        TremParams("TREMTest.case_hp_edge_8x64", np.float32, 8, 64, 8, 64, use_edge_cases=True),
+        TremParams("TREMTest.case_hp_edge_1x64", np.float32, 1, 64, 1, 64, use_edge_cases=True),
+        TremParams("TREMTest.case_hp_inplace", np.float32, 8, 64, 8, 64),
+        TremParams("TREMTest.case_hp_v16", np.float32, 16, 64, 16, 64),
+        TremParams("TREMTest.case_hp_v24", np.float32, 24, 64, 24, 64),
+        TremParams("TREMTest.case_hp_v32", np.float32, 32, 64, 32, 64),
+        TremParams("TREMTest.case_hp_v48", np.float32, 48, 64, 48, 64),
     ]
 
     for param in case_params_list:
