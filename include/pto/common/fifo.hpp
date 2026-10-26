@@ -30,7 +30,7 @@ enum Direction : uint8_t {
     DIR_V2C = 2,                  // Vector → Cube: Vector is producer, Cube is consumer
     DIR_BOTH = DIR_C2V | DIR_V2C, // Support both directions
     DIR_V2C_CTRL = 4,
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(__CPU_SIM)
     DIR_C2V_GM = 5,
     DIR_V2C_GM = 6,
     DIR_BOTH_GM = DIR_C2V_GM | DIR_V2C_GM,
