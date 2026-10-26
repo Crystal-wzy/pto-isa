@@ -12,6 +12,8 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "test_common.h"
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 using namespace std;
 using namespace PtoTestCommon;
 
@@ -21,10 +23,18 @@ enum class TStoreConvCase {
     NDC1HWC0DynN,
     NDC1HWC0DynND,
     NDC1HWC0DynNDGlobal,
+    NC1HWC0ValidStatic,
+    NC1HWC0ValidDynamic,
+    NDC1HWC0ValidStatic,
+    NDC1HWC0ValidDynamic,
 };
 
 template <typename T, TStoreConvCase caseKey, int s0, int s1, int s2, int s3, int s4>
 void LaunchTStoreConv(T* out, T* src, int64_t n, int64_t d, void* stream);
+
+template <
+    typename T, TStoreConvCase caseKey, int s0, int s1, int s2, int s3, int s4, int v0, int v1, int v2, int v3, int v4>
+void LaunchTStoreConvValid(T* out, T* src, void* stream);
 
 class TStoreConvTest : public testing::Test {
 protected:
@@ -42,7 +52,7 @@ std::string GetGoldenDir()
 }
 
 template <typename T, typename LaunchFn>
-void RunTStoreConvCase(size_t srcFileSize, size_t dstFileSize, LaunchFn launch)
+void RunTStoreConvCase(size_t srcFileSize, size_t dstFileSize, LaunchFn launch, T initValue = T(0))
 {
     aclInit(nullptr);
     aclrtSetDevice(0);
@@ -59,8 +69,9 @@ void RunTStoreConvCase(size_t srcFileSize, size_t dstFileSize, LaunchFn launch)
     aclrtMalloc((void**)&srcDevice, srcFileSize, ACL_MEM_MALLOC_HUGE_FIRST);
 
     ReadFile(GetGoldenDir() + "/input.bin", srcFileSize, srcHost, srcFileSize);
-    aclrtMemset(dstDevice, dstFileSize, 0, dstFileSize);
+    std::fill(dstHost, dstHost + dstFileSize / sizeof(T), initValue);
 
+    aclrtMemcpy(dstDevice, dstFileSize, dstHost, dstFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
     aclrtMemcpy(srcDevice, srcFileSize, srcHost, srcFileSize, ACL_MEMCPY_HOST_TO_DEVICE);
 
     launch(dstDevice, srcDevice, stream);
@@ -100,6 +111,21 @@ void test_tstore_conv(int64_t n = 0, int64_t d = 0)
     });
 }
 
+template <
+    typename T, TStoreConvCase caseKey, int s0, int s1, int s2, int s3, int s4, int v0, int v1, int v2, int v3, int v4>
+void test_tstore_conv_valid()
+{
+    constexpr size_t kC0 = 32 / sizeof(T);
+    size_t fileSize = s0 * s1 * s2 * s3 * s4 * kC0 * sizeof(T);
+
+    RunTStoreConvCase<T>(
+        fileSize, fileSize,
+        [&](T* dst, T* src, void* stream) {
+            LaunchTStoreConvValid<T, caseKey, s0, s1, s2, s3, s4, v0, v1, v2, v3, v4>(dst, src, stream);
+        },
+        static_cast<T>(-7));
+}
+
 /*-----------------Static shapes------------------*/
 TEST_F(TStoreConvTest, NDC1HWC0_1) { test_tstore_conv<float, TStoreConvCase::NDC1HWC0Static, 1, 1, 1, 2, 8>(); }
 
@@ -128,3 +154,24 @@ TEST_F(TStoreConvTest, NDC1HWC0_Dyn4)
 
 /*-------Dynamic tile dims, unaligned sizes-------*/
 TEST_F(TStoreConvTest, NDC1HWC0_Dyn5) { test_tstore_conv<float, TStoreConvCase::NDC1HWC0DynN, 4, 3, 3, 3, 5>(3); }
+
+/*------------------ValidShape cases------------------*/
+TEST_F(TStoreConvTest, NC1HWC0_valid_static)
+{
+    test_tstore_conv_valid<float, TStoreConvCase::NC1HWC0ValidStatic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>();
+}
+
+TEST_F(TStoreConvTest, NC1HWC0_valid_dynamic)
+{
+    test_tstore_conv_valid<int32_t, TStoreConvCase::NC1HWC0ValidDynamic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>();
+}
+
+TEST_F(TStoreConvTest, NDC1HWC0_valid_static)
+{
+    test_tstore_conv_valid<float, TStoreConvCase::NDC1HWC0ValidStatic, 2, 3, 2, 4, 5, 1, 2, 1, 3, 4>();
+}
+
+TEST_F(TStoreConvTest, NDC1HWC0_valid_dynamic)
+{
+    test_tstore_conv_valid<int32_t, TStoreConvCase::NDC1HWC0ValidDynamic, 2, 3, 2, 4, 5, 1, 2, 1, 3, 4>();
+}

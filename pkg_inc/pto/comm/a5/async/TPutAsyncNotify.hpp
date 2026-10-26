@@ -62,7 +62,7 @@ PTO_INTERNAL AsyncEvent TPUT_ASYNC_NOTIFY_URMA(
         reinterpret_cast<__gm__ uint8_t*>(dstGlobalData.data()),
         reinterpret_cast<__gm__ uint8_t*>(srcGlobalData.data()), transferSize,
         reinterpret_cast<__gm__ int32_t*>(dstSignalData.data()), signalValue, notifyOp, session, peer);
-    return AsyncEvent(result.handle, DmaEngine::URMA, result.targetCqe);
+    return urma::MakeUrmaNotifyEvent(result);
 }
 #endif
 
@@ -76,8 +76,8 @@ PTO_INTERNAL AsyncEvent TPUT_ASYNC_NOTIFY_RDMA(
         session.valid && session.engine == DmaEngine::RDMA, "TPUT_ASYNC_NOTIFY: RDMA requires a valid RDMA session.");
     const uint64_t transferSize = TPutAsyncValidatePayload(dstGlobalData, srcGlobalData);
     TPutAsyncValidateNotifySignal(dstSignalData, notifyOp);
-    if (notifyOp != NotifyOp::Set) {
-        PTO_ASSERT(false, "TPUT_ASYNC_NOTIFY: RDMA currently supports NotifyOp::Set only.");
+    if (notifyOp != NotifyOp::Set && notifyOp != NotifyOp::AtomicAdd) {
+        PTO_ASSERT(false, "TPUT_ASYNC_NOTIFY: notifyOp must be Set or AtomicAdd.");
         return AsyncEvent(rdma::EncodeErrorHandle(rdma::kRdmaUnsupportedOperationError), DmaEngine::RDMA);
     }
     PTO_ASSERT(transferSize <= 0x7fffffffULL, "TPUT_ASYNC_NOTIFY: RDMA payload must not exceed 0x7fffffff bytes.");
@@ -85,7 +85,7 @@ PTO_INTERNAL AsyncEvent TPUT_ASYNC_NOTIFY_RDMA(
     const uint64_t eventHandle = rdma::WriteNotify(
         session, reinterpret_cast<__gm__ uint8_t*>(dstGlobalData.data()),
         reinterpret_cast<__gm__ uint8_t*>(srcGlobalData.data()), transferSize,
-        reinterpret_cast<__gm__ int32_t*>(dstSignalData.data()), signalValue, peer);
+        reinterpret_cast<__gm__ int32_t*>(dstSignalData.data()), signalValue, peer, notifyOp);
     return AsyncEvent(eventHandle, DmaEngine::RDMA);
 }
 #endif

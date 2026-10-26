@@ -680,8 +680,8 @@ void PopulateMultiServerTiling(MegaMoeBuildResult& result, const CaseConfig& cfg
     const uint32_t rank = static_cast<uint32_t>(runtime.hccl.rank_id);
     const uint32_t perServer = runtime.rank_num_per_server;
     if (ranks != static_cast<uint32_t>(runtime.hccl.world_size) || rank >= ranks || perServer == 0U ||
-        perServer > ranks || ranks % perServer != 0U || runtime.urma_workspace == nullptr ||
-        runtime.urma_jetty_count != cfg.aic_num) {
+        perServer > ranks || ranks % perServer != 0U || runtime.urma_workspace == nullptr || cfg.aic_num == 0U ||
+        runtime.urma_jetty_count == 0U || runtime.urma_jetty_count % cfg.aic_num != 0U) {
         throw std::runtime_error("URMA topology/workspace is incomplete");
     }
     multi.enabled = 1U;

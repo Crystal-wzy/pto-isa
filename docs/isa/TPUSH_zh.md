@@ -1,5 +1,18 @@
 # TPUSH
 
+## 产品支持情况<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT系列产品：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3系列产品：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2系列产品：支持
+<!-- end id3 -->
+
+
 ## 简介
 
 将生产者tile推入FIFO中，用于Cube-Vector之间的数据传输和核间同步。

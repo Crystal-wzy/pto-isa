@@ -39,22 +39,6 @@ namespace mgather_cfg {
 constexpr uint32_t WARP_SIZE = 32u;
 constexpr uint32_t MAX_WARPS = 32u;
 constexpr uint32_t MAX_THREADS = WARP_SIZE * MAX_WARPS;
-
-template <uint32_t TotalElems>
-struct ElemLaunch {
-    static constexpr uint32_t kWarpsNeeded = (TotalElems + WARP_SIZE - 1u) / WARP_SIZE;
-    static constexpr uint32_t kLaunchWarps =
-        (kWarpsNeeded == 0u) ? 1u : ((kWarpsNeeded < MAX_WARPS) ? kWarpsNeeded : MAX_WARPS);
-};
-
-template <uint32_t NumRows, uint32_t RowWidth>
-struct RowLaunch {
-    static constexpr uint32_t kRowWarps = (NumRows < MAX_WARPS) ? ((NumRows == 0u) ? 1u : NumRows) : MAX_WARPS;
-    static constexpr uint32_t kFreeWarps = MAX_WARPS / kRowWarps;
-    static constexpr uint32_t kColChunks = (RowWidth + WARP_SIZE - 1u) / WARP_SIZE;
-    static constexpr uint32_t kWarpsPerRow = (kFreeWarps < kColChunks) ? kFreeWarps : kColChunks;
-    static constexpr uint32_t kLaunchWarps = kRowWarps * ((kWarpsPerRow == 0u) ? 1u : kWarpsPerRow);
-};
 } // namespace mgather_cfg
 
 template <GatherOOB Oob>
@@ -72,6 +56,19 @@ __simt_callee__ AICORE PTO_INLINE uint32_t gather_remap(uint32_t idx, uint32_t c
     } else {
         doRead = (idx < cap) ? 1u : 0u;
         return idx;
+    }
+}
+
+template <typename T>
+__simt_callee__ AICORE PTO_INLINE void mgather_copy_or_zero(__ubuf__ T* dst, __gm__ const T* src, uint32_t doRead)
+{
+    if constexpr (
+        std::is_same_v<T, float8_e4m3_t> || std::is_same_v<T, float8_e5m2_t> || std::is_same_v<T, hifloat8_t>) {
+        __ubuf__ uint8_t* dstByte = reinterpret_cast<__ubuf__ uint8_t*>(dst);
+        __gm__ const uint8_t* srcByte = reinterpret_cast<__gm__ const uint8_t*>(src);
+        *dstByte = doRead ? *srcByte : static_cast<uint8_t>(0);
+    } else {
+        *dst = doRead ? *src : static_cast<T>(0);
     }
 }
 
@@ -115,7 +112,7 @@ AICORE __simt_vf__ LAUNCH_BOUND(1024) PTO_INLINE void simt_mgather_row_kernel(
     const uint32_t rowWarp = ty % kRowWarps;
     const uint32_t colSeg = ty / kRowWarps;
 
-#pragma unroll(1)
+#pragma unroll 1
     for (uint32_t row = rowWarp; row < validRows; row += kRowWarps) {
         const uint32_t rawIdx = static_cast<uint32_t>(indices[row]);
         uint32_t doRead;
@@ -123,8 +120,7 @@ AICORE __simt_vf__ LAUNCH_BOUND(1024) PTO_INLINE void simt_mgather_row_kernel(
         __gm__ const T* srcRow = table + safeIdx * validCols;
 #pragma unroll 4
         for (uint32_t col = colSeg * mgather_cfg::WARP_SIZE + tx; col < validCols; col += kColStride) {
-            const T val = doRead ? srcRow[col] : static_cast<T>(0);
-            dst[tile_offset_2d<TileDst>(row, col)] = val;
+            mgather_copy_or_zero(dst + tile_offset_2d<TileDst>(row, col), srcRow + col, doRead);
         }
     }
 }
@@ -153,7 +149,7 @@ AICORE __simt_vf__ LAUNCH_BOUND(1024) PTO_INLINE void simt_mgather_elem_kernel(
     const uint32_t ty = threadIdx.y;
     const uint32_t tid = ty * mgather_cfg::WARP_SIZE + tx;
 
-#pragma unroll(1)
+#pragma unroll 1
     for (uint32_t i = tid; i < totalElems; i += kLaunchThreads) {
         const uint32_t r = (validCols == 1u) ? i : (i / validCols);
         const uint32_t c = (validCols == 1u) ? 0u : (i - r * validCols);
@@ -162,7 +158,7 @@ AICORE __simt_vf__ LAUNCH_BOUND(1024) PTO_INLINE void simt_mgather_elem_kernel(
         const uint32_t rawIdx = static_cast<uint32_t>(indices[idxOff]);
         uint32_t doRead;
         const uint32_t safeIdx = gather_remap<Oob>(rawIdx, tableSize, doRead);
-        dst[dstOff] = doRead ? table[safeIdx] : static_cast<T>(0);
+        mgather_copy_or_zero(dst + dstOff, table + safeIdx, doRead);
     }
 }
 
@@ -232,7 +228,14 @@ __tf__ AICORE void MGatherScalarImpl(
         doRead = (rawIdx < tableSize) ? 1u : 0u;
         safeIdx = rawIdx;
     }
-    dstPtr[0] = doRead ? tablePtr[safeIdx] : static_cast<T>(0);
+    if constexpr (
+        std::is_same_v<T, float8_e4m3_t> || std::is_same_v<T, float8_e5m2_t> || std::is_same_v<T, hifloat8_t>) {
+        __ubuf__ uint8_t* dstByte = reinterpret_cast<__ubuf__ uint8_t*>(dstPtr);
+        __gm__ const uint8_t* srcByte = reinterpret_cast<__gm__ const uint8_t*>(tablePtr);
+        dstByte[0] = doRead ? srcByte[safeIdx] : static_cast<uint8_t>(0);
+    } else {
+        dstPtr[0] = doRead ? tablePtr[safeIdx] : static_cast<T>(0);
+    }
     set_flag(PIPE_S, PIPE_V, EVENT_ID0);
     wait_flag(PIPE_S, PIPE_V, EVENT_ID0);
 }
@@ -375,7 +378,7 @@ AICORE __simt_vf__ LAUNCH_BOUND(1024) PTO_INLINE void simt_mgather_l1_elem_kerne
 
     const uint32_t tid = threadIdx.y * mgather_cfg::WARP_SIZE + threadIdx.x;
 
-#pragma unroll(1)
+#pragma unroll 1
     for (uint32_t off = tid; off < kTileNumel; off += kLaunchThreads) {
         const uint32_t blockCol = off / kBlockSpan;
         const uint32_t rem = off - blockCol * kBlockSpan;
@@ -493,13 +496,13 @@ PTO_INTERNAL void MGatherCheck(const TileDst& dst, const GlobalTable& table, con
     static_assert(TileDst::Loc == TileType::Vec, "MGATHER destination must be a Vec tile (UB).");
     static_assert(TileIdx::Loc == TileType::Vec, "MGATHER indices must be a Vec tile (UB).");
 
-    constexpr uint32_t kDstValidR = static_cast<uint32_t>(TileDst::ValidRow);
-    constexpr uint32_t kDstValidC = static_cast<uint32_t>(TileDst::ValidCol);
-    constexpr uint32_t kIdxValidR = static_cast<uint32_t>(TileIdx::ValidRow);
-    constexpr uint32_t kIdxValidC = static_cast<uint32_t>(TileIdx::ValidCol);
+    constexpr int kDstValidR = TileDst::ValidRow;
+    constexpr int kDstValidC = TileDst::ValidCol;
+    constexpr int kIdxValidR = TileIdx::ValidRow;
+    constexpr int kIdxValidC = TileIdx::ValidCol;
 
     using ShapeType = typename GlobalTable::Shape;
-    constexpr uint32_t kTableCols = static_cast<uint32_t>(ShapeType::staticShape[4]);
+    constexpr int64_t kTableCols = ShapeType::staticShape[4];
 
     if constexpr (Mode == Coalesce::Row) {
         if constexpr (kDstValidR > 0 && kDstValidC > 0) {

@@ -60,6 +60,33 @@ PTO_INTERNAL bool DecodeSdmaEventHandle(uint64_t handle, uint64_t& postId, uint3
     return true;
 }
 
+// The committed post counter persisted in GM carries the writing session's final queue prefix in the
+// same high bits the event handle uses, which postId never reaches. A session rebuilt on the same
+// workspace needs that prefix: the flag payload slots it inherits were written by posts whose queue
+// prefix is recorded nowhere else, and a per-queue record sitting below a slot's post id is
+// indistinguishable from an SQE still in flight.
+PTO_INTERNAL uint64_t EncodeCommittedPostId(uint64_t postId, uint32_t queueCount)
+{
+    return (static_cast<uint64_t>(queueCount) << kSdmaHandlePostIdBits) | postId;
+}
+
+// Returns whether the word carries a prefix this encoding wrote. Every persisted prefix is at least
+// one, so a zero or out-of-range prefix marks a word that belongs to something else: a workspace
+// written before this encoding existed, or a region a differently shaped session aliased onto this
+// address. The post id is still resumed from such a word -- restarting it would hand two tasks the
+// same id -- but queueNum is substituted for the prefix, which is the conservative wait the code
+// used before any prefix was persisted.
+PTO_INTERNAL bool DecodeCommittedPostId(uint64_t word, uint32_t queueNum, uint64_t& postId, uint32_t& queueCount)
+{
+    postId = word & kSdmaHandlePostIdMask;
+    queueCount = static_cast<uint32_t>(word >> kSdmaHandlePostIdBits);
+    if (queueCount == 0U || queueCount > queueNum) {
+        queueCount = queueNum;
+        return false;
+    }
+    return true;
+}
+
 PTO_INTERNAL bool MakeSdmaTmpLocal(__ubuf__ uint8_t* addr, uint32_t size, UbTmpBuf& tmpBuf)
 {
     if (addr == nullptr || size < sizeof(uint64_t)) {

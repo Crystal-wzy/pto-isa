@@ -37,20 +37,22 @@ struct BackendQueueSnapshot {
 };
 
 // Read only while the test stream is idle; the driver owns both ring depths.
-inline bool ReadBackendQueueSnapshot(const void* workspace, uint32_t peer, BackendQueueSnapshot& snapshot)
+inline bool ReadBackendQueueSnapshot(
+    const void* workspace, uint32_t peer, BackendQueueSnapshot& snapshot, uint32_t qpIdx = 0)
 {
     RdmaInfo info{};
     if (aclrtMemcpy(&info, sizeof(info), workspace, sizeof(info), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS ||
-        peer >= info.rankCount || info.qpNum != 1 || info.sqPtr == 0 || info.scqPtr == 0) {
+        peer >= info.rankCount || qpIdx >= info.qpNum || info.sqPtr == 0 || info.scqPtr == 0) {
         return false;
     }
+    const uint64_t queue = static_cast<uint64_t>(peer) * info.qpNum + qpIdx;
     hns_1825::SqContext sq{};
     hns_1825::CqContext cq{};
     if (aclrtMemcpy(
-            &sq, sizeof(sq), reinterpret_cast<const void*>(info.sqPtr + peer * sizeof(sq)), sizeof(sq),
+            &sq, sizeof(sq), reinterpret_cast<const void*>(info.sqPtr + queue * sizeof(sq)), sizeof(sq),
             ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS ||
         aclrtMemcpy(
-            &cq, sizeof(cq), reinterpret_cast<const void*>(info.scqPtr + peer * sizeof(cq)), sizeof(cq),
+            &cq, sizeof(cq), reinterpret_cast<const void*>(info.scqPtr + queue * sizeof(cq)), sizeof(cq),
             ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS ||
         sq.stateAddr == 0) {
         return false;

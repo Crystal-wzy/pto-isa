@@ -18,15 +18,33 @@ namespace comm {
 namespace sdma {
 namespace detail {
 
-PTO_INTERNAL void UpdateCachedPostDoneIds(uint64_t postId, uint64_t queueMask, SdmaRuntimeContext& runtimeCtx)
+// Per-post view of the SQ ring positions. The authoritative copy lives in the GM channel info, so
+// each post reloads it instead of carrying 2 * kSdmaMaxChannelGroups words in the session.
+struct SdmaSqCursor {
+    uint32_t sqTail[kSdmaMaxChannelGroups];
+    uint32_t sqHead[kSdmaMaxChannelGroups];
+};
+
+// Plain scalar loads, matching how AddOneMemcpySqe reads sq_base / sq_depth from the same lines.
+// InitializeRuntimeCtx already invalidated this range once at session build time, and PersistSqTails
+// keeps the scalar cache in sync with what it pushes to GM.
+PTO_INTERNAL void LoadSqCursor(__gm__ BatchWriteChannelInfo* channels, uint32_t queueNum, SdmaSqCursor& cursor)
 {
-    uint32_t queue = 0U;
-    while (queueMask != 0ULL) {
-        if ((queueMask & 1ULL) != 0ULL && runtimeCtx.postDoneId[queue] < postId) {
-            runtimeCtx.postDoneId[queue] = postId;
-        }
-        queueMask >>= 1U;
-        ++queue;
+    for (uint32_t queue = 0U; queue < queueNum; ++queue) {
+        cursor.sqHead[queue] = channels[queue].sq_head;
+        cursor.sqTail[queue] = channels[queue].sq_tail;
+    }
+}
+
+// Raise the single completion watermark. Only an observation that covers at least the already
+// confirmed queue prefix can move it; a narrower one is dropped so the invariant "every queue below
+// confirmedQueueCount retired everything up to confirmedPostId" always holds. Dropping an
+// observation only costs one extra GM poll later.
+PTO_INTERNAL void UpdateCachedPostDoneIds(uint64_t postId, uint32_t queueCount, SdmaRuntimeContext& runtimeCtx)
+{
+    if (queueCount >= runtimeCtx.confirmedQueueCount && postId > runtimeCtx.confirmedPostId) {
+        runtimeCtx.confirmedPostId = postId;
+        runtimeCtx.confirmedQueueCount = static_cast<uint8_t>(queueCount);
     }
 }
 
@@ -52,10 +70,42 @@ PTO_INTERNAL bool CheckPostDoneIds(
     return true;
 }
 
-PTO_INTERNAL bool InitializeRuntimeCtx(const SdmaSession& session)
+// Resume the committed post counter and the queue prefix that was committed with it, instead of
+// restarting at zero. The caller invalidates this address first, which keeps the read independent of
+// the channel metadata cache range; a fresh workspace still reads zero because it is zeroed when it
+// is allocated.
+PTO_INTERNAL void SeedResumedPostCounters(
+    __gm__ uint8_t* nextPostIdAddr, uint32_t queueNum, UbTmpBuf& tmpBuf, SdmaRuntimeContext& runtimeCtx)
 {
-    SdmaRuntimeContext& runtimeCtx = session.runtimeCtx;
-    const SdmaExecContext& execCtx = session.execCtx;
+    uint64_t committedPostId = 0ULL;
+    uint32_t committedQueueCount = 0U;
+    const bool prefixKnown = DecodeCommittedPostId(
+        GetValue<uint64_t>(nextPostIdAddr, tmpBuf), queueNum, committedPostId, committedQueueCount);
+    runtimeCtx.nextPostId = committedPostId;
+    if (committedPostId == 0ULL) {
+        runtimeCtx.lastPostQueueCount = 0U;
+        runtimeCtx.usedQueueCount = 0U;
+        return;
+    }
+    // A resumed session inherits flag payload slots whose per-slot queue prefix is recorded nowhere,
+    // so it has to wait on a prefix that covers them.
+    runtimeCtx.lastPostQueueCount = static_cast<uint8_t>(committedQueueCount);
+    // Continuing this session's own posts from the predecessor's prefix is what keeps the prefix
+    // monotonic across the whole chain of sessions sharing this workspace, and monotonicity is
+    // exactly what the wait above rests on: every queue below the prefix was fenced up to
+    // committedPostId and keeps being fenced, so the wait is both sufficient and reachable. Only a
+    // prefix this encoding actually wrote may do that. Without one the word is not ours, so the wait
+    // falls back to queueNum while the post width stays where a fresh session would start it --
+    // widening posts on the strength of an unrelated word would fence queues for no reason.
+    runtimeCtx.usedQueueCount = prefixKnown ? committedQueueCount : 0U;
+    // confirmedPostId and confirmedQueueCount deliberately stay at zero. The predecessor's SQEs may
+    // still be in flight, so nothing is known to have retired; the first reuse check pays one GM poll.
+}
+
+// Takes the two pieces it actually needs rather than a whole SdmaSession, so a builder holding an
+// AsyncSession can initialize that session's runtime state in place.
+PTO_INTERNAL bool InitializeRuntimeCtx(const SdmaExecContext& execCtx, SdmaRuntimeContext& runtimeCtx)
+{
     if (execCtx.contextGm == nullptr || !IsValidTmpBuffer(execCtx.tmpBuf)) {
         return false;
     }
@@ -75,11 +125,6 @@ PTO_INTERNAL bool InitializeRuntimeCtx(const SdmaSession& session)
     __gm__ BatchWriteChannelInfo* channelBase =
         reinterpret_cast<__gm__ BatchWriteChannelInfo*>(execCtx.contextGm + sizeof(BatchWriteFlagInfo));
     __gm__ BatchWriteChannelInfo* channels = channelBase + execCtx.channelGroupIdx * execCtx.baseConfig.queue_num;
-    for (uint32_t slot = 0U; slot < kSdmaFlagPayloadDepth; ++slot) {
-        // The slot queue mask is session-local. Use the current queue count as a conservative
-        // cold-start value so a rebuilt session never skips reuse checks for an old payload.
-        runtimeCtx.flagPayloadQueueCount[slot] = static_cast<uint8_t>(execCtx.baseConfig.queue_num);
-    }
     // ChannelInfo is populated outside AI Core and read through scalar loads during Post.
     // Invalidate stale metadata once at session build time to keep DCCI out of the Post hot path.
     __asm__ __volatile__("");
@@ -87,16 +132,7 @@ PTO_INTERNAL bool InitializeRuntimeCtx(const SdmaSession& session)
     dcci((__gm__ void*)nextPostIdAddr, cache_line_t::SINGLE_CACHE_LINE);
     __asm__ __volatile__("");
     dsb(DSB_DDR);
-    for (uint32_t queue = 0U; queue < execCtx.baseConfig.queue_num; ++queue) {
-        __gm__ BatchWriteChannelInfo* channel = channels + queue;
-        const uint64_t packedHeadTail = GetValue<uint64_t>((__gm__ uint8_t*)channel, tmpBuf);
-        runtimeCtx.sqHead[queue] = static_cast<uint32_t>(packedHeadTail);
-        runtimeCtx.sqTail[queue] = static_cast<uint32_t>(packedHeadTail >> 32U);
-    }
-    // Resume the committed post counter instead of restarting at zero. The explicit invalidation
-    // above keeps this read independent of the channel metadata cache range; the first post of a
-    // fresh workspace still sees 0 because the workspace is zeroed when it is allocated.
-    runtimeCtx.nextPostId = GetValue<uint64_t>(nextPostIdAddr, tmpBuf);
+    SeedResumedPostCounters(nextPostIdAddr, execCtx.baseConfig.queue_num, tmpBuf, runtimeCtx);
     return true;
 }
 
@@ -107,24 +143,17 @@ PTO_INTERNAL bool EnsureFlagPayloadSlotAvailable(uint64_t postId, const SdmaSess
         // Post IDs are contiguous, so this slot was last used by postId - depth.
         // Wait for that flag source to be consumed before overwriting the slot.
         const uint64_t oldPostId = postId - kSdmaFlagPayloadDepth;
-        const uint32_t slot = static_cast<uint32_t>(postId % kSdmaFlagPayloadDepth);
-        const uint64_t oldQueueMask = QueueCountToMask(runtimeCtx.flagPayloadQueueCount[slot]);
-        bool knownComplete = true;
-        uint64_t remaining = oldQueueMask;
-        uint32_t queue = 0U;
-        while (remaining != 0ULL) {
-            if ((remaining & 1ULL) != 0ULL && runtimeCtx.postDoneId[queue] < oldPostId) {
-                knownComplete = false;
-                break;
-            }
-            remaining >>= 1U;
-            ++queue;
-        }
-        if (!knownComplete) {
-            if (!CheckPostDoneIds(runtimeCtx.postDoneBase, oldPostId, oldQueueMask, tmpBuf, true)) {
+        // The exact queue prefix of the post that last used this slot is not tracked. Waiting on the
+        // widest prefix seen so far is a superset of it, so the check stays correct, and it
+        // terminates because the prefix never shrinks -- not even across a session rebuild, since a
+        // resumed session seeds it from the prefix its predecessor committed. Every queue in that
+        // prefix was therefore fenced by an already submitted post whose id is above oldPostId.
+        const uint32_t oldQueueCount = runtimeCtx.lastPostQueueCount;
+        if (runtimeCtx.confirmedPostId < oldPostId || runtimeCtx.confirmedQueueCount < oldQueueCount) {
+            if (!CheckPostDoneIds(runtimeCtx.postDoneBase, oldPostId, QueueCountToMask(oldQueueCount), tmpBuf, true)) {
                 return false;
             }
-            UpdateCachedPostDoneIds(oldPostId, oldQueueMask, runtimeCtx);
+            UpdateCachedPostDoneIds(oldPostId, oldQueueCount, runtimeCtx);
         }
     }
     return true;
@@ -136,7 +165,9 @@ PTO_INTERNAL void WriteFlagPayload(
     SdmaRuntimeContext& runtimeCtx = session.runtimeCtx;
     *reinterpret_cast<volatile __gm__ uint64_t*>(flagPayload) = postId;
     __asm__ __volatile__("" ::: "memory");
-    runtimeCtx.flagPayloadQueueCount[postId % kSdmaFlagPayloadDepth] = static_cast<uint8_t>(queueCount);
+    if (queueCount > runtimeCtx.lastPostQueueCount) {
+        runtimeCtx.lastPostQueueCount = static_cast<uint8_t>(queueCount);
+    }
 }
 
 PTO_INTERNAL bool StoreFlagPayload(
@@ -168,7 +199,7 @@ PTO_INTERNAL bool ValidateSinglePostSqCapacity(
 
 PTO_INTERNAL void SubmitDataTransferSqes(
     __gm__ BatchWriteChannelInfo* channels, __gm__ uint8_t* recvBuffer, __gm__ uint8_t* sendBuffer, uint64_t opcode,
-    const SdmaConfig& config, SdmaRuntimeContext& runtimeCtx)
+    const SdmaConfig& config, SdmaSqCursor& cursor)
 {
     for (uint32_t index = 0U; index < config.iter_num; ++index) {
         const uint32_t queue = index % config.queue_num;
@@ -179,9 +210,9 @@ PTO_INTERNAL void SubmitDataTransferSqes(
         __gm__ uint8_t* src = sendBuffer + config.comm_block_offset + index * config.block_bytes;
         __gm__ uint8_t* dst = recvBuffer + config.comm_block_offset + index * config.block_bytes;
         AddOneMemcpySqe(
-            channels + queue, src, dst, opcode, transferBytes, runtimeCtx.sqTail[queue],
-            runtimeCtx.sqTail[queue] - runtimeCtx.sqHead[queue]);
-        runtimeCtx.sqTail[queue] = (runtimeCtx.sqTail[queue] + 1U) % channels[queue].sq_depth;
+            channels + queue, src, dst, opcode, transferBytes, cursor.sqTail[queue],
+            cursor.sqTail[queue] - cursor.sqHead[queue]);
+        cursor.sqTail[queue] = (cursor.sqTail[queue] + 1U) % channels[queue].sq_depth;
     }
     pipe_barrier(PIPE_ALL);
 }
@@ -288,29 +319,36 @@ PTO_INTERNAL void FlushDataCacheAndRingDoorbells(
 }
 
 PTO_INTERNAL void SubmitFlagTransferSqes(
-    __gm__ BatchWriteChannelInfo* channels, __gm__ uint8_t* flagPayload, uint32_t postQueueCount,
-    SdmaRuntimeContext& runtimeCtx)
+    __gm__ BatchWriteChannelInfo* channels, __gm__ uint8_t* flagPayload, __gm__ uint8_t* postDoneBase,
+    uint32_t postQueueCount, SdmaSqCursor& cursor)
 {
     for (uint32_t queue = 0U; queue < postQueueCount; ++queue) {
         AddOneMemcpySqe(
-            channels + queue, flagPayload, GetPostDoneRecordAddr(runtimeCtx.postDoneBase, queue), 0U,
-            kSdmaPostIdFlagBytes, runtimeCtx.sqTail[queue], runtimeCtx.sqTail[queue] - runtimeCtx.sqHead[queue]);
-        runtimeCtx.sqTail[queue] = (runtimeCtx.sqTail[queue] + 1U) % channels[queue].sq_depth;
+            channels + queue, flagPayload, GetPostDoneRecordAddr(postDoneBase, queue), 0U, kSdmaPostIdFlagBytes,
+            cursor.sqTail[queue], cursor.sqTail[queue] - cursor.sqHead[queue]);
+        cursor.sqTail[queue] = (cursor.sqTail[queue] + 1U) % channels[queue].sq_depth;
     }
     pipe_barrier(PIPE_ALL);
 }
 
 PTO_INTERNAL void PersistSqTails(
-    __gm__ BatchWriteChannelInfo* channels, uint32_t queueNum, const SdmaRuntimeContext& runtimeCtx, UbTmpBuf& tmpBuf,
-    uint32_t syncId)
+    __gm__ BatchWriteChannelInfo* channels, uint32_t queueNum, const SdmaRuntimeContext& runtimeCtx,
+    const SdmaSqCursor& cursor, UbTmpBuf& tmpBuf, uint32_t syncId)
 {
     for (uint32_t queue = 0U; queue < queueNum; ++queue) {
-        const uint64_t packed = (static_cast<uint64_t>(runtimeCtx.sqTail[queue]) << 32U) | runtimeCtx.sqHead[queue];
+        const uint64_t packed = (static_cast<uint64_t>(cursor.sqTail[queue]) << 32U) | cursor.sqHead[queue];
+        // SetValue goes UB -> MTE3 -> GM and bypasses the scalar cache. The next post reloads these
+        // words with plain scalar loads, so mirror the value through a scalar store as well.
+        channels[queue].sq_tail = cursor.sqTail[queue];
         SetValue<uint64_t>((__gm__ uint8_t*)(channels + queue), tmpBuf, syncId, packed);
     }
     // Written on every post rather than at session end: a kernel has no reliable teardown point, so a
-    // mid-run exit would otherwise lose the last ids and let the next session reuse them.
-    SetValue<uint64_t>(GetNextPostIdAddr(runtimeCtx.postDoneBase, queueNum), tmpBuf, syncId, runtimeCtx.nextPostId);
+    // mid-run exit would otherwise lose the last ids and let the next session reuse them. The queue
+    // prefix rides along in the same word so a resumed session can bound the slots it inherits;
+    // callers must have published this post's prefix into usedQueueCount before getting here.
+    SetValue<uint64_t>(
+        GetNextPostIdAddr(runtimeCtx.postDoneBase, queueNum), tmpBuf, syncId,
+        EncodeCommittedPostId(runtimeCtx.nextPostId, runtimeCtx.usedQueueCount));
     pipe_barrier(PIPE_ALL);
 }
 
@@ -337,6 +375,7 @@ struct SdmaPostState {
     __gm__ BatchWriteChannelInfo* channels;
     __gm__ uint8_t* flagPayload;
     UbTmpBuf tmpBuf;
+    SdmaSqCursor cursor;
     uint32_t dataQueueCount;
     uint32_t postQueueCount;
     uint64_t eventHandle;
@@ -356,6 +395,7 @@ PTO_INTERNAL bool PrepareSdmaPostBase(
         reinterpret_cast<__gm__ BatchWriteChannelInfo*>(execCtx.contextGm + sizeof(BatchWriteFlagInfo));
     state.channels = channelBase + execCtx.channelGroupIdx * config.queue_num;
     state.tmpBuf = execCtx.tmpBuf;
+    LoadSqCursor(state.channels, config.queue_num, state.cursor);
     return true;
 }
 
@@ -404,18 +444,19 @@ PTO_INTERNAL bool BeginSdmaPost(
     return true;
 }
 
-PTO_INTERNAL AsyncEvent FinishSdmaPost(const SdmaConfig& config, const SdmaPostState& state, const SdmaSession& session)
+PTO_INTERNAL AsyncEvent FinishSdmaPost(const SdmaConfig& config, SdmaPostState& state, const SdmaSession& session)
 {
     const SdmaExecContext& execCtx = session.execCtx;
     SdmaRuntimeContext& runtimeCtx = session.runtimeCtx;
     UbTmpBuf tmpBuf = state.tmpBuf;
-    FlushDataCacheAndRingDoorbells(state.channels, state.dataQueueCount, runtimeCtx.sqTail, tmpBuf, execCtx.syncId);
-    SubmitFlagTransferSqes(state.channels, state.flagPayload, state.postQueueCount, runtimeCtx);
-    PersistSqTails(state.channels, config.queue_num, runtimeCtx, tmpBuf, execCtx.syncId);
-    PublishFlagTransferSqes(state.channels, 0U, state.dataQueueCount, runtimeCtx.sqTail, tmpBuf, execCtx.syncId);
+    FlushDataCacheAndRingDoorbells(state.channels, state.dataQueueCount, state.cursor.sqTail, tmpBuf, execCtx.syncId);
+    SubmitFlagTransferSqes(
+        state.channels, state.flagPayload, runtimeCtx.postDoneBase, state.postQueueCount, state.cursor);
+    PersistSqTails(state.channels, config.queue_num, runtimeCtx, state.cursor, tmpBuf, execCtx.syncId);
+    PublishFlagTransferSqes(state.channels, 0U, state.dataQueueCount, state.cursor.sqTail, tmpBuf, execCtx.syncId);
     if (state.dataQueueCount < state.postQueueCount) {
         PublishFlagTransferSqes(
-            state.channels, state.dataQueueCount, state.postQueueCount, runtimeCtx.sqTail, tmpBuf, execCtx.syncId);
+            state.channels, state.dataQueueCount, state.postQueueCount, state.cursor.sqTail, tmpBuf, execCtx.syncId);
     }
     return AsyncEvent(state.eventHandle, DmaEngine::SDMA);
 }
@@ -432,7 +473,7 @@ PTO_INTERNAL AsyncEvent SdmaPostAsync(
     if (!BeginSdmaPost(messageLen, session, config, state)) {
         return {};
     }
-    SubmitDataTransferSqes(state.channels, recvBuffer, sendBuffer, opcode, config, session.runtimeCtx);
+    SubmitDataTransferSqes(state.channels, recvBuffer, sendBuffer, opcode, config, state.cursor);
     return FinishSdmaPost(config, state, session);
 }
 
@@ -457,13 +498,13 @@ PTO_INTERNAL bool ValidateSingleNotifyPostSqCapacity(
 
 PTO_INTERNAL void SubmitSignalSqe(
     __gm__ BatchWriteChannelInfo* channels, __gm__ uint8_t* remoteSignal, __gm__ uint8_t* signalValueSlot,
-    NotifyOp notifyOp, SdmaRuntimeContext& runtimeCtx)
+    NotifyOp notifyOp, SdmaSqCursor& cursor)
 {
     const uint64_t opcode = notifyOp == NotifyOp::AtomicAdd ? kSdmaInt32AtomicAddOpcode : 0U;
     AddOneMemcpySqe(
-        channels, signalValueSlot, remoteSignal, opcode, kSdmaSignalValueBytes, runtimeCtx.sqTail[0],
-        runtimeCtx.sqTail[0] - runtimeCtx.sqHead[0]);
-    runtimeCtx.sqTail[0] = (runtimeCtx.sqTail[0] + 1U) % channels[0].sq_depth;
+        channels, signalValueSlot, remoteSignal, opcode, kSdmaSignalValueBytes, cursor.sqTail[0],
+        cursor.sqTail[0] - cursor.sqHead[0]);
+    cursor.sqTail[0] = (cursor.sqTail[0] + 1U) % channels[0].sq_depth;
     pipe_barrier(PIPE_ALL);
 }
 
@@ -524,24 +565,26 @@ PTO_INTERNAL AsyncEvent SdmaPostAsyncNotify(
 
     SdmaConfig payloadConfig = config;
     payloadConfig.queue_num = 1U;
-    SubmitDataTransferSqes(state.channels, recvBuffer, sendBuffer, 0U, payloadConfig, session.runtimeCtx);
+    SubmitDataTransferSqes(state.channels, recvBuffer, sendBuffer, 0U, payloadConfig, state.cursor);
     // Publish payload first so SDMA can start transferring while the signal and completion SQEs are prepared.
     FlushDataCacheAndRingDoorbells(
-        state.channels, state.dataQueueCount, session.runtimeCtx.sqTail, state.tmpBuf, session.execCtx.syncId);
+        state.channels, state.dataQueueCount, state.cursor.sqTail, state.tmpBuf, session.execCtx.syncId);
 
-    SubmitSignalSqe(state.channels, remoteSignal, notifyState.signalValueSlot, notifyOp, session.runtimeCtx);
-    SubmitFlagTransferSqes(state.channels, state.flagPayload, state.postQueueCount, session.runtimeCtx);
+    SubmitSignalSqe(state.channels, remoteSignal, notifyState.signalValueSlot, notifyOp, state.cursor);
+    SubmitFlagTransferSqes(
+        state.channels, state.flagPayload, session.runtimeCtx.postDoneBase, state.postQueueCount, state.cursor);
 
     const SdmaExecContext& execCtx = session.execCtx;
-    PersistSqTails(state.channels, config.queue_num, session.runtimeCtx, state.tmpBuf, execCtx.syncId);
+    PersistSqTails(state.channels, config.queue_num, session.runtimeCtx, state.cursor, state.tmpBuf, execCtx.syncId);
     // Flush and publish the signal and postDone SQEs after the payload doorbell.
     FlushDataCacheAndRingDoorbells(
-        state.channels, state.postQueueCount, session.runtimeCtx.sqTail, state.tmpBuf, execCtx.syncId);
+        state.channels, state.postQueueCount, state.cursor.sqTail, state.tmpBuf, execCtx.syncId);
     return AsyncEvent(state.eventHandle, DmaEngine::SDMA);
 }
 
-PTO_INTERNAL bool SdmaEventCheck(uint64_t postId, uint64_t queueMask, const SdmaSession& session, bool blocking)
+PTO_INTERNAL bool SdmaEventCheck(uint64_t postId, uint32_t queueCount, const SdmaSession& session, bool blocking)
 {
+    const uint64_t queueMask = QueueCountToMask(queueCount);
     if (!session.valid || postId == 0ULL || queueMask == 0ULL) {
         return false;
     }
@@ -549,7 +592,7 @@ PTO_INTERNAL bool SdmaEventCheck(uint64_t postId, uint64_t queueMask, const Sdma
     if (!CheckPostDoneIds(session.runtimeCtx.postDoneBase, postId, queueMask, tmpBuf, blocking)) {
         return false;
     }
-    UpdateCachedPostDoneIds(postId, queueMask, session.runtimeCtx);
+    UpdateCachedPostDoneIds(postId, queueCount, session.runtimeCtx);
     return true;
 }
 
@@ -560,8 +603,7 @@ PTO_INTERNAL bool SdmaTestEvent(uint64_t handle, const SdmaSession& session)
     if (!DecodeSdmaEventHandle(handle, postId, queueCount)) {
         return false;
     }
-    const uint64_t queueMask = QueueCountToMask(queueCount);
-    return SdmaEventCheck(postId, queueMask, session, false);
+    return SdmaEventCheck(postId, queueCount, session, false);
 }
 
 PTO_INTERNAL bool SdmaWaitEvent(uint64_t handle, const SdmaSession& session)
@@ -571,8 +613,7 @@ PTO_INTERNAL bool SdmaWaitEvent(uint64_t handle, const SdmaSession& session)
     if (!DecodeSdmaEventHandle(handle, postId, queueCount)) {
         return false;
     }
-    const uint64_t queueMask = QueueCountToMask(queueCount);
-    return SdmaEventCheck(postId, queueMask, session, true);
+    return SdmaEventCheck(postId, queueCount, session, true);
 }
 
 } // namespace detail

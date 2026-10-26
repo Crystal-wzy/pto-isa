@@ -162,6 +162,9 @@ enum class CcuInputSource : uint8_t {
 // ============================================================================
 // CcuTriggerContext: Opaque context passed from host to AIV kernel for CCU path.
 // Host fills it from ccu::TryGet() + rtGetDevResAddress() before kernel launch.
+//
+// `selfIdx` and `inputSource` are only consulted by the CCU IMPL when
+// `inputSource == AivStored`; HostManaged callers may leave them at default.
 // ============================================================================
 
 struct CcuTriggerContext {
@@ -216,12 +219,21 @@ struct AsyncEvent {
     uint32_t urmaTargetCqePerJetty[urma::kUrmaMaxJettiesPerCore]{};
     uint16_t urmaJettyBase{0};
     uint16_t urmaJettyCount{0};
+    bool postFailed{false};
 
     AICORE constexpr AsyncEvent() = default;
     AICORE constexpr AsyncEvent(uint64_t h, DmaEngine e, uint32_t targetCqe = 0U)
         : handle(h), engine(e), urmaTargetCqe(targetCqe)
     {}
     AICORE constexpr bool valid() const { return handle != 0U; }
+
+    AICORE static AsyncEvent Failed(DmaEngine e)
+    {
+        AsyncEvent event{};
+        event.engine = e;
+        event.postFailed = true;
+        return event;
+    }
 
     PTO_INTERNAL bool Wait(const AsyncSession& session) const;
     PTO_INTERNAL bool Test(const AsyncSession& session) const;

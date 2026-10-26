@@ -17,6 +17,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "utils.hpp"
 #include "TBinSOp.hpp"
 #include "custom/TFmodRemHp.hpp"
+#include "custom/TRemHpStaged.hpp"
 #include "TRem.hpp"
 
 namespace pto {
@@ -81,6 +82,14 @@ __tf__ PTO_INTERNAL OP_NAME(TREMS) OP_TYPE(element_wise) void TRemS(
     if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
         Int64RemScalar<T, TileDataDst::Cols, TileDataSrc::Cols>(dstPtr, srcPtr, scalar, kValidRows, kValidCols);
     } else {
+        if constexpr (PrecisionType == RemSAlgorithm::HIGH_PRECISION && std::is_same_v<T, float>) {
+            if (TRemHpStagedDisjoint<float>(
+                    dstPtr, TileDataDst::Rows * TileDataDst::Cols, srcPtr, TileDataSrc::Rows * TileDataSrc::Cols) &&
+                kValidRows * (kValidCols / elementsPerRepeat) >= TREM_HP_STAGED_MIN_VECS) {
+                TRemSStaged<false, dstRowStride, srcRowStride>(dstPtr, srcPtr, scalar, kValidRows, kValidCols);
+                return;
+            }
+        }
         BinaryInstr<
             RemSOp<PrecisionType, T>, TileDataDst, TileDataSrc, T, elementsPerRepeat, blockSizeElem, dstRowStride,
             srcRowStride>(dstPtr, srcPtr, scalar, kValidRows, kValidCols, version);

@@ -1,8 +1,21 @@
 # TFREE
 
+## 产品支持情况<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT系列产品：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3系列产品：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2系列产品：支持
+<!-- end id3 -->
+
+
 ## 简介
 
-释放 `TPipe` 条目的 FIFO 空间。
+释放FIFO中的槽位(slot)空间。
 
 对于TileData `TPOP` 流程，Atlas A2/A3 训练系列产品/Atlas A2/A3 推理系列产品平台上`TPOP` 已经在内部执行空闲空间通知步骤。因此，面向TileData的 `TFREE(Pipe &pipe)` 接口当前是空操作，只是为了与 `GlobalData` 流程保持API对称。Ascend 950PR/Ascend 950DT平台上TFREE会释放TPOP使用的FIFO槽位空间。
 
@@ -61,6 +74,7 @@ PTO_INTERNAL void TFREE_IMPL(Pipe &pipe)
     - 当弹出的FIFO槽位中的数据不再需要时，使用 `TFREE(Pipe&, GlobalData&)`。
     - `gmTensor` 只用于选择重载；实现不会读取或写入tensor内容。
     - 空闲空间通知是稀疏的，并由 `Pipe::SyncPeriod` 控制。
+    - 如果非1:1或者1:2关系，即存在subtile的数据传输，需要搭配使用TALLOC/TPUSH/TPOP/TFREE来实现核间同步和数据传输。
 
 ## 示例
 

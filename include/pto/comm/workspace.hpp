@@ -73,6 +73,8 @@ struct RdmaTransportConfig {
     std::vector<uint32_t> peerPhyIds;
     std::vector<uint64_t> peerSymAddrs;
     uint32_t traceId{0};
+    // Number of QPs per peer; all ranks must use the same value.
+    uint32_t qpNum{1};
 };
 
 struct WorkspaceRequest {
@@ -172,7 +174,8 @@ inline bool IsValidRdmaRequest(const WorkspaceRequest& req)
     return req.rdma != nullptr && req.rankNum != 0 && req.rankId < req.rankNum && req.symmetricAddr != nullptr &&
            req.symmetricBytes != 0 && req.rdma->peerIps.size() == req.rankNum &&
            req.rdma->peerPhyIds.size() == req.rankNum && req.rdma->peerSymAddrs.size() == req.rankNum &&
-           !req.rdma->localIp.empty();
+           !req.rdma->localIp.empty() && req.rdma->qpNum != 0 &&
+           static_cast<uint64_t>(req.rankNum) * req.rdma->qpNum <= UINT32_MAX;
 }
 
 inline rdma::WorkspaceConfig MakeRdmaWorkspaceConfig(const WorkspaceRequest& req)
@@ -188,6 +191,7 @@ inline rdma::WorkspaceConfig MakeRdmaWorkspaceConfig(const WorkspaceRequest& req
     config.peerSymAddrs = req.rdma->peerSymAddrs;
     config.symmetricAddr = req.symmetricAddr;
     config.symmetricSize = req.symmetricBytes;
+    config.qpNum = req.rdma->qpNum;
     return config;
 }
 

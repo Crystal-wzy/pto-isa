@@ -120,13 +120,19 @@ inline bool WorkspaceManager::InitializeSqOwners(const host::SqContext& sq, uint
 
 inline bool WorkspaceManager::PrepareRdmaInfoLayout(std::vector<uint8_t>& hostBuffer, RdmaInfoHostLayout& layout)
 {
-    constexpr uint32_t kQpNum = 1;
-    const size_t sqBytes = sizeof(RoceSqCtx) * rankCount_ * kQpNum;
-    const size_t cqBytes = sizeof(RoceCqCtx) * rankCount_ * kQpNum;
-    const size_t memBytes = sizeof(RdmaMemInfo) * rankCount_;
+    const uint64_t queueCount = static_cast<uint64_t>(rankCount_) * qpNum_;
+    constexpr size_t bytesPerQueue = 2 * sizeof(RoceSqCtx) + 2 * sizeof(RoceCqCtx) + sizeof(QueueState);
+    const uint64_t memBytes = sizeof(RdmaMemInfo) * static_cast<uint64_t>(rankCount_);
+    if (memBytes > SIZE_MAX - sizeof(RdmaInfo) - sizeof(QueueState) ||
+        queueCount > (SIZE_MAX - sizeof(RdmaInfo) - sizeof(QueueState) - memBytes) / bytesPerQueue) {
+        std::cerr << "[RoCE] RDMA workspace size overflow" << std::endl;
+        return false;
+    }
+    const size_t sqBytes = sizeof(RoceSqCtx) * static_cast<size_t>(queueCount);
+    const size_t cqBytes = sizeof(RoceCqCtx) * static_cast<size_t>(queueCount);
     const size_t metadataBytes = sizeof(RdmaInfo) + 2 * sqBytes + 2 * cqBytes + memBytes;
     const size_t stateOffset = (metadataBytes + sizeof(QueueState) - 1) & ~(sizeof(QueueState) - 1);
-    layout.totalSize = stateOffset + sizeof(QueueState) * rankCount_ * kQpNum;
+    layout.totalSize = stateOffset + sizeof(QueueState) * static_cast<size_t>(queueCount);
     workspaceBytes_ = static_cast<uint64_t>(layout.totalSize);
     if (aclrtMalloc(&rdmaInfoDevice_, layout.totalSize, ACL_MEM_MALLOC_HUGE_FIRST) != 0 || rdmaInfoDevice_ == nullptr) {
         std::cerr << "[RoCE] aclrtMalloc(rdmaInfo) failed" << std::endl;
@@ -138,7 +144,7 @@ inline bool WorkspaceManager::PrepareRdmaInfoLayout(std::vector<uint8_t>& hostBu
     layout.info->magic = kRdmaWorkspaceMagic;
     layout.info->version = kRdmaWorkspaceVersion;
     layout.info->backend = RdmaBackend::HNS_1825;
-    layout.info->qpNum = kQpNum;
+    layout.info->qpNum = qpNum_;
     layout.info->rankCount = rankCount_;
     uint8_t* deviceBase = static_cast<uint8_t*>(rdmaInfoDevice_) + sizeof(RdmaInfo);
     layout.info->sqPtr = reinterpret_cast<uint64_t>(deviceBase);
@@ -168,21 +174,29 @@ inline bool WorkspaceManager::FillLocalMemoryInfo(RdmaMemInfo* memory)
             std::cerr << "[RoCE] failed to read ChannelEntity while resolving the local MR" << std::endl;
             return false;
         }
-        if (!ValidateChannelEntity(entity, channelPeer_[channel]) || entity.localBufferNum == 0 ||
+        if (!ValidateChannelEntity(entity, channelPeer_[channel]) || entity.localBufferNum < 2 ||
             entity.localBufferAddr == nullptr) {
             std::cerr << "[RoCE] local registered buffer is absent for peer " << channelPeer_[channel] << std::endl;
             return false;
         }
         host::RegedBufferEntity localBuffer{};
-        if (!ReadDeviceStruct(entity.localBufferAddr, &localBuffer, sizeof(localBuffer)) ||
-            !ValidateRegisteredBuffer(
-                localBuffer, reinterpret_cast<uint64_t>(symmetricAddr_), symmetricSize_, "local", rankId_)) {
+        if (!ReadRegisteredBuffer(
+                entity.localBufferAddr, entity.localBufferNum, reinterpret_cast<uint64_t>(symmetricAddr_),
+                symmetricSize_, "local", rankId_, localBuffer)) {
             return false;
         }
         memory[rankId_].addr = localBuffer.bufferInfo.rma.addr;
         memory[rankId_].size = localBuffer.bufferInfo.rma.size;
         memory[rankId_].lkey = localBuffer.bufferInfo.rma.protectionInfo.memInfo.roce.lkey;
         memory[rankId_].rkey = localBuffer.bufferInfo.rma.protectionInfo.memInfo.roce.rkey;
+        host::RegedBufferEntity notifyBuffer{};
+        const uint64_t notifyBytes = static_cast<uint64_t>(rankCount_) * qpNum_ * kNotifyOperandSlots * sizeof(int32_t);
+        if (!ReadRegisteredBuffer(
+                entity.localBufferAddr, entity.localBufferNum, reinterpret_cast<uint64_t>(notifyOperands_), notifyBytes,
+                "notify", rankId_, notifyBuffer)) {
+            return false;
+        }
+        notifyLkey_ = notifyBuffer.bufferInfo.rma.protectionInfo.memInfo.roce.lkey;
         localMrRead = true;
     }
     if (!localMrRead) {
@@ -195,6 +209,7 @@ inline bool WorkspaceManager::FillLocalMemoryInfo(RdmaMemInfo* memory)
 inline bool WorkspaceManager::FillPeerRdmaInfo(size_t channelIndex, RdmaInfoHostLayout& layout)
 {
     const uint32_t peer = channelPeer_[channelIndex];
+    const size_t queueIndex = static_cast<size_t>(peer) * qpNum_ + channelIndex % qpNum_;
     host::ChannelEntity entity{};
     if (!ReadChannelEntity(channelHandles_[channelIndex], entity)) {
         std::cerr << "[RoCE] read ChannelEntity failed for peer " << peer << std::endl;
@@ -208,8 +223,9 @@ inline bool WorkspaceManager::FillPeerRdmaInfo(size_t channelIndex, RdmaInfoHost
         return false;
     }
     host::RegedBufferEntity remoteBuffer{};
-    if (!ReadDeviceStruct(entity.remoteBufferAddr, &remoteBuffer, sizeof(remoteBuffer)) ||
-        !ValidateRegisteredBuffer(remoteBuffer, peerSymAddrs_[peer], symmetricSize_, "remote", peer)) {
+    if (!ReadRegisteredBuffer(
+            entity.remoteBufferAddr, entity.remoteBufferNum, peerSymAddrs_[peer], symmetricSize_, "remote", peer,
+            remoteBuffer)) {
         return false;
     }
     layout.memory[peer].addr = remoteBuffer.bufferInfo.rma.addr;
@@ -221,17 +237,20 @@ inline bool WorkspaceManager::FillPeerRdmaInfo(size_t channelIndex, RdmaInfoHost
         !ReadDeviceStruct(entity.sqContextAddr, &sq, sizeof(sq)) || !ValidateSqContext(sq, peer)) {
         return false;
     }
-    CopyRoceSq(layout.sq[peer], sq);
-    layout.sq[peer].stateAddr = layout.stateDeviceBase + sizeof(QueueState) * peer;
-    layout.rq[peer] = layout.sq[peer];
+    CopyRoceSq(layout.sq[queueIndex], sq);
+    layout.sq[queueIndex].stateAddr = layout.stateDeviceBase + sizeof(QueueState) * queueIndex;
+    layout.sq[queueIndex].amoAddr = reinterpret_cast<uint64_t>(notifyOperands_) +
+                                    static_cast<uint64_t>(queueIndex) * kNotifyOperandSlots * sizeof(int32_t);
+    layout.sq[queueIndex].amoLkey = notifyLkey_;
+    layout.rq[queueIndex] = layout.sq[queueIndex];
     host::CqContext cq{};
     if (entity.cqNum == 0 || entity.cqContextAddr == nullptr ||
         !ReadDeviceStruct(entity.cqContextAddr, &cq, sizeof(cq)) || !ValidateCqContext(cq, peer) ||
         !InitializeQueueMirrors(sq, cq, peer) || !InitializeSqOwners(sq, peer)) {
         return false;
     }
-    CopyRoceCq(layout.scq[peer], cq);
-    layout.rcq[peer] = layout.scq[peer];
+    CopyRoceCq(layout.scq[queueIndex], cq);
+    layout.rcq[queueIndex] = layout.scq[queueIndex];
     return true;
 }
 
@@ -256,15 +275,20 @@ inline void WorkspaceManager::LogRdmaInfo(const RdmaInfoHostLayout& layout) cons
               << layout.memory[rankId_].addr << std::dec << " size=" << layout.memory[rankId_].size << " lkey=0x"
               << std::hex << layout.memory[rankId_].lkey << " rkey=0x" << layout.memory[rankId_].rkey << std::dec
               << std::endl;
-    for (uint32_t peer : channelPeer_) {
+    for (size_t channel = 0; channel < channelPeer_.size(); ++channel) {
+        const uint32_t peer = channelPeer_[channel];
+        const size_t qpIdx = channel % qpNum_;
+        const size_t queueIndex = static_cast<size_t>(peer) * qpNum_ + qpIdx;
         std::cerr << "[RoCE][rank " << rankId_ << "]   peer[" << peer << "] MR addr=0x" << std::hex
-                  << layout.memory[peer].addr << " rkey=0x" << layout.memory[peer].rkey << std::dec
-                  << " | SQ wqn=" << layout.sq[peer].wqn << " depth=" << layout.sq[peer].depth << " sqVa=0x" << std::hex
-                  << layout.sq[peer].bufAddr << " dbHw=0x" << layout.sq[peer].dbAddr << " dbSw=0x"
-                  << layout.sq[peer].dbSwAddr << std::dec << " mtuShift=" << static_cast<int>(layout.sq[peer].mtuShift)
-                  << " dbCos=" << static_cast<int>(layout.sq[peer].dbCos) << " | CQ cqn=" << layout.scq[peer].cqn
-                  << " depth=" << layout.scq[peer].depth << " cqVa=0x" << std::hex << layout.scq[peer].bufAddr
-                  << " dbSw=0x" << layout.scq[peer].dbSwAddr << std::dec << std::endl;
+                  << layout.memory[peer].addr << " rkey=0x" << layout.memory[peer].rkey << std::dec << " | QP=" << qpIdx
+                  << " SQ wqn=" << layout.sq[queueIndex].wqn << " depth=" << layout.sq[queueIndex].depth << " sqVa=0x"
+                  << std::hex << layout.sq[queueIndex].bufAddr << " dbHw=0x" << layout.sq[queueIndex].dbAddr
+                  << " dbSw=0x" << layout.sq[queueIndex].dbSwAddr << std::dec
+                  << " mtuShift=" << static_cast<int>(layout.sq[queueIndex].mtuShift)
+                  << " dbCos=" << static_cast<int>(layout.sq[queueIndex].dbCos)
+                  << " | CQ cqn=" << layout.scq[queueIndex].cqn << " depth=" << layout.scq[queueIndex].depth
+                  << " cqVa=0x" << std::hex << layout.scq[queueIndex].bufAddr << " dbSw=0x"
+                  << layout.scq[queueIndex].dbSwAddr << std::dec << std::endl;
     }
 }
 
@@ -304,6 +328,24 @@ inline bool WorkspaceManager::ValidateChannelEntity(const host::ChannelEntity& e
         return false;
     }
     return true;
+}
+
+inline bool WorkspaceManager::ReadRegisteredBuffer(
+    const host::RegedBufferEntity* buffers, uint32_t count, uint64_t expectedAddr, uint64_t expectedSize,
+    const char* side, uint32_t rank, host::RegedBufferEntity& output)
+{
+    // Select by address rather than relying on the order of HCOMM's exchanged MRs.
+    for (uint32_t index = 0; index < count; ++index) {
+        if (!ReadDeviceStruct(buffers + index, &output, sizeof(output))) {
+            return false;
+        }
+        if (output.type == host::REGED_BUFFER_TYPE_RMA && output.bufferInfo.rma.addr == expectedAddr) {
+            return ValidateRegisteredBuffer(output, expectedAddr, expectedSize, side, rank);
+        }
+    }
+    std::cerr << "[RoCE] " << side << " MR for rank " << rank << " is absent at address 0x" << std::hex << expectedAddr
+              << std::dec << std::endl;
+    return false;
 }
 
 inline bool WorkspaceManager::ValidateRegisteredBuffer(

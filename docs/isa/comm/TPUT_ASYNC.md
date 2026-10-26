@@ -1,5 +1,18 @@
 # TPUT_ASYNC
 
+## Product Support<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT products: Supported
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3 products: Supported
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2 products: Supported
+<!-- end id3 -->
+
+
 ## Introduction
 
 `TPUT_ASYNC` is an asynchronous remote write primitive. It starts a transfer from local GM to remote GM and returns an `AsyncEvent` immediately.
@@ -96,7 +109,8 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
                                     __gm__ uint8_t *workspace,
                                     uint32_t myPe,
                                     AsyncSession &session,
-                                    uint32_t syncId = 0);
+                                    uint32_t syncId = 0,
+                                    uint32_t qpIdx = 0);
 #endif
 ```
 
@@ -107,6 +121,11 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
 | `myPe` | Local rank id used to select the registered local memory region. |
 | `session` | Output `AsyncSession` object. |
 | `syncId` | MTE/scalar synchronization event id in the range 0-7. |
+| `qpIdx` | QP index for each peer; defaults to 0 and must be less than the host-configured `qpNum`. |
+
+The host sets the QP count per peer with `RdmaTransportConfig::qpNum` (default: 1; identical on all ranks),
+or `rdma::WorkspaceConfig::qpNum` when using the backend manager directly. Different QPs complete independently;
+wait for the events on each QP.
 
 Build one peer-independent session, then select the destination rank with the explicit `peer` argument:
 

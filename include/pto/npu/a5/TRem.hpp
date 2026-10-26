@@ -18,6 +18,7 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include <pto/npu/a5/TBinOp.hpp>
 #include <pto/common/debug.h>
 #include "custom/TFmodRemHp.hpp"
+#include "custom/TRemHpStaged.hpp"
 #include "TDiv.hpp"
 
 namespace pto {
@@ -228,6 +229,14 @@ __tf__ PTO_INTERNAL OP_NAME(TREM) OP_TYPE(element_wise) void TRem(
         Int64Rem<T, TileDataDst::Cols, TileDataSrc0::Cols, TileDataSrc1::Cols>(
             dstPtr, src0Ptr, src1Ptr, validRows, validCols);
     } else {
+        if constexpr (PrecisionType == RemAlgorithm::HIGH_PRECISION && std::is_same_v<T, float>) {
+            if (TRemHpStagedEligible<TileDataDst, TileDataSrc0, TileDataSrc1>(
+                    dstPtr, src0Ptr, src1Ptr, validRows, validCols)) {
+                TRemHpStaged<false, TileDataDst::RowStride, TileDataSrc0::RowStride, TileDataSrc1::RowStride>(
+                    dstPtr, src0Ptr, src1Ptr, validRows, validCols);
+                return;
+            }
+        }
         BinaryInstr<RemOp<PrecisionType, T>, TileDataDst, TileDataSrc0, TileDataSrc1, ElementsPerRepeat, BlockSizeElem>(
             dstPtr, src0Ptr, src1Ptr, validRows, validCols, version);
     }

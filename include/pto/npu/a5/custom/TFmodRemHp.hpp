@@ -132,34 +132,27 @@ PTO_INTERNAL void SolveExceptionScenarios(
     vsel(dstReg, src0Reg, dstReg, src0Is0CmpReg);
 }
 
+// Post-SolveScale fixups shared by the register and staged kernels:
+// dividend sign restore, subnormal rescale, exceptions, rem sign correction.
 template <bool isFmod>
-PTO_INTERNAL void TFmodRemHP(
-    RegTensor<float>& dstReg, RegTensor<float>& src0Reg, RegTensor<float>& src1Reg, MaskReg& mask)
+PTO_INTERNAL void TFmodRemHPPost(
+    RegTensor<float>& dstReg, RegTensor<float>& src0Reg, RegTensor<float>& src1Reg, RegTensor<float>& nanReg,
+    MaskReg& mask)
 {
-    using RoundMode = std::conditional_t<isFmod, decltype(ROUND_Z), decltype(ROUND_F)>;
-    constexpr FloatUnion nan(0x7fc00000);
-    constexpr FloatUnion scale1(0x4b800000); // 2**24
     constexpr FloatUnion scale2(0x33800000); // 2**-24
     constexpr float subNormal = 1.1754944e-38;
     RegTensor<float> srcReg;
     RegTensor<float> src0SignBitReg, src0SignBitTmpReg;
-    RegTensor<float> bTmpReg, tmpReg, nanReg;
+    RegTensor<float> tmpReg;
     MaskReg subNormalMask, signDiffMask;
-
-    vdup(nanReg, nan.f, mask, MODE_ZEROING);
-    vabs(dstReg, src0Reg, mask, MODE_ZEROING);
-    vabs(srcReg, src1Reg, mask, MODE_ZEROING);
-    SolveScaleIter<RoundMode, FMOD_ITERATION_NUM_MAX>(dstReg, srcReg, mask);
 
     GetSignBit(src0SignBitReg, src0Reg, mask);
     vmuls(src0SignBitTmpReg, src0SignBitReg, -2.0f, mask, MODE_ZEROING);
     vadds(src0SignBitTmpReg, src0SignBitTmpReg, 1.0f, mask, MODE_ZEROING);
     vmul(dstReg, dstReg, src0SignBitTmpReg, mask, MODE_ZEROING);
 
+    vabs(srcReg, src1Reg, mask, MODE_ZEROING);
     vcmps_le(subNormalMask, srcReg, subNormal, mask);
-    vmuls(tmpReg, srcReg, scale1.f, subNormalMask, MODE_ZEROING);
-    vsel(bTmpReg, tmpReg, srcReg, subNormalMask);
-
     vmuls(tmpReg, dstReg, scale2.f, subNormalMask, MODE_ZEROING);
     vsel(dstReg, tmpReg, dstReg, subNormalMask);
 
@@ -171,6 +164,23 @@ PTO_INTERNAL void TFmodRemHP(
         vadd(tmpReg, dstReg, src1Reg, signDiffMask, MODE_ZEROING);
         vsel(dstReg, tmpReg, dstReg, signDiffMask);
     }
+}
+
+template <bool isFmod>
+PTO_INTERNAL void TFmodRemHP(
+    RegTensor<float>& dstReg, RegTensor<float>& src0Reg, RegTensor<float>& src1Reg, MaskReg& mask)
+{
+    using RoundMode = std::conditional_t<isFmod, decltype(ROUND_Z), decltype(ROUND_F)>;
+    constexpr FloatUnion nanLocal(0x7fc00000);
+    RegTensor<float> srcReg;
+    RegTensor<float> nanReg;
+
+    vdup(nanReg, nanLocal.f, mask, MODE_ZEROING);
+    vabs(dstReg, src0Reg, mask, MODE_ZEROING);
+    vabs(srcReg, src1Reg, mask, MODE_ZEROING);
+    SolveScaleIter<RoundMode, FMOD_ITERATION_NUM_MAX>(dstReg, srcReg, mask);
+
+    TFmodRemHPPost<isFmod>(dstReg, src0Reg, src1Reg, nanReg, mask);
 }
 
 } // namespace pto

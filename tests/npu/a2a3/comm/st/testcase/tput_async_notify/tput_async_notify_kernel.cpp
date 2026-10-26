@@ -164,7 +164,7 @@ __global__ AICORE void TPutAsyncNotifyKernel(
             *localStatus = event.valid() ? kDeviceUnexpectedValidEvent : kDeviceSuccess;
         } else if (!event.valid()) {
             *localStatus = kDeviceInvalidEvent;
-        } else if (session.sdmaRuntimeCtx.nextPostId != expectedPostId) {
+        } else if (session.rt.sdma.nextPostId != expectedPostId) {
             *localStatus = kDeviceUnexpectedPostId;
         } else if (!event.Wait(session)) {
             *localStatus = kDeviceWaitFailed;

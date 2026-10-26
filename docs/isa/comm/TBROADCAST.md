@@ -1,5 +1,18 @@
 # TBROADCAST
 
+## Product Support<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT products: Supported
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3 products: Supported
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2 products: Supported
+<!-- end id3 -->
+
+
 ## Introduction
 
 Broadcast data from current NPU to all ranks in the parallel group. The calling NPU is the root and its data is copied to all other NPUs.

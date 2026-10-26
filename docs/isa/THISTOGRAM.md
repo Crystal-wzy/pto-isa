@@ -1,5 +1,18 @@
 # THISTOGRAM
 
+## Product Support<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT products: Supported
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3 products: Not supported
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2 products: Not supported
+<!-- end id3 -->
+
+
 > **Implementation status**: THISTOGRAM is provided as a C++ intrinsic on the A5 and Kirin9030 back ends and in CPU simulation (`__CPU_SIM`), and is registered in the virtual-ISA indexes (`PTOISA`, `isa/README`, `manifest.yaml`, the `appendix-d` family matrix, and the mkdocs nav). It is available on A5 / Kirin9030 / CPU-sim only (not on A2/A3); it has no public bytecode encoding yet.
 
 ## Introduction

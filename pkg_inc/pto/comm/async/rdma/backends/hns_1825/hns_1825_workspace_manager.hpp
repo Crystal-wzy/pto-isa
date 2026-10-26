@@ -47,7 +47,7 @@ namespace hns_1825 {
 // Flow:
 //   1. Create the local RoCE endpoint.
 //   2. Register the symmetric communication buffer.
-//   3. Create one channel per peer and wait for every channel to become ready.
+//   3. Create the configured QPs per peer and wait for every channel to become ready.
 //   4. Read ChannelEntity SQ/CQ/MR metadata and copy RdmaInfo to device memory.
 //
 // Teardown releases resources in reverse ownership order: channels, registered
@@ -69,10 +69,11 @@ public:
     // peerIps/peerPhyIds   — every rank's RoCE endpoint information.
     // peerSymAddrs         — every rank's registered communication-buffer base.
     // symmetricAddr/Size   — this rank's symmetric communication buffer.
+    // qpNum                — QPs per peer, equal on every rank.
     bool Init(
         uint32_t rankId, uint32_t rankCount, uint32_t phyId, const std::string& localIp, uint16_t basePort,
         const std::vector<std::string>& peerIps, const std::vector<uint32_t>& peerPhyIds,
-        const std::vector<uint64_t>& peerSymAddrs, void* symmetricAddr, uint64_t symmetricSize);
+        const std::vector<uint64_t>& peerSymAddrs, void* symmetricAddr, uint64_t symmetricSize, uint32_t qpNum = 1);
 
     static bool Verbose();
 
@@ -138,8 +139,8 @@ private:
     bool RegisterMemory();
     bool InitializeChannelDescriptions(std::vector<HcommChannelDesc>& descriptions) const;
     bool ConfigureChannelDescription(
-        HcommChannelDesc& description, std::string& channelName, uint32_t channelIndex, uint32_t remoteRank, uint8_t tc,
-        uint8_t sl) const;
+        HcommChannelDesc& description, std::string& channelName, uint32_t channelIndex, uint32_t remoteRank,
+        uint32_t qpIdx, uint8_t tc, uint8_t sl) const;
     bool ConfigureChannelDescriptions(
         std::vector<HcommChannelDesc>& descriptions, std::vector<std::string>& channelNames);
     bool CreateAndValidateChannels(std::vector<HcommChannelDesc>& descriptions);
@@ -166,6 +167,9 @@ private:
     static bool IsU32Aligned(uint64_t address);
     static bool IsCacheLineAligned(uint64_t address);
     static bool ValidateChannelEntity(const host::ChannelEntity& entity, uint32_t peer);
+    static bool ReadRegisteredBuffer(
+        const host::RegedBufferEntity* buffers, uint32_t count, uint64_t expectedAddr, uint64_t expectedSize,
+        const char* side, uint32_t rank, host::RegedBufferEntity& output);
     static bool ValidateRegisteredBuffer(
         const host::RegedBufferEntity& buffer, uint64_t expectedAddr, uint64_t expectedSize, const char* side,
         uint32_t rank);
@@ -191,6 +195,7 @@ private:
 
     uint32_t rankId_{0};
     uint32_t rankCount_{1};
+    uint32_t qpNum_{1};
     uint32_t phyId_{0};
     std::string localIp_;
     uint16_t basePort_{60032};
@@ -202,6 +207,9 @@ private:
 
     EndpointHandle endpoint_{nullptr};
     HcommMemHandle memHandle_{nullptr};
+    HcommMemHandle notifyMemHandle_{nullptr};
+    void* notifyOperands_{nullptr};
+    uint32_t notifyLkey_{0};
     std::vector<ChannelHandle> channelHandles_;
     std::vector<uint32_t> channelPeer_;
     void* rdmaInfoDevice_{nullptr};

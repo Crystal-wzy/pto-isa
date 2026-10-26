@@ -801,6 +801,17 @@ AICORE inline bool BuildTPutPostSession(
     return pto::comm::BuildAsyncSession(scratchTile, sdmaWorkspace, session, 0, config);
 }
 
+// Same queue_num and workspace as BuildTPutPostSession, but one block per post instead of queueNum
+// blocks, so a full-size post spreads over a single queue. That makes a session narrow without
+// shrinking the transfer, which keeps every post verifiable by the shared result check.
+AICORE inline bool BuildTPutNarrowPostSession(
+    PostScratchTile& scratchTile, __gm__ uint8_t* sdmaWorkspace, pto::comm::AsyncSession& session, uint32_t queueNum)
+{
+    const uint64_t bytesPerPost = static_cast<uint64_t>(kPostStabilityElemsPerPost) * sizeof(int32_t);
+    pto::comm::sdma::SdmaBaseConfig config{bytesPerPost, 0, queueNum};
+    return pto::comm::BuildAsyncSession(scratchTile, sdmaWorkspace, session, 0, config);
+}
+
 __global__ AICORE void TPutImmediatePostWaitKernel(
     __gm__ int32_t* localSend, __gm__ int32_t* localRecv, __gm__ int32_t* localSignal, __gm__ int32_t* consumeOutput,
     __gm__ uint32_t* postStatus, __gm__ CommDeviceContext* hcclCtx, __gm__ uint8_t* sdmaWorkspace, uint32_t postCount,
@@ -911,6 +922,54 @@ __global__ AICORE void TPutPostsWaitFinalKernel(
     pipe_barrier(PIPE_ALL);
 }
 
+// Rebuild a session on a workspace that already carries post history, then keep posting across it.
+// The second session inherits flag payload slots whose queue prefix lives only in the workspace, so
+// it must wait on exactly the prefix those slots were fenced with: too narrow and it can overwrite a
+// payload still being read, too wide and it waits on a queue no post ever fenced, which never
+// advances. The rebuild is placed past the 64-slot ring so the inherited slots are really in play.
+//
+// wideFirstSession selects which half of the mismatch is exercised. False makes the first session
+// narrow, so the very first post after the rebuild reuses a slot fenced on one queue. True makes it
+// wide, so the mismatch only surfaces once the second session's own posts start wrapping the ring.
+__global__ AICORE void TPutSessionRebuildKernel(
+    __gm__ int32_t* localSend, __gm__ int32_t* localRecv, __gm__ int32_t* localSignal, __gm__ int32_t* consumeOutput,
+    __gm__ uint32_t* postStatus, __gm__ CommDeviceContext* hcclCtx, __gm__ uint8_t* sdmaWorkspace, uint32_t postCount,
+    uint32_t rounds, uint32_t queueNum, bool wideFirstSession)
+{
+    const uint32_t rank = hcclCtx->rankId;
+    const uint32_t postsPerPeer = postCount * rounds;
+    if (rank != kPostStabilityRootRank) {
+        ConsumeTPutPosts(localRecv, localSignal, consumeOutput, postStatus, rank, postsPerPeer);
+        pipe_barrier(PIPE_ALL);
+        return;
+    }
+    PostScratchTile scratchTile;
+    TASSIGN(scratchTile, 0x0);
+    pto::comm::AsyncSession session;
+    const bool built = wideFirstSession ? BuildTPutPostSession(scratchTile, sdmaWorkspace, session, queueNum) :
+                                          BuildTPutNarrowPostSession(scratchTile, sdmaWorkspace, session, queueNum);
+    if (!built) {
+        NotifyAllTPutConsumers(localSignal, hcclCtx, postsPerPeer);
+        pipe_barrier(PIPE_ALL);
+        return;
+    }
+    const uint32_t rebuildAt = postsPerPeer / 2U;
+    for (uint32_t sequence = 0; sequence < postsPerPeer; ++sequence) {
+        if (sequence == rebuildAt && !BuildTPutNarrowPostSession(scratchTile, sdmaWorkspace, session, queueNum)) {
+            NotifyAllTPutConsumers(localSignal, hcclCtx, postsPerPeer);
+            pipe_barrier(PIPE_ALL);
+            return;
+        }
+        for (int targetRank = 1; targetRank < static_cast<int>(hcclCtx->rankNum); ++targetRank) {
+            const uint32_t transferIndex = static_cast<uint32_t>(targetRank - 1) * postsPerPeer + sequence;
+            pto::comm::AsyncEvent event =
+                PostTPut(localSend, localRecv, hcclCtx, targetRank, transferIndex, kPostStabilityElemsPerPost, session);
+            RecordTPutPost(event, session, postStatus, localSignal, hcclCtx, targetRank, sequence, transferIndex);
+        }
+    }
+    pipe_barrier(PIPE_ALL);
+}
+
 struct TPutPostLayout {
     uint32_t postsPerPeer;
     uint32_t totalTransfers;
@@ -955,6 +1014,22 @@ void LaunchTPutFinal(
 {
     TPutPostsWaitFinalKernel<<<1, nullptr, stream>>>(
         send, recv, signal, consumed, status, context, workspace, postCount, rounds, queueNum);
+}
+
+void LaunchTPutRebuildNarrowFirst(
+    int32_t* send, int32_t* recv, int32_t* signal, int32_t* consumed, uint32_t* status, CommDeviceContext* context,
+    uint8_t* workspace, uint32_t postCount, uint32_t rounds, uint32_t queueNum, aclrtStream stream)
+{
+    TPutSessionRebuildKernel<<<1, nullptr, stream>>>(
+        send, recv, signal, consumed, status, context, workspace, postCount, rounds, queueNum, false);
+}
+
+void LaunchTPutRebuildWideFirst(
+    int32_t* send, int32_t* recv, int32_t* signal, int32_t* consumed, uint32_t* status, CommDeviceContext* context,
+    uint8_t* workspace, uint32_t postCount, uint32_t rounds, uint32_t queueNum, aclrtStream stream)
+{
+    TPutSessionRebuildKernel<<<1, nullptr, stream>>>(
+        send, recv, signal, consumed, status, context, workspace, postCount, rounds, queueNum, true);
 }
 
 bool AllTPutRanksReady(bool localReady, int nRanks)
@@ -1176,4 +1251,20 @@ bool RunTPutAsyncPostsWaitFinal(
            RunTPutPostStability(
                nRanks, nDevices, firstRankId, firstDeviceId, postCount, rounds, queueNum, "wait_final", LaunchTPutFinal,
                true);
+}
+
+bool RunTPutAsyncSessionRebuild(
+    int nRanks, int nDevices, int firstRankId, int firstDeviceId, uint32_t postCount, uint32_t rounds,
+    uint32_t queueNum, bool wideFirstSession)
+{
+    // The rebuild lands at half the posts, so the run has to be long enough for the second session to
+    // both inherit slots from the first and wrap the ring with its own.
+    if (postCount * rounds <= 2U * pto::comm::sdma::kSdmaFlagPayloadDepth) {
+        return false;
+    }
+    return ValidateTPutPostArguments(nRanks, postCount, rounds, queueNum, false, false) &&
+           RunTPutPostStability(
+               nRanks, nDevices, firstRankId, firstDeviceId, postCount, rounds, queueNum,
+               wideFirstSession ? "session_rebuild_wide_first" : "session_rebuild_narrow_first",
+               wideFirstSession ? LaunchTPutRebuildWideFirst : LaunchTPutRebuildNarrowFirst, false);
 }

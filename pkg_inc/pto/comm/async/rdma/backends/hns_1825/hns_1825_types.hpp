@@ -161,6 +161,8 @@ constexpr uint32_t kQueueIndexExhaustedError = 0x20004;
 constexpr uint64_t kMaxQueueIndex = 0xffffffffULL;
 constexpr uint32_t kCqProgressBatch = 8;
 constexpr uint32_t kPostSendBatch = 32;
+// One registered 4 KiB operand ring per peer. Reuse follows the signal WQE's CQ completion.
+constexpr uint32_t kNotifyOperandSlots = 1024;
 
 static_assert(sizeof(QueueState) == 64, "unexpected HNS1825 queue-state layout");
 

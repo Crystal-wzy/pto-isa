@@ -50,6 +50,10 @@ set(ALL_TESTCASES
     reduction_fit
     local_expand_fit
     sort_fit
+    bitwise_fit
+    comparison_layout_fit
+    matrix_load_fit
+    data_movement_fit
     dtype_expansion_fit
 )
 

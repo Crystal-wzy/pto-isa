@@ -78,39 +78,197 @@ __tf__ PTO_INLINE void TStore(GlobalData& dst, TileData& src, const std::vector<
     }
 }
 
+// ConvTile TSTORE writes only the source valid box (each dimension starts at the logical origin);
+// GM outside it is left untouched. The tile and the GlobalTensor are packed with their own declared
+// shapes, mirroring the TLOAD valid-box implementation.
+template <typename GlobalData, typename ConTile, AtomicType atomicType>
+PTO_INLINE void TStoreConvTileElement(
+    GlobalData& dst, ConTile& src, int64_t srcRow, int64_t srcCol, int64_t dstRow, int64_t dstCol,
+    const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& dstShapes,
+    const std::vector<int64_t>& dstStrides)
+{
+    using T = typename ConTile::DType;
+    const T val = src.GetElement(GetConvTileElementOffset<ConTile>(srcRow, srcCol, tile_shapes));
+    const size_t dstOffset = MapTileIndicesToGlobalOffset<GlobalData>(dstRow, dstCol, dstShapes, dstStrides);
+    if constexpr (atomicType == AtomicType::AtomicAdd) {
+        dst.AddToElement(dstOffset, val);
+    } else {
+        dst.SetElement(dstOffset, val);
+    }
+}
+
+template <typename GlobalData, typename ConTile, AtomicType atomicType>
+PTO_INLINE void TStoreConvTileNC1HWC0(
+    GlobalData& dst, ConTile& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& dstShapes,
+    const std::vector<int64_t>& dstStrides)
+{
+    using T = typename ConTile::DType;
+    constexpr int64_t c0 = static_cast<int64_t>(GetC0ElemCount<T>());
+
+    const int64_t tH = src.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t tW = src.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t gH = dst.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t gW = dst.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t gC0 = dst.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t vN = src.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t vC1 = src.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t vH = src.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t vW = src.GetValidShape(GlobalTensorDim::DIM_3);
+    int64_t vC0 = c0;
+    if constexpr (ConTile::totalDimCount >= 5) {
+        vC0 = src.GetValidShape(GlobalTensorDim::DIM_4);
+    }
+    assert(vC0 <= c0 && "ConvTile valid C0 must not exceed the 32-byte C0 block!");
+    assert(gC0 == c0 && "NC1HWC0 GlobalTensor C0 must equal the 32-byte C0 block!");
+
+    for (int64_t n = 0; n < vN; ++n) {
+        for (int64_t c1 = 0; c1 < vC1; ++c1) {
+            for (int64_t h = 0; h < vH; ++h) {
+                for (int64_t w = 0; w < vW; ++w) {
+                    const int64_t tileRow = (n * tH + h) * tW + w;
+                    const int64_t dstRow = (n * gH + h) * gW + w;
+                    for (int64_t c = 0; c < vC0; ++c) {
+                        TStoreConvTileElement<GlobalData, ConTile, atomicType>(
+                            dst, src, tileRow, c1 * c0 + c, dstRow, c1 * gC0 + c, tile_shapes, dstShapes, dstStrides);
+                    }
+                }
+            }
+        }
+    }
+}
+
+template <typename GlobalData, typename ConTile, AtomicType atomicType>
+PTO_INLINE void TStoreConvTileNDC1HWC0(
+    GlobalData& dst, ConTile& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& dstShapes,
+    const std::vector<int64_t>& dstStrides)
+{
+    using T = typename ConTile::DType;
+    constexpr int64_t c0 = static_cast<int64_t>(GetC0ElemCount<T>());
+
+    const int64_t tC1 = src.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t tH = src.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t tW = src.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t gC1 = dst.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t gH = dst.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t gW = dst.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t vN = src.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t vD = src.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t vC1 = src.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t vH = src.GetValidShape(GlobalTensorDim::DIM_3);
+    const int64_t vW = src.GetValidShape(GlobalTensorDim::DIM_4);
+    int64_t vC0 = c0;
+    if constexpr (ConTile::totalDimCount >= 6) {
+        vC0 = src.GetValidShape(5);
+    }
+    assert(vC0 <= c0 && "ConvTile valid C0 must not exceed the 32-byte C0 block!");
+
+    for (int64_t n = 0; n < vN; ++n) {
+        for (int64_t d = 0; d < vD; ++d) {
+            for (int64_t c1 = 0; c1 < vC1; ++c1) {
+                for (int64_t h = 0; h < vH; ++h) {
+                    for (int64_t w = 0; w < vW; ++w) {
+                        const int64_t tileRow = (n * tH + h) * tW + w;
+                        const int64_t dstRow = (n * gH + h) * gW + w;
+                        const int64_t tileColBase = (d * tC1 + c1) * c0;
+                        const int64_t dstColBase = (d * gC1 + c1) * c0;
+                        for (int64_t c = 0; c < vC0; ++c) {
+                            TStoreConvTileElement<GlobalData, ConTile, atomicType>(
+                                dst, src, tileRow, tileColBase + c, dstRow, dstColBase + c, tile_shapes, dstShapes,
+                                dstStrides);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+template <typename GlobalData, typename ConTile, AtomicType atomicType>
+PTO_INLINE void TStoreConvTileFractalZ4D(
+    GlobalData& dst, ConTile& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& dstShapes,
+    const std::vector<int64_t>& dstStrides)
+{
+    const int64_t d1 = src.GetShape(GlobalTensorDim::DIM_1);
+    const int64_t d3 = src.GetShape(GlobalTensorDim::DIM_3);
+    const int64_t v0 = src.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t v1 = src.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t v2 = src.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t v3 = src.GetValidShape(GlobalTensorDim::DIM_3);
+
+    for (int64_t i0 = 0; i0 < v0; ++i0) {
+        for (int64_t i1 = 0; i1 < v1; ++i1) {
+            const int64_t rowBase = (i0 * d1 + i1) * d3;
+            for (int64_t i2 = 0; i2 < v2; ++i2) {
+                for (int64_t i3 = 0; i3 < v3; ++i3) {
+                    TStoreConvTileElement<GlobalData, ConTile, atomicType>(
+                        dst, src, rowBase + i3, i2, rowBase + i3, i2, tile_shapes, dstShapes, dstStrides);
+                }
+            }
+        }
+    }
+}
+
+template <typename GlobalData, typename ConTile, AtomicType atomicType>
+PTO_INLINE void TStoreConvTileFractalZ5D(
+    GlobalData& dst, ConTile& src, const std::vector<int64_t>& tile_shapes, const std::vector<int64_t>& dstShapes,
+    const std::vector<int64_t>& dstStrides)
+{
+    const int64_t tH = src.GetShape(GlobalTensorDim::DIM_1);
+    const int64_t tW = src.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t tC0 = src.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t gH = dst.GetShape(GlobalTensorDim::DIM_1);
+    const int64_t gW = dst.GetShape(GlobalTensorDim::DIM_2);
+    const int64_t gC0 = dst.GetShape(GlobalTensorDim::DIM_4);
+    const int64_t vC1 = src.GetValidShape(GlobalTensorDim::DIM_0);
+    const int64_t vH = src.GetValidShape(GlobalTensorDim::DIM_1);
+    const int64_t vW = src.GetValidShape(GlobalTensorDim::DIM_2);
+    const int64_t vN = src.GetValidShape(GlobalTensorDim::DIM_3);
+    const int64_t vC0 = src.GetValidShape(GlobalTensorDim::DIM_4);
+
+    for (int64_t c1 = 0; c1 < vC1; ++c1) {
+        for (int64_t h = 0; h < vH; ++h) {
+            for (int64_t w = 0; w < vW; ++w) {
+                const int64_t tileRowBase = ((c1 * tH + h) * tW + w) * tC0;
+                const int64_t dstRowBase = ((c1 * gH + h) * gW + w) * gC0;
+                for (int64_t n = 0; n < vN; ++n) {
+                    for (int64_t c = 0; c < vC0; ++c) {
+                        TStoreConvTileElement<GlobalData, ConTile, atomicType>(
+                            dst, src, tileRowBase + c, n, dstRowBase + c, n, tile_shapes, dstShapes, dstStrides);
+                    }
+                }
+            }
+        }
+    }
+}
+
 template <typename GlobalData, typename ConTile, AtomicType atomicType = AtomicType::AtomicNone>
 __tf__ PTO_INLINE void TStoreConv(GlobalData& dst, ConTile& src)
 {
-    using T = typename ConTile::DType;
     CheckConvTileData<ConTile, GlobalData>(src, dst);
-
-    const size_t validRow = CalculateValidRowFromTile(src);
-    const size_t validCol = CalculateValidColFromTile(src);
+    CheckConvTileValidShape(src);
 
     const std::vector<int64_t> tile_shapes = {
         src.GetShape(GlobalTensorDim::DIM_0), src.GetShape(GlobalTensorDim::DIM_1),
         src.GetShape(GlobalTensorDim::DIM_2), src.GetShape(GlobalTensorDim::DIM_3),
         src.GetShape(GlobalTensorDim::DIM_4)};
-
-    const std::vector<int64_t> shapes = {
+    const std::vector<int64_t> dstShapes = {
         dst.GetShape(GlobalTensorDim::DIM_0), dst.GetShape(GlobalTensorDim::DIM_1),
         dst.GetShape(GlobalTensorDim::DIM_2), dst.GetShape(GlobalTensorDim::DIM_3),
         dst.GetShape(GlobalTensorDim::DIM_4)};
-    const std::vector<int64_t> strides = {
+    const std::vector<int64_t> dstStrides = {
         dst.GetStride(GlobalTensorDim::DIM_0), dst.GetStride(GlobalTensorDim::DIM_1),
         dst.GetStride(GlobalTensorDim::DIM_2), dst.GetStride(GlobalTensorDim::DIM_3),
         dst.GetStride(GlobalTensorDim::DIM_4)};
 
-    uint64_t scalar = 0;
-    for (size_t row = 0; row < validRow; ++row) {
-        for (size_t col = 0; col < validCol; ++col) {
-            T val = src.GetElement(GetConvTileElementOffset<ConTile>(row, col, tile_shapes));
-            const size_t dstOffset = MapTileIndicesToGlobalOffset<GlobalData>(row, col, shapes, strides);
-            if constexpr (atomicType == AtomicType::AtomicAdd) {
-                dst.AddToElement(dstOffset, val);
-            } else {
-                dst.SetElement(dstOffset, val);
-            }
+    if constexpr (GlobalData::layout == pto::Layout::NC1HWC0) {
+        TStoreConvTileNC1HWC0<GlobalData, ConTile, atomicType>(dst, src, tile_shapes, dstShapes, dstStrides);
+    } else if constexpr (GlobalData::layout == pto::Layout::NDC1HWC0) {
+        TStoreConvTileNDC1HWC0<GlobalData, ConTile, atomicType>(dst, src, tile_shapes, dstShapes, dstStrides);
+    } else if constexpr (GlobalData::layout == pto::Layout::FRACTAL_Z) {
+        if constexpr (ConTile::totalDimCount == 4) {
+            TStoreConvTileFractalZ4D<GlobalData, ConTile, atomicType>(dst, src, tile_shapes, dstShapes, dstStrides);
+        } else {
+            TStoreConvTileFractalZ5D<GlobalData, ConTile, atomicType>(dst, src, tile_shapes, dstShapes, dstStrides);
         }
     }
 }

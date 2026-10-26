@@ -26,6 +26,27 @@ TEST(TPutAsyncNotifyRdma, Int32SetAndCanaries)
     ASSERT_EQ(result, RdmaTestResult::PASSED);
 }
 
+static void CheckNotifyAdd(int32_t increment, int operations = 1, int blocks = 1)
+{
+    if (CommMpiSize() != 2) {
+        GTEST_SKIP() << "Requires exactly two MPI ranks";
+    }
+    const RdmaTestResult result = RunPutAsyncNotifyRdmaAdd(2, 2, 0, 0, increment, operations, blocks);
+    if (result == RdmaTestResult::SKIPPED) {
+        GTEST_SKIP() << "RDMA runtime prerequisites are unavailable on at least one rank";
+    }
+    ASSERT_EQ(result, RdmaTestResult::PASSED);
+}
+
+TEST(TPutAsyncNotifyRdma, Int32AddAndCanaries) { CheckNotifyAdd(37); }
+
+TEST(TPutAsyncNotifyRdma, Int32AddNegative) { CheckNotifyAdd(-3, 4); }
+
+TEST(TPutAsyncNotifyRdma, Int32AddZero) { CheckNotifyAdd(0); }
+
+// Four AIVs write disjoint payload slices and increment one shared signal 16 times.
+TEST(TPutAsyncNotifyRdma, Int32AddMultiAiv) { CheckNotifyAdd(1, 16, 4); }
+
 int main(int argc, char** argv)
 {
     if (!CommMpiInit(&argc, &argv)) {

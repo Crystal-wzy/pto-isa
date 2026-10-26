@@ -4,7 +4,7 @@
 
 # PTO Tile Library
 
-Parallel Tile Operation (PTO) is a virtual ISA for tile-oriented programming defined by Ascend CANN. This repository provides PTO Tile instruction implementations, examples, tests, and documentation to help developers migrate and optimize operators more smoothly across different Ascend generations.
+Parallel Tile Operation (PTO) is a virtual ISA for tile-oriented programming defined by Huawei Ascend CANN. This repository provides PTO Tile instruction implementations, examples, tests, and documentation to help developers migrate and optimize operators more smoothly across different Ascend generations.
 
 [![License](https://img.shields.io/badge/License-CANN%20Open%20Software%20License%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Ascend%20A2%20%7C%20A3%20%7C%20A5%20%7C%20CPU-green.svg)](#-platform-support)
@@ -133,15 +133,14 @@ This repository also demonstrates how standard tile operations can be mapped to 
 
 ### Flash Attention
 
-- Reference implementations: `kernels/manual/common/flash_atten/` for A2/A3 and `kernels/manual/a5/flash_atten/` for A5
-- Detailed analysis and tuning notes: [Flash Attention Operator Implementation](kernels/manual/common/flash_atten/README.md)
+- Operator implementation and tuning notes: [A2/A3 version](kernels/manual/common/flash_atten/README.md), [A5 version](kernels/manual/a5/flash_atten/README.md)
 - A5 build guide, with A5 performance numbers still pending: [Flash Attention Performance Kernel (A5)](kernels/manual/a5/flash_atten/README.md)
 - S0: query sequence length (number of rows in Q/O)
 - S1: key/value sequence length (number of rows in K/V)
 
-Ascend 910B2 (A2/A3) multi-core comparison, using `torch_npu` as the baseline:
+Ascend 910B2 multi-core comparison, using `torch_npu` as the baseline:
 
-| Sequence length | PTO time (us) | torch_npu time (us) | PTO TFLOPS | torch_npu TFLOPS | Speedup |
+| Sequence length | PTO time (us) | torch_npu time (us) | PTO TFLOPS | torch_npu TFLOPS | PTO speedup |
 | --- | --- | --- | --- | --- | --- |
 | 1024 | 20.960 | 58.461 | 25.61 | 9.18 | 2.79x |
 | 2048 | 32.461 | 70.801 | 66.16 | 30.33 | 2.18x |
@@ -151,10 +150,6 @@ Ascend 910B2 (A2/A3) multi-core comparison, using `torch_npu` as the baseline:
 | 32768 | 3262.645 | 3646.173 | 168.50 | 150.78 | 1.12x |
 
 ![Flash Attention 910B2 PTO vs torch_npu](docs/figures/performance/fa_910b2_pto_vs_torch_npu.png)
-
-Additional A2/A3 normalized reference:
-
-![Flash Attention normalized TFLOPS (A2/A3)](docs/figures/performance/fa_normalized_tflops_a2a3.svg)
 
 ### Communication Instruction Bandwidth
 

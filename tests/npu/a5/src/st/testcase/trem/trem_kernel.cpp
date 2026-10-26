@@ -73,6 +73,16 @@ template void LaunchTRem<int32_t, 8, 8, 8, 8, false, false>(int32_t* out, int32_
 template void LaunchTRem<float, 64, 64, 64, 64, false, true>(float* out, float* src0, float* src1, void* stream);
 template void LaunchTRem<float, 128, 128, 96, 96, false, true>(float* out, float* src0, float* src1, void* stream);
 template void LaunchTRem<float, 128, 128, 96, 97, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 1, 64, 1, 64, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 2, 64, 2, 64, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 4, 64, 4, 64, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 8, 64, 8, 64, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 1, 512, 1, 512, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 4, 128, 4, 65, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 16, 64, 16, 64, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 24, 64, 24, 64, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 32, 64, 32, 64, false, true>(float* out, float* src0, float* src1, void* stream);
+template void LaunchTRem<float, 48, 64, 48, 64, false, true>(float* out, float* src0, float* src1, void* stream);
 template void LaunchTRem<int64_t, 4, 16, 4, 16, false, false>(int64_t* out, int64_t* src0, int64_t* src1, void* stream);
 template void LaunchTRem<uint64_t, 4, 16, 4, 16, false, false>(
     uint64_t* out, uint64_t* src0, uint64_t* src1, void* stream);
@@ -84,7 +94,7 @@ template void LaunchTRem<int64_t, 32, 32, 32, 32, false, false>(
 template void LaunchTRem<uint64_t, 32, 32, 32, 32, false, false>(
     uint64_t* out, uint64_t* src0, uint64_t* src1, void* stream);
 
-template <typename T, int tileH, int tileW, int vRows, int vCols>
+template <typename T, int tileH, int tileW, int vRows, int vCols, bool highPrecision>
 __global__ AICORE void runTRemInplace(__gm__ T* out, __gm__ T* src1)
 {
     using DynShapeDim5 = Shape<1, 1, 1, vRows, vCols>;
@@ -111,7 +121,8 @@ __global__ AICORE void runTRemInplace(__gm__ T* out, __gm__ T* src1)
     set_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
     wait_flag(PIPE_MTE2, PIPE_V, EVENT_ID0);
 #endif
-    TREM<RemAlgorithm::DEFAULT>(dstTile, src0Tile, src1Tile, tmpTile);
+    constexpr auto precisionType = highPrecision ? RemAlgorithm::HIGH_PRECISION : RemAlgorithm::DEFAULT;
+    TREM<precisionType>(dstTile, src0Tile, src1Tile, tmpTile);
 #ifndef __PTO_AUTO__
     set_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
     wait_flag(PIPE_V, PIPE_MTE3, EVENT_ID0);
@@ -120,15 +131,16 @@ __global__ AICORE void runTRemInplace(__gm__ T* out, __gm__ T* src1)
     out = dstGlobal.data();
 }
 
-template <typename T, int tileH, int tileW, int vRows, int vCols>
+template <typename T, int tileH, int tileW, int vRows, int vCols, bool highPrecision>
 void LaunchTRemInplace(T* out, T* src1, void* stream)
 {
-    runTRemInplace<T, tileH, tileW, vRows, vCols><<<1, nullptr, stream>>>(out, src1);
+    runTRemInplace<T, tileH, tileW, vRows, vCols, highPrecision><<<1, nullptr, stream>>>(out, src1);
 }
 
-template void LaunchTRemInplace<int64_t, 4, 32, 4, 32>(int64_t* out, int64_t* src1, void* stream);
-template void LaunchTRemInplace<uint64_t, 4, 32, 4, 32>(uint64_t* out, uint64_t* src1, void* stream);
-template void LaunchTRemInplace<int64_t, 1, 1024, 1, 1024>(int64_t* out, int64_t* src1, void* stream);
-template void LaunchTRemInplace<int64_t, 1, 2048, 1, 2045>(int64_t* out, int64_t* src1, void* stream);
-template void LaunchTRemInplace<int64_t, 4, 64, 4, 40>(int64_t* out, int64_t* src1, void* stream);
-template void LaunchTRemInplace<uint64_t, 4, 64, 4, 40>(uint64_t* out, uint64_t* src1, void* stream);
+template void LaunchTRemInplace<int64_t, 4, 32, 4, 32, false>(int64_t* out, int64_t* src1, void* stream);
+template void LaunchTRemInplace<uint64_t, 4, 32, 4, 32, false>(uint64_t* out, uint64_t* src1, void* stream);
+template void LaunchTRemInplace<int64_t, 1, 1024, 1, 1024, false>(int64_t* out, int64_t* src1, void* stream);
+template void LaunchTRemInplace<int64_t, 1, 2048, 1, 2045, false>(int64_t* out, int64_t* src1, void* stream);
+template void LaunchTRemInplace<int64_t, 4, 64, 4, 40, false>(int64_t* out, int64_t* src1, void* stream);
+template void LaunchTRemInplace<uint64_t, 4, 64, 4, 40, false>(uint64_t* out, uint64_t* src1, void* stream);
+template void LaunchTRemInplace<float, 8, 64, 8, 64, true>(float* out, float* src1, void* stream);

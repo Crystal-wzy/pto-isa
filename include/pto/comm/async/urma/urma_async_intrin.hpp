@@ -43,6 +43,8 @@ namespace detail {
 struct UrmaPostResult {
     uint64_t handle;
     uint32_t targetCqe;
+    uint32_t jetty;
+    bool failed{false};
 };
 
 struct UrmaMultiPostResult {
@@ -51,6 +53,7 @@ struct UrmaMultiPostResult {
     uint32_t jettyCount;
     uint32_t targetBb[kUrmaMaxJettiesPerCore];
     uint32_t targetCqe[kUrmaMaxJettiesPerCore];
+    bool failed{false};
 };
 
 // One jetty's slice completion targets; ok stays false on a drain failure.
@@ -78,8 +81,8 @@ AICORE inline bool SequenceReached(uint32_t current, uint32_t target)
 
 AICORE inline void UrmaPostSendUpdateInfo(uint32_t head, __gm__ UrmaWQCtx* wq)
 {
-    st_dev(head, reinterpret_cast<__gm__ uint32_t*>(wq->dbAddr), 0);
     st_dev(head, reinterpret_cast<__gm__ uint32_t*>(wq->headAddr), 0);
+    st_dev(head, reinterpret_cast<__gm__ uint32_t*>(wq->dbAddr), 0);
 }
 
 AICORE inline uint32_t UrmaCtxRow(__gm__ UrmaInfo* info, uint32_t peer, uint32_t jettyIdx)
@@ -90,8 +93,10 @@ AICORE inline uint32_t UrmaCtxRow(__gm__ UrmaInfo* info, uint32_t peer, uint32_t
 
 AICORE inline uint32_t UrmaTargetRow(__gm__ UrmaInfo* info, uint32_t peer, uint32_t jettyIdx)
 {
-    const uint32_t jettyStride = (info->layout == UrmaLayout::SHARED_POOL) ? info->rankCount : 0U;
-    return jettyIdx * jettyStride + peer;
+    if (info->layout == UrmaLayout::SHARED_POOL) {
+        return jettyIdx * info->rankCount + peer;
+    }
+    return peer * info->rowsPerPeer + jettyIdx;
 }
 
 AICORE inline uint32_t UrmaJettyIdxBound(__gm__ UrmaInfo* info)
@@ -119,6 +124,14 @@ AICORE inline __gm__ UrmaWQCtx* GetWqContext(const AsyncSession& session, uint32
 AICORE inline __gm__ UrmaCqCtx* GetCqContext(const AsyncSession& session, uint32_t peer)
 {
     return GetCqContextAt(session, peer, session.qpIdxBase);
+}
+
+AICORE inline uint32_t UrmaRailCycleSlot(__gm__ UrmaInfo* info, uint32_t cursor)
+{
+    if (info->railCycleLen == 0U) {
+        return 0U;
+    }
+    return info->railCycle[cursor % info->railCycleLen];
 }
 
 AICORE inline __gm__ UrmaMemInfo* GetRemoteMemInfo(__gm__ UrmaInfo* info, uint32_t peer, uint32_t jettyIdx)
@@ -149,10 +162,10 @@ AICORE inline bool ValidateUrmaSessionAt(const AsyncSession& session, uint32_t p
 
 AICORE inline bool ValidateUrmaSession(const AsyncSession& session, uint32_t peer)
 {
-    if (session.qpCount == 0U || session.qpCount > kUrmaMaxJettiesPerCore) {
+    if (session.cfg.urma.qpCount == 0U || session.cfg.urma.qpCount > kUrmaMaxJettiesPerCore) {
         return false;
     }
-    for (uint32_t j = 0U; j < session.qpCount; ++j) {
+    for (uint32_t j = 0U; j < session.cfg.urma.qpCount; ++j) {
         if (!ValidateUrmaSessionAt(session, peer, session.qpIdxBase + j)) {
             return false;
         }
@@ -205,11 +218,17 @@ AICORE inline bool GetUrmaCompletionRecord(
     return GetUrmaCompletionRecordAt(session, peer, session.qpIdxBase, targetCqe, record);
 }
 
-AICORE inline __gm__ UrmaNotifyResourceRegion* GetUrmaNotifyResourceRegion(const AsyncSession& session, uint32_t peer)
+AICORE inline __gm__ UrmaNotifyResourceRegion* GetUrmaNotifyResourceRegionAt(
+    const AsyncSession& session, uint32_t peer, uint32_t jettyIdx)
 {
     __gm__ UrmaInfo* info = reinterpret_cast<__gm__ UrmaInfo*>(session.contextGm);
     __gm__ UrmaNotifyResourceRegion* regions = reinterpret_cast<__gm__ UrmaNotifyResourceRegion*>(info->notifyPoolPtr);
-    return regions + UrmaTargetRow(info, peer, session.qpIdxBase);
+    return regions + UrmaTargetRow(info, peer, jettyIdx);
+}
+
+AICORE inline __gm__ UrmaNotifyResourceRegion* GetUrmaNotifyResourceRegion(const AsyncSession& session, uint32_t peer)
+{
+    return GetUrmaNotifyResourceRegionAt(session, peer, session.qpIdxBase);
 }
 
 AICORE inline void PublishCqAndWqTails(
@@ -238,14 +257,29 @@ AICORE inline bool IsUrmaCqePrefixReady(__gm__ UrmaCqCtx* cq, uint32_t begin, ui
     return true;
 }
 
+// Same SYS_CNT read as AscendC::GetSystemCycle. This header is included from every
+// A5 kernel, and that declaration's header is only on the comm ST include path.
+AICORE inline uint64_t UrmaReadSystemCycle()
+{
+#if defined(__CCE_AICORE__)
+    uint64_t sysCnt = 0;
+    asm volatile("MOV %0, SYS_CNT\n" : "+l"(sysCnt));
+    return sysCnt;
+#else
+    return 0U;
+#endif
+}
+
 AICORE inline bool WaitForUrmaCqe(__gm__ UrmaCqCtx* cq, uint32_t sequence, uint32_t cqeSize, __gm__ UrmaJfcCqeCtx*& cqe)
 {
     cqe = GetUrmaCqe(cq, sequence, cqeSize);
     const bool validOwner = (sequence / cq->depth) & 1U;
+    const uint64_t startCycles = UrmaReadSystemCycle();
     uint32_t polls = 0U;
     DcciCachelines(reinterpret_cast<__gm__ uint8_t*>(cqe), sizeof(UrmaJfcCqeCtx));
     while ((validOwner ^ cqe->owner) == 0U) {
-        if (++polls >= kUrmaMaxPollTimes) {
+        if ((++polls & (kUrmaPollCycleStride - 1U)) == 0U &&
+            UrmaReadSystemCycle() - startCycles >= kUrmaPollCqTimeoutCycles) {
             return false;
         }
         DcciCachelines(reinterpret_cast<__gm__ uint8_t*>(cqe), sizeof(UrmaJfcCqeCtx));
@@ -291,7 +325,12 @@ AICORE inline bool UrmaPollCqAt(
         return true;
     }
     if (!RetireUrmaCqePrefix(cq, completedCqe, targetCqe, cqeSize)) {
-        return false;
+        dsb(DSB_DDR);
+        UrmaPostSendUpdateInfo(ld_dev(reinterpret_cast<__gm__ uint32_t*>(wq->headAddr), 0), wq);
+        pipe_barrier(PIPE_ALL);
+        if (!RetireUrmaCqePrefix(cq, completedCqe, targetCqe, cqeSize)) {
+            return false;
+        }
     }
     PublishCqAndWqTails(targetBb, targetCqe, cq, wq);
     completed = true;
@@ -336,12 +375,27 @@ AICORE inline bool UrmaWaitEventMultiJetty(
 AICORE inline AsyncEvent MakeUrmaMultiJettyEvent(const detail::UrmaMultiPostResult& result)
 {
     AsyncEvent event(result.handle, DmaEngine::URMA);
+    event.postFailed = result.failed;
     event.urmaJettyBase = static_cast<uint16_t>(result.jettyBase);
     event.urmaJettyCount = static_cast<uint16_t>(result.jettyCount);
     for (uint32_t j = 0U; j < result.jettyCount; ++j) {
         event.urmaTargetBbPerJetty[j] = result.targetBb[j];
         event.urmaTargetCqePerJetty[j] = result.targetCqe[j];
     }
+    return event;
+}
+
+AICORE inline AsyncEvent MakeUrmaNotifyEvent(const detail::UrmaPostResult& result)
+{
+    AsyncEvent event(result.handle, DmaEngine::URMA, result.targetCqe);
+    event.postFailed = result.failed;
+    uint32_t peer = 0U;
+    uint32_t targetBb = 0U;
+    detail::DecodeHandle(result.handle, peer, targetBb);
+    event.urmaJettyBase = static_cast<uint16_t>(result.jetty);
+    event.urmaJettyCount = 1U;
+    event.urmaTargetBbPerJetty[0] = targetBb;
+    event.urmaTargetCqePerJetty[0] = result.targetCqe;
     return event;
 }
 

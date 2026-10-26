@@ -30,8 +30,8 @@ PTO_INTERNAL bool BuildAsyncSession(
     const sdma::SdmaBaseConfig& baseConfig = {sdma::kDefaultSdmaBlockBytes, 0, 1},
     uint32_t channelGroupIdx = sdma::kAutoChannelGroupIdx)
 {
-    session.engine = engine;
     if constexpr (engine == DmaEngine::SDMA) {
+        // BuildSdmaSession activates the SDMA alternative, which sets session.engine.
         session.valid = sdma::BuildSdmaSession(scratchTile, workspace, session, syncId, baseConfig, channelGroupIdx);
         return session.valid;
     } else {
@@ -48,26 +48,29 @@ PTO_INTERNAL bool BuildAsyncSession(__gm__ uint8_t* workspace, AsyncSession& ses
 {
     static_assert(engine == DmaEngine::URMA, "This overload is for URMA only");
     session = AsyncSession{};
-    session.engine = engine;
+    // AsyncSession{} leaves cfg/rt on their SDMA alternative, so the URMA ones
+    // have to be activated explicitly rather than inherited from the defaults.
+    detail::ActivateEngineState<DmaEngine::URMA>(session);
     session.contextGm = workspace;
-    session.destRankId = 0;
-    session.qpIdxBase = 0;
-    session.qpCount = 1;
+    // destRankId and qpIdxBase keep the zeros AsyncSession{} gave them; the shared-pool path below
+    // is the only one that moves qpIdxBase off its base.
+    session.cfg.urma.qpCount = 1;
     if (workspace == nullptr) {
         return false;
     }
     __gm__ urma::UrmaInfo* info = reinterpret_cast<__gm__ urma::UrmaInfo*>(workspace);
-    if (info->layout != urma::UrmaLayout::SHARED_POOL) {
-        session.valid = true;
-        return session.valid;
-    }
     const uint32_t perCore = info->jettiesPerCore;
     if (perCore == 0U || perCore > urma::kUrmaMaxJettiesPerCore) {
         return false;
     }
-    session.qpIdxBase = static_cast<uint32_t>(get_block_idx()) * perCore;
-    session.qpCount = perCore;
-    session.valid = (session.qpIdxBase + perCore <= urma::detail::UrmaJettyIdxBound(info));
+    session.qpIdxBase = 0;
+    session.cfg.urma.qpCount = perCore;
+    const uint32_t block = static_cast<uint32_t>(get_block_idx());
+    const uint32_t bound = urma::detail::UrmaJettyIdxBound(info);
+    session.valid = (perCore <= bound) && (block <= (bound - perCore) / perCore);
+    if (session.valid) {
+        session.qpIdxBase = block * perCore;
+    }
     return session.valid;
 }
 
@@ -86,9 +89,11 @@ PTO_INTERNAL bool BuildAsyncSession(__gm__ uint8_t* workspace, uint32_t destRank
 #ifdef PTO_RDMA_SUPPORTED
 // Peer-independent RDMA session builder. The explicit-peer TPUT_ASYNC and
 // TGET_ASYNC overloads can reuse this session for multiple remote ranks.
+// qpIdx selects one of the workspace's QPs for every peer; existing calls use QP0.
 template <DmaEngine engine, typename ScratchTile>
 PTO_INTERNAL bool BuildAsyncSession(
-    ScratchTile& scratchTile, __gm__ uint8_t* workspace, uint32_t myPe, AsyncSession& session, uint32_t syncId = 0)
+    ScratchTile& scratchTile, __gm__ uint8_t* workspace, uint32_t myPe, AsyncSession& session, uint32_t syncId = 0,
+    uint32_t qpIdx = 0)
 {
     static_assert(engine == DmaEngine::RDMA, "This overload is for RDMA only");
     rdma::RdmaTmpBuffer tmpBuf{};
@@ -96,7 +101,7 @@ PTO_INTERNAL bool BuildAsyncSession(
         session = AsyncSession{};
         return false;
     }
-    return rdma::BuildSession(workspace, myPe, tmpBuf, syncId, session);
+    return rdma::BuildSession(workspace, myPe, tmpBuf, syncId, session, qpIdx);
 }
 
 // Peer-bound RDMA builder retained for callers that use the original async
@@ -104,7 +109,7 @@ PTO_INTERNAL bool BuildAsyncSession(
 template <DmaEngine engine, typename ScratchTile>
 PTO_INTERNAL bool BuildAsyncSession(
     ScratchTile& scratchTile, __gm__ uint8_t* workspace, uint32_t destRankId, uint32_t myPe, AsyncSession& session,
-    uint32_t syncId = 0)
+    uint32_t syncId = 0, uint32_t qpIdx = 0)
 {
     static_assert(engine == DmaEngine::RDMA, "This overload is for RDMA only");
     rdma::RdmaTmpBuffer tmpBuf{};
@@ -112,7 +117,7 @@ PTO_INTERNAL bool BuildAsyncSession(
         session = AsyncSession{};
         return false;
     }
-    return rdma::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session);
+    return rdma::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session, qpIdx);
 }
 #endif
 
@@ -138,6 +143,9 @@ PTO_INTERNAL bool UrmaEventComplete(const AsyncEvent& event, const AsyncSession&
 
 PTO_INTERNAL bool AsyncEvent::Wait(const AsyncSession& session) const
 {
+    if (postFailed) {
+        return false;
+    }
     if (handle == 0) {
         return true;
     }
@@ -159,6 +167,9 @@ PTO_INTERNAL bool AsyncEvent::Wait(const AsyncSession& session) const
 
 PTO_INTERNAL bool AsyncEvent::Test(const AsyncSession& session) const
 {
+    if (postFailed) {
+        return false;
+    }
     if (handle == 0) {
         return true;
     }
@@ -191,7 +202,7 @@ PTO_INTERNAL uint32_t AsyncEvent::CompletionRecordCount(const AsyncSession& sess
             uint64_t postId = 0ULL;
             uint32_t queueCount = 0U;
             return sdma::detail::DecodeSdmaEventHandle(handle, postId, queueCount) &&
-                           session.sdmaRuntimeCtx.postDoneBase != nullptr ?
+                           session.rt.sdma.postDoneBase != nullptr ?
                        queueCount :
                        kCompletionRecordCountError;
         }
@@ -246,10 +257,10 @@ PTO_INTERNAL AsyncCompletionRecord AsyncEvent::CompletionRecordAt(const AsyncSes
             uint64_t postId = 0ULL;
             uint32_t queueCount = 0U;
             if (!sdma::detail::DecodeSdmaEventHandle(handle, postId, queueCount) || idx >= queueCount ||
-                session.sdmaRuntimeCtx.postDoneBase == nullptr) {
+                session.rt.sdma.postDoneBase == nullptr) {
                 return record;
             }
-            record.addr = sdma::detail::GetPostDoneRecordAddr(session.sdmaRuntimeCtx.postDoneBase, idx);
+            record.addr = sdma::detail::GetPostDoneRecordAddr(session.rt.sdma.postDoneBase, idx);
             record.expected = postId;
             record.kind = CompletionKind::SDMA_POST_DONE;
             return record;

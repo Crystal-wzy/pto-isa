@@ -1,5 +1,18 @@
 # SYNCALL
 
+## Product Support<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT products: Supported
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3 products: Supported
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2 products: Supported
+<!-- end id3 -->
+
+
 ## Instruction Diagram
 
 > No `SYNCALL.svg` is provided. `SYNCALL` is a **cross-core control-plane** primitive; it does not describe a data transform on a single Tile. Its meaning is "all participants rendezvous at this point before any may proceed".

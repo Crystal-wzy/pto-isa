@@ -19,3 +19,12 @@ bool RunPutAsyncUrmaRootPut(int n_ranks, int n_devices, int first_rank_id, int f
 template <typename T, size_t count, int nAiv, int jettiesPerCore>
 bool RunPutAsyncUrmaPool(int n_ranks, int n_devices, int first_rank_id, int first_device_id);
 bool RunPutAsyncUrmaPoolAutoAivCount(int n_ranks, int n_devices, int first_rank_id, int first_device_id);
+
+// PER_PEER with an explicit AIV width: nAiv blocks, jettiesPerCore private
+// queues each, on every peer.
+template <typename T, size_t count, int nAiv, int jettiesPerCore>
+bool RunPutAsyncUrmaPerPeer(int n_ranks, int n_devices, int first_rank_id, int first_device_id);
+
+// Every rank puts to every peer at once, with the payload checked per sender.
+template <typename T, size_t count>
+bool RunPutAsyncUrmaAllToAll(int n_ranks, int n_devices, int first_rank_id, int first_device_id);

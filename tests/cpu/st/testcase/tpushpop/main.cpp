@@ -1591,3 +1591,337 @@ TEST_F(TPushPopTest, v2c_leftright_odd_split_layout)
         }
     }
 }
+
+class TPushPopPackedMxTest : public testing::Test {
+protected:
+    NPUArch previousArch;
+
+    void SetUp() override
+    {
+        previousArch = NPUMemoryModel::Instance().GetArch();
+        NPU_MEMORY_INIT(NPUArch::A5);
+        NPU_MEMORY_CLEAR();
+    }
+
+    void TearDown() override
+    {
+        cpu_sim::reset_execution_context();
+        NPU_MEMORY_CLEAR();
+        NPU_MEMORY_INIT(previousArch);
+    }
+};
+
+namespace {
+template <int Rows, int Cols, bool Transpose, uint8_t DirectionType>
+void checkPackedMxTransfer()
+{
+    using Vec = Tile<TileType::Vec, float8_e8m0_t, Rows, Cols, BLayout::RowMajor, Rows, Cols, SLayout::RowMajor, 32>;
+    using Mat = Tile<
+        TileType::Mat, float8_e8m0_t, Transpose ? Cols : Rows, Transpose ? Rows : Cols,
+        Transpose ? BLayout::ColMajor : BLayout::RowMajor, Transpose ? Cols : Rows, Transpose ? Rows : Cols,
+        Transpose ? SLayout::ColMajor : SLayout::RowMajor, 32>;
+    using Pipe = TPipe<14, DirectionType, 4096, 2, 2, true>;
+    Pipe::reset_for_cpu_sim();
+    Pipe pipe(nullptr, 0, 0);
+    Vec source;
+    Mat result;
+    TASSIGN(source, 0);
+    TASSIGN(result, 0);
+    cpu_sim::ScopedExecutionContext ctx(0, 0, 1);
+    for (int iter = 0; iter < 5; ++iter) {
+        for (int r = 0; r < Rows; ++r) {
+            for (int c = 0; c < Cols; ++c) {
+                source.SetElement(r, c, float8_e8m0_t::FromRaw(static_cast<uint8_t>(r * Cols + c + iter)));
+            }
+        }
+        TPUSH<Pipe, Vec, TileSplitAxis::TILE_NO_SPLIT>(pipe, source);
+        TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+        TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
+        for (int r = 0; r < Rows; ++r) {
+            for (int c = 0; c < Cols; ++c) {
+                EXPECT_EQ(
+                    result.GetElement(Transpose ? c : r, Transpose ? r : c).RawData(),
+                    source.GetElement(r, c).RawData());
+            }
+        }
+        for (int i = 0; i < Rows * Cols; ++i) {
+            EXPECT_EQ(result.data()[i].RawData(), source.data()[i].RawData());
+        }
+    }
+}
+} // namespace
+
+TEST_F(TPushPopPackedMxTest, packed_mx_same_layout_and_transposed_layout_wraparound)
+{
+    checkPackedMxTransfer<16, 4, false, Direction::DIR_V2C>();
+    checkPackedMxTransfer<128, 4, true, Direction::DIR_V2C>();
+    checkPackedMxTransfer<256, 4, true, Direction::DIR_BOTH>();
+    checkPackedMxTransfer<64, 8, false, Direction::DIR_BOTH>();
+}
+
+TEST_F(TPushPopPackedMxTest, packed_mx_entry_metadata_does_not_leak_to_reused_slot)
+{
+    using Packed = Tile<TileType::Vec, float8_e8m0_t, 16, 4, BLayout::RowMajor, 16, 4, SLayout::RowMajor, 32>;
+    using Plain = Tile<TileType::Vec, float8_e8m0_t, 4, 32, BLayout::RowMajor, 4, 16>;
+    using Mat = Tile<TileType::Mat, float8_e8m0_t, 4, 16, BLayout::ColMajor, 4, 16, SLayout::ColMajor, 32>;
+    using Pipe = TPipe<15, Direction::DIR_V2C, 256, 1, 2, true>;
+    Pipe::reset_for_cpu_sim();
+    Pipe pipe(nullptr, 0, 0);
+    Packed packed;
+    Plain plain;
+    Mat result;
+    TASSIGN(packed, 0);
+    TASSIGN(plain, 256);
+    TASSIGN(result, 0);
+    cpu_sim::ScopedExecutionContext ctx(0, 0, 1);
+    for (int iter = 0; iter < 3; ++iter) {
+        for (int r = 0; r < 16; ++r) {
+            for (int c = 0; c < 4; ++c) {
+                packed.SetElement(r, c, float8_e8m0_t(1 << ((r + c + iter) % 6)));
+                plain.SetElement(c, r, float8_e8m0_t(1 << ((2 * r + c + iter) % 6)));
+            }
+        }
+        // Two independently typed entries share a slot and use nonzero offsets.
+        pipe.prod.setRecordStatus(false);
+        pipe.prod.setEntryOffset(32);
+        TPUSH<Pipe, Packed, TileSplitAxis::TILE_NO_SPLIT>(pipe, packed);
+        pipe.prod.setAllocateStatus(false);
+        pipe.prod.setRecordStatus(true);
+        pipe.prod.setEntryOffset(128);
+        TPUSH<Pipe, Plain, TileSplitAxis::TILE_NO_SPLIT>(pipe, plain);
+        pipe.prod.setAllocateStatus(true);
+        pipe.cons.setentryOffset(32);
+        TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+        for (int r = 0; r < 4; ++r) {
+            for (int c = 0; c < 16; ++c) {
+                EXPECT_EQ(result.GetElement(r, c).RawData(), packed.GetElement(c, r).RawData());
+            }
+        }
+        pipe.cons.setWaitStatus(false);
+        pipe.cons.setentryOffset(128);
+        TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+        TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
+        pipe.cons.setWaitStatus(true);
+        for (int r = 0; r < 4; ++r) {
+            for (int c = 0; c < 16; ++c) {
+                EXPECT_EQ(result.GetElement(r, c).RawData(), plain.GetElement(r, c).RawData());
+            }
+        }
+        // Reuse the formerly packed entry with an ordinary logical transfer.
+        pipe.prod.setEntryOffset(32);
+        TPUSH<Pipe, Plain, TileSplitAxis::TILE_NO_SPLIT>(pipe, plain);
+        pipe.cons.setentryOffset(32);
+        TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+        TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
+        for (int r = 0; r < 4; ++r) {
+            for (int c = 0; c < 16; ++c) {
+                EXPECT_EQ(result.GetElement(r, c).RawData(), plain.GetElement(r, c).RawData());
+            }
+        }
+    }
+}
+
+TEST_F(TPushPopPackedMxTest, packed_mx_gm_transport_keeps_logical_row_major_payload)
+{
+    using Vec = Tile<TileType::Vec, float8_e8m0_t, 16, 4, BLayout::RowMajor, 16, 4, SLayout::RowMajor, 32>;
+    using Mat = Tile<TileType::Mat, float8_e8m0_t, 4, 16, BLayout::ColMajor, 4, 16, SLayout::ColMajor, 32>;
+    auto check = []<uint8_t DirType>(NPUArch arch) {
+        NPU_MEMORY_INIT(arch);
+        using Pipe = TPipe<16, DirType, 256, 2, 2, true>;
+        Pipe::reset_for_cpu_sim();
+        Pipe pipe(nullptr, 0, 0);
+        Vec source;
+        Mat result;
+        TASSIGN(source, 0);
+        TASSIGN(result, 0);
+        cpu_sim::ScopedExecutionContext ctx(0, 0, 1);
+        for (int r = 0; r < 16; ++r) {
+            for (int c = 0; c < 4; ++c) {
+                source.SetElement(r, c, float8_e8m0_t(1 << ((r + c) % 6)));
+            }
+        }
+        TPUSH<Pipe, Vec, TileSplitAxis::TILE_NO_SPLIT>(pipe, source);
+        TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+        TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
+        for (int r = 0; r < 4; ++r) {
+            for (int c = 0; c < 16; ++c) {
+                const int index = r * 16 + c;
+                EXPECT_EQ(result.GetElement(r, c).RawData(), source.GetElement(index / 4, index % 4).RawData());
+            }
+        }
+    };
+    check.template operator()<Direction::DIR_V2C_GM>(NPUArch::A5);
+    check.template operator()<Direction::DIR_V2C>(NPUArch::A2A3);
+}
+
+TEST_F(TPushPopPackedMxTest, packed_mx_many_entries_fill_slot_at_unaligned_offsets)
+{
+    using Vec = Tile<TileType::Vec, float8_e8m0_t, 16, 2, BLayout::RowMajor, 16, 2, SLayout::RowMajor, 32>;
+    using Mat = Tile<TileType::Mat, float8_e8m0_t, 2, 16, BLayout::ColMajor, 2, 16, SLayout::ColMajor, 32>;
+    using Pipe = TPipe<17, Direction::DIR_V2C, 257, 1, 2, true>;
+    Pipe::reset_for_cpu_sim();
+    Pipe pipe(nullptr, 0, 0);
+    Vec source;
+    Mat result;
+    TASSIGN(source, 0);
+    TASSIGN(result, 0);
+    for (int iteration = 0; iteration < 3; ++iteration) {
+        for (int entry = 0; entry < 8; ++entry) {
+            for (int i = 0; i < 32; ++i) {
+                source.data()[i] = float8_e8m0_t::FromRaw(static_cast<uint8_t>(entry * 32 + i + iteration));
+            }
+            pipe.prod.setEntryOffset(1 + entry * 32);
+            pipe.prod.setAllocateStatus(entry == 0);
+            pipe.prod.setRecordStatus(entry == 7);
+            TPUSH<Pipe, Vec, TileSplitAxis::TILE_NO_SPLIT>(pipe, source);
+        }
+        for (int entry = 0; entry < 8; ++entry) {
+            pipe.cons.setentryOffset(1 + entry * 32);
+            pipe.cons.setWaitStatus(entry == 0);
+            TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+            for (int i = 0; i < 32; ++i) {
+                EXPECT_EQ(result.data()[i].RawData(), static_cast<uint8_t>(entry * 32 + i + iteration));
+            }
+        }
+        TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
+    }
+}
+
+TEST_F(TPushPopPackedMxTest, packed_mx_overlapping_plain_entry_invalidates_old_shape)
+{
+    using Packed = Tile<TileType::Vec, float8_e8m0_t, 16, 4, BLayout::RowMajor, 16, 4, SLayout::RowMajor, 32>;
+    using Plain = Tile<TileType::Vec, float8_e8m0_t, 4, 32, BLayout::RowMajor, 4, 32>;
+    using Mat = Tile<TileType::Mat, float8_e8m0_t, 4, 16, BLayout::ColMajor, 4, 16, SLayout::ColMajor, 32>;
+    using Pipe = TPipe<18, Direction::DIR_V2C, 256, 1, 2, true>;
+    Pipe::reset_for_cpu_sim();
+    Pipe pipe(nullptr, 0, 0);
+    Packed packed;
+    Plain plain;
+    Mat result;
+    TASSIGN(packed, 0);
+    TASSIGN(plain, 256);
+    TASSIGN(result, 0);
+    for (int i = 0; i < 64; ++i) {
+        packed.data()[i] = float8_e8m0_t::FromRaw(static_cast<uint8_t>(200 + i));
+    }
+    for (int i = 0; i < 128; ++i) {
+        plain.data()[i] = float8_e8m0_t::FromRaw(static_cast<uint8_t>(i));
+    }
+    pipe.prod.setRecordStatus(false);
+    pipe.prod.setEntryOffset(32);
+    TPUSH<Pipe, Packed, TileSplitAxis::TILE_NO_SPLIT>(pipe, packed);
+    pipe.prod.setAllocateStatus(false);
+    pipe.prod.setEntryOffset(160);
+    TPUSH<Pipe, Packed, TileSplitAxis::TILE_NO_SPLIT>(pipe, packed);
+    pipe.prod.setRecordStatus(true);
+    pipe.prod.setEntryOffset(0);
+    TPUSH<Pipe, Plain, TileSplitAxis::TILE_NO_SPLIT>(pipe, plain);
+    pipe.cons.setentryOffset(32);
+    TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 16; ++c) {
+            EXPECT_EQ(result.GetElement(r, c).RawData(), 32 + r * 16 + c);
+        }
+    }
+    // An entry outside the overwritten byte range must retain its packed view.
+    pipe.cons.setWaitStatus(false);
+    pipe.cons.setentryOffset(160);
+    TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+    for (int i = 0; i < 64; ++i) {
+        EXPECT_EQ(result.data()[i].RawData(), packed.data()[i].RawData());
+    }
+    TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
+}
+
+TEST_F(TPushPopPackedMxTest, packed_mx_split_overwrite_invalidates_old_shape)
+{
+    using Packed = Tile<TileType::Vec, float8_e8m0_t, 16, 16, BLayout::RowMajor, 16, 16, SLayout::RowMajor, 32>;
+    using Plain = Tile<TileType::Vec, float8_e8m0_t, 4, 32, BLayout::RowMajor, 4, 32>;
+    using Mat = Tile<TileType::Mat, float8_e8m0_t, 16, 16, BLayout::ColMajor, 16, 16, SLayout::ColMajor, 32>;
+    using Pipe = TPipe<19, Direction::DIR_V2C, 256, 1>;
+    auto check = []<TileSplitAxis Split>() {
+        Pipe::reset_for_cpu_sim();
+        Pipe pipe(nullptr, 0, 0);
+        Packed packed;
+        Plain plain;
+        Mat result;
+        TASSIGN(packed, 0);
+        TASSIGN(plain, 256);
+        TASSIGN(result, 0);
+        std::fill_n(packed.data(), 256, float8_e8m0_t::FromRaw(0));
+        pipe.prod.setRecordStatus(false);
+        TPUSH<Pipe, Packed, TileSplitAxis::TILE_NO_SPLIT>(pipe, packed);
+        pipe.prod.setAllocateStatus(false);
+        pipe.prod.setRecordStatus(true);
+        for (int lane = 0; lane < 2; ++lane) {
+            cpu_sim::ScopedExecutionContext ctx(0, lane, 2);
+            pipe.prod.setTileId(0, lane);
+            for (int r = 0; r < 4; ++r) {
+                for (int c = 0; c < 32; ++c) {
+                    const int index =
+                        Split == TileSplitAxis::TILE_UP_DOWN ? (lane * 4 + r) * 32 + c : r * 64 + lane * 32 + c;
+                    plain.SetElement(r, c, float8_e8m0_t::FromRaw(static_cast<uint8_t>(index)));
+                }
+            }
+            TPUSH<Pipe, Plain, Split>(pipe, plain);
+        }
+        TPOP<Pipe, Mat, Split>(pipe, result);
+        TFREE<Pipe, Split>(pipe);
+        for (int r = 0; r < 16; ++r) {
+            for (int c = 0; c < 16; ++c) {
+                EXPECT_EQ(result.GetElement(r, c).RawData(), r * 16 + c);
+            }
+        }
+    };
+    check.template operator()<TileSplitAxis::TILE_UP_DOWN>();
+    check.template operator()<TileSplitAxis::TILE_LEFT_RIGHT>();
+}
+
+TEST_F(TPushPopPackedMxTest, packed_mx_partial_views_keep_logical_payload)
+{
+    using Vec = Tile<TileType::Vec, float8_e8m0_t, 16, 4, BLayout::RowMajor, -1, -1, SLayout::RowMajor, 32>;
+    using Mat = Tile<TileType::Mat, float8_e8m0_t, 4, 16, BLayout::ColMajor, -1, -1, SLayout::ColMajor, 32>;
+    using Pipe = TPipe<21, Direction::DIR_V2C, 256, 1, 2, true>;
+    for (bool partialProducer : {false, true}) {
+        Pipe::reset_for_cpu_sim();
+        Pipe pipe(nullptr, 0, 0);
+        Vec source(partialProducer ? 12 : 16, 4);
+        Mat result(3, 16);
+        TASSIGN(source, 0);
+        TASSIGN(result, 0);
+        for (int r = 0; r < source.GetValidRow(); ++r) {
+            for (int c = 0; c < 4; ++c) {
+                source.SetElement(r, c, float8_e8m0_t::FromRaw(static_cast<uint8_t>(r * 4 + c)));
+            }
+        }
+        TPUSH<Pipe, Vec, TileSplitAxis::TILE_NO_SPLIT>(pipe, source);
+        TPOP<Pipe, Mat, TileSplitAxis::TILE_NO_SPLIT>(pipe, result);
+        TFREE<Pipe, TileSplitAxis::TILE_NO_SPLIT>(pipe);
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 16; ++c) {
+                EXPECT_EQ(result.GetElement(r, c).RawData(), r * 16 + c);
+            }
+        }
+    }
+}
+
+TEST_F(TPushPopPackedMxTest, packed_mx_invalid_offset_leaves_slot_unmodified)
+{
+    using Vec = Tile<TileType::Vec, float8_e8m0_t, 16, 2, BLayout::RowMajor, 16, 2, SLayout::RowMajor, 32>;
+    using Pipe = TPipe<22, Direction::DIR_V2C, 32, 1, 2, true>;
+    Pipe::reset_for_cpu_sim();
+    Pipe pipe(nullptr, 0, 0);
+    Vec source;
+    TASSIGN(source, 0);
+    for (int offset : {-1, 1, 32}) {
+        pipe.prod.setEntryOffset(offset);
+        auto& state = Pipe::GetSharedState(cpu_pipe::TransferDir::V2C);
+        state.local_slot_storage[0].fill(0xa5);
+        EXPECT_THROW((TPUSH<Pipe, Vec, TileSplitAxis::TILE_NO_SPLIT>(pipe, source)), std::out_of_range);
+        for (auto byte : state.local_slot_storage[0]) {
+            EXPECT_EQ(byte, 0xa5);
+        }
+        EXPECT_EQ(state.occupied, 0);
+        Pipe::reset_for_cpu_sim();
+    }
+}

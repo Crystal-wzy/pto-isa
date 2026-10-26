@@ -38,18 +38,18 @@ public:
         manager_ = std::make_unique<pto::comm::urma::UrmaWorkspaceManager>();
         // Keep partial resources alive on failure until the runtime destroys HCCL.
         if (!manager_->Init(
-                comm, rank, ranks, window, bytes, pto::comm::urma::UrmaLayout::SHARED_POOL, submittingAivs, 1U, 0U,
-                "megamoe_aiv0"))
+                comm, rank, ranks, window, bytes, pto::comm::urma::UrmaLayout::SHARED_POOL, submittingAivs,
+                pto::comm::urma::kUrmaAutoJettiesPerCore, 0U, "megamoe_aiv0"))
             return false;
-        if (!ValidatePool(manager_->GetWorkspaceAddr(), ranks, submittingAivs))
+        if (!ValidatePool(manager_->GetWorkspaceAddr(), ranks, submittingAivs, queueCount_))
             return false;
-        queueCount_ = submittingAivs;
         initialized_ = true;
         return true;
     }
 
     void* GetWorkspaceAddr() const { return initialized_ ? manager_->GetWorkspaceAddr() : nullptr; }
     uint32_t QueueCount() const { return queueCount_; }
+    uint32_t JettiesPerCore() const { return initialized_ ? manager_->JettiesPerCore() : 0U; }
 
     // Reject accidentally aliased SQ/CQ resources: each submitting AIV must own
     // its producer and completion state, even when sending to the same peer.
@@ -79,15 +79,18 @@ public:
     }
 
 private:
-    static bool ValidatePool(void* workspace, uint32_t ranks, uint32_t queues)
+    static bool ValidatePool(void* workspace, uint32_t ranks, uint32_t submittingAivs, uint32_t& queues)
     {
         using namespace pto::comm::urma;
         UrmaInfo info{};
         if (workspace == nullptr ||
             aclrtMemcpy(&info, sizeof(info), workspace, sizeof(info), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS ||
-            info.layout != UrmaLayout::SHARED_POOL || info.rankCount != ranks || info.jettyCount != queues ||
-            info.jettiesPerCore != 1U || info.sqPtr == 0U || info.scqPtr == 0U || info.memPtr == 0U)
+            info.layout != UrmaLayout::SHARED_POOL || info.rankCount != ranks || info.jettiesPerCore == 0U ||
+            info.jettiesPerCore > pto::comm::urma::kUrmaMaxJettiesPerCore ||
+            info.jettyCount != submittingAivs * info.jettiesPerCore || info.sqPtr == 0U || info.scqPtr == 0U ||
+            info.memPtr == 0U)
             return false;
+        queues = info.jettyCount;
         std::vector<UrmaWQCtx> sq(queues);
         std::vector<UrmaCqCtx> cq(queues);
         if (aclrtMemcpy(

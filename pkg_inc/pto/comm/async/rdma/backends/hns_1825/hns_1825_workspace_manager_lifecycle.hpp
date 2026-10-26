@@ -25,11 +25,15 @@ inline WorkspaceManager::~WorkspaceManager() { (void)Finalize(); }
 inline bool WorkspaceManager::Init(
     uint32_t rankId, uint32_t rankCount, uint32_t phyId, const std::string& localIp, uint16_t basePort,
     const std::vector<std::string>& peerIps, const std::vector<uint32_t>& peerPhyIds,
-    const std::vector<uint64_t>& peerSymAddrs, void* symmetricAddr, uint64_t symmetricSize)
+    const std::vector<uint64_t>& peerSymAddrs, void* symmetricAddr, uint64_t symmetricSize, uint32_t qpNum)
 {
     if (HasOwnedResources() && !Finalize()) {
         std::cerr << "[RoCE] previous session cleanup reported errors; continuing with a fresh HCOMM session"
                   << std::endl;
+    }
+    if (qpNum == 0 || static_cast<uint64_t>(rankCount) * qpNum > UINT32_MAX) {
+        std::cerr << "[RoCE] invalid QP count or queue index overflow" << std::endl;
+        return false;
     }
     if (!ValidateInitArguments(
             rankId, rankCount, phyId, localIp, basePort, peerIps, peerPhyIds, peerSymAddrs, symmetricAddr,
@@ -38,6 +42,7 @@ inline bool WorkspaceManager::Init(
     }
     AssignInitArguments(
         rankId, rankCount, phyId, localIp, basePort, peerIps, peerPhyIds, peerSymAddrs, symmetricAddr, symmetricSize);
+    qpNum_ = qpNum;
     const auto initStart = std::chrono::steady_clock::now();
     Trace(
         "INIT begin manager=", static_cast<const void*>(this), " endpoint=", endpoint_, " memHandle=", memHandle_,
@@ -231,22 +236,22 @@ inline bool WorkspaceManager::DestroyChannels()
 
 inline bool WorkspaceManager::UnregisterMemory()
 {
-    if (memHandle_ == nullptr) {
-        return true;
-    }
-    const HcommMemHandle memHandle = memHandle_;
+    const HcommMemHandle memories[] = {notifyMemHandle_, memHandle_};
+    notifyMemHandle_ = nullptr;
     memHandle_ = nullptr;
-    if (endpoint_ == nullptr) {
-        std::cerr << "[RoCE] cannot unregister memory without its endpoint" << std::endl;
-        return false;
+    bool ok = true;
+    for (HcommMemHandle memory : memories) {
+        if (memory == nullptr) {
+            continue;
+        }
+        if (endpoint_ == nullptr || HcommMemUnreg(endpoint_, memory) != 0) {
+            std::cerr << "[RoCE] HcommMemUnreg failed" << std::endl;
+            ok = false;
+        } else {
+            Trace("DESTROY mem-unreg API returned success handle=", memory);
+        }
     }
-    const HcommResult result = HcommMemUnreg(endpoint_, memHandle);
-    if (result != 0) {
-        std::cerr << "[RoCE] HcommMemUnreg failed: " << result << std::endl;
-        return false;
-    }
-    Trace("DESTROY mem-unreg API returned success handle=", memHandle);
-    return true;
+    return ok;
 }
 
 inline bool WorkspaceManager::DestroyEndpoint()
@@ -267,24 +272,23 @@ inline bool WorkspaceManager::DestroyEndpoint()
 
 inline bool WorkspaceManager::FreeDeviceInfo()
 {
-    if (rdmaInfoDevice_ == nullptr) {
-        return true;
-    }
-    void* rdmaInfo = rdmaInfoDevice_;
+    void* allocations[] = {rdmaInfoDevice_, notifyOperands_};
     rdmaInfoDevice_ = nullptr;
-    const aclError result = aclrtFree(rdmaInfo);
-    if (result != ACL_SUCCESS) {
-        std::cerr << "[RoCE] aclrtFree(rdmaInfo) failed: " << static_cast<int>(result) << std::endl;
-        return false;
+    notifyOperands_ = nullptr;
+    bool ok = true;
+    for (void* allocation : allocations) {
+        if (allocation != nullptr && aclrtFree(allocation) != ACL_SUCCESS) {
+            std::cerr << "[RoCE] workspace allocation release failed" << std::endl;
+            ok = false;
+        }
     }
-    Trace("DESTROY rdma-info free returned success addr=", rdmaInfo);
-    return true;
+    return ok;
 }
 
 inline bool WorkspaceManager::HasOwnedResources() const
 {
-    return initialized_ || endpoint_ != nullptr || memHandle_ != nullptr || rdmaInfoDevice_ != nullptr ||
-           !channelHandles_.empty();
+    return initialized_ || endpoint_ != nullptr || memHandle_ != nullptr || notifyMemHandle_ != nullptr ||
+           notifyOperands_ != nullptr || rdmaInfoDevice_ != nullptr || !channelHandles_.empty();
 }
 
 inline bool WorkspaceManager::ValidateBasicInitArguments(
@@ -362,6 +366,9 @@ inline void WorkspaceManager::ResetOwnedState()
     peerPhyIds_.clear();
     peerSymAddrs_.clear();
     memHandle_ = nullptr;
+    notifyMemHandle_ = nullptr;
+    notifyOperands_ = nullptr;
+    notifyLkey_ = 0;
     endpoint_ = nullptr;
     rdmaInfoDevice_ = nullptr;
     symmetricAddr_ = nullptr;
@@ -369,6 +376,7 @@ inline void WorkspaceManager::ResetOwnedState()
     localIp_.clear();
     rankId_ = 0;
     rankCount_ = 1;
+    qpNum_ = 1;
     phyId_ = 0;
     basePort_ = 60032;
     initialized_ = false;

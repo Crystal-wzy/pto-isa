@@ -307,6 +307,7 @@ __tf__ AICORE void MGatherGm2L1RowImpl(
         constexpr uint32_t kColBlocks = kTileCols / kC0;
         int64_t repeatConfig = (static_cast<int64_t>(kTileRows) << 16) | static_cast<int64_t>(kColBlocks);
         pto_create_cbuf_matrix((__cbuf__ uint16_t*)dstPtr, repeatConfig, 0);
+        pipe_barrier(PIPE_MTE2);
     }
 
     for (uint32_t r = 0; r < validRow; r++) {

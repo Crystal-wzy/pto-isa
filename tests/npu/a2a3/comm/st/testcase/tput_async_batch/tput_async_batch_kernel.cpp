@@ -349,6 +349,17 @@ AICORE inline bool BuildSdmaP0Session(
     return pto::comm::BuildAsyncSession(scratchTile, workspace, session, syncId, config, channelGroupIdx);
 }
 
+// SQ ring positions live in the GM channel info, not in the session. Resolve the channel group the
+// same way the SDMA backend does so the assertions below observe what the backend persisted.
+AICORE inline __gm__ pto::comm::sdma::BatchWriteChannelInfo* ResolveChannelGroup(
+    const pto::comm::AsyncSession& session, uint32_t queueNum, uint32_t channelGroupIdx)
+{
+    __gm__ pto::comm::sdma::BatchWriteChannelInfo* channelBase =
+        reinterpret_cast<__gm__ pto::comm::sdma::BatchWriteChannelInfo*>(
+            session.contextGm + sizeof(pto::comm::sdma::BatchWriteFlagInfo));
+    return channelBase + channelGroupIdx * queueNum;
+}
+
 AICORE inline void MakeBatchGlobal(
     __gm__ int32_t* data, uint32_t elements, BatchShape& shape, BatchStride& stride, BatchGlobal& global)
 {
@@ -379,9 +390,11 @@ AICORE inline uint32_t RunSdmaQueueBoundaryCases(
             return 100U + caseIndex;
         }
         session.batchSize = UINT32_MAX;
+        __gm__ pto::comm::sdma::BatchWriteChannelInfo* channelBase =
+            ResolveChannelGroup(session, queueNums[caseIndex], channelGroupIndices[caseIndex]);
         uint32_t initialTail[4] = {0U, 0U, 0U, 0U};
         for (uint32_t queue = 0U; queue < queueNums[caseIndex]; ++queue) {
-            initialTail[queue] = session.sdmaRuntimeCtx.sqTail[queue];
+            initialTail[queue] = channelBase[queue].sq_tail;
         }
         pto::comm::AsyncEvent event;
         for (uint32_t operation = 0U; operation < operationCounts[caseIndex]; ++operation) {
@@ -409,14 +422,10 @@ AICORE inline uint32_t RunSdmaQueueBoundaryCases(
             const uint32_t dataSqes = operationCounts[caseIndex] / queueNums[caseIndex] +
                                       (queue < operationCounts[caseIndex] % queueNums[caseIndex] ? 1U : 0U);
             const uint32_t flagSqes = queue < postQueueCount ? 1U : 0U;
-            __gm__ pto::comm::sdma::BatchWriteChannelInfo* channelBase =
-                reinterpret_cast<__gm__ pto::comm::sdma::BatchWriteChannelInfo*>(
-                    session.contextGm + sizeof(pto::comm::sdma::BatchWriteFlagInfo));
-            channelBase += channelGroupIndices[caseIndex] * queueNums[caseIndex];
             const uint32_t expectedTail = (initialTail[queue] + dataSqes + flagSqes) % channelBase[queue].sq_depth;
-            if (session.sdmaRuntimeCtx.sqTail[queue] != expectedTail) {
-                return 1000U + caseIndex * 100U + queue * 10U +
-                       (session.sdmaRuntimeCtx.sqTail[queue] == initialTail[queue] ? 1U : 2U);
+            const uint32_t actualTail = channelBase[queue].sq_tail;
+            if (actualTail != expectedTail) {
+                return 1000U + caseIndex * 100U + queue * 10U + (actualTail == initialTail[queue] ? 1U : 2U);
             }
         }
         operationBase += operationCounts[caseIndex];
@@ -433,7 +442,8 @@ AICORE inline bool RunSdmaFullQueueCase(
     }
     session.batchSize = UINT32_MAX;
     session.submitMode = pto::comm::AsyncSubmitMode::DEFER_AND_SUBMIT;
-    const uint32_t initialTail = session.sdmaRuntimeCtx.sqTail[0];
+    __gm__ pto::comm::sdma::BatchWriteChannelInfo* channelBase = ResolveChannelGroup(session, 1U, 0U);
+    const uint32_t initialTail = channelBase[0].sq_tail;
     BatchShape shape;
     BatchStride stride;
     BatchGlobal src;
@@ -441,8 +451,8 @@ AICORE inline bool RunSdmaFullQueueCase(
     MakeBatchGlobal(send, kFullQueueElements, shape, stride, src);
     MakeBatchGlobal(remoteRecv, kFullQueueElements, shape, stride, dst);
     const pto::comm::AsyncEvent event = pto::comm::TPUT_ASYNC<pto::comm::DmaEngine::SDMA>(dst, src, session);
-    return event.valid() && session.sdmaRuntimeCtx.batchStagedDataSqeCount == 0U &&
-           session.sdmaRuntimeCtx.sqTail[0] == initialTail && event.Wait(session);
+    return event.valid() && session.rt.sdma.batchStagedDataSqeCount == 0U && channelBase[0].sq_tail == initialTail &&
+           event.Wait(session);
 }
 
 AICORE inline bool RunSdmaCapacityModel(__gm__ uint8_t* workspace, ScratchTile& scratchTile)
@@ -473,7 +483,7 @@ AICORE inline bool RunSdmaPriorFourQueuePost(
     MakeBatchGlobal(send, kPriorPostElements, oldShape, oldStride, oldSrc);
     MakeBatchGlobal(remoteRecv, kPriorPostElements, oldShape, oldStride, oldDst);
     const pto::comm::AsyncEvent oldEvent = pto::comm::TPUT_ASYNC<pto::comm::DmaEngine::SDMA>(oldDst, oldSrc, session);
-    if (!oldEvent.valid() || session.sdmaRuntimeCtx.usedQueueCount != 4U) {
+    if (!oldEvent.valid() || session.rt.sdma.usedQueueCount != 4U) {
         return false;
     }
     BatchShape batchShape;
@@ -485,13 +495,13 @@ AICORE inline bool RunSdmaPriorFourQueuePost(
     session.submitMode = pto::comm::AsyncSubmitMode::DEFER;
     const pto::comm::AsyncEvent deferredEvent =
         pto::comm::TPUT_ASYNC<pto::comm::DmaEngine::SDMA>(batchDst, batchSrc, session);
-    if (!deferredEvent.valid() || session.sdmaRuntimeCtx.batchStagedDataSqeCount != 1U) {
+    if (!deferredEvent.valid() || session.rt.sdma.batchStagedDataSqeCount != 1U) {
         return false;
     }
     session.submitMode = pto::comm::AsyncSubmitMode::IMMEDIATE;
     const pto::comm::AsyncEvent batchEvent =
         pto::comm::TPUT_ASYNC<pto::comm::DmaEngine::SDMA>(batchDst, batchSrc, session);
-    if (session.sdmaRuntimeCtx.batchStagedDataSqeCount != 0U) {
+    if (session.rt.sdma.batchStagedDataSqeCount != 0U) {
         return false;
     }
     uint64_t postId = 0U;
@@ -570,7 +580,7 @@ AICORE inline bool RunSdmaSessionPolicyCase(
         if (mode == SdmaBatchP0Mode::BATCH_SIZE_ZERO && operation == 2U && !lastEvent.Wait(session)) {
             return false;
         }
-        if (mode == SdmaBatchP0Mode::BATCH_SIZE_ONE && session.sdmaRuntimeCtx.batchStagedDataSqeCount != 0U) {
+        if (mode == SdmaBatchP0Mode::BATCH_SIZE_ONE && session.rt.sdma.batchStagedDataSqeCount != 0U) {
             return false;
         }
     }

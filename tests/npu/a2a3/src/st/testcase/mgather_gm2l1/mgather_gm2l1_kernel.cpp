@@ -122,6 +122,7 @@ DEFINE_ROW_L1(row_uint8_32x32_64rows, uint8_t, uint8_t, int32_t, 32, 32, 64, Und
 DEFINE_ROW_L1(row_float_clamp_16x16_8rows, float, float, int32_t, 16, 16, 8, Clamp)
 DEFINE_ROW_L1(row_int32_wrap_16x8_8rows, int32_t, int32_t, int32_t, 16, 8, 8, Wrap)
 DEFINE_ROW_L1(row_half_zero_16x16_8rows, aclFloat16, half, int32_t, 16, 16, 8, Zero)
+DEFINE_ROW_L1(row_bfloat16_zero_128x512_193rows, uint16_t, bfloat16_t, int32_t, 128, 512, 193, Zero)
 
 DEFINE_ELEM_L1(elem_float_16x16_256size, float, float, int32_t, 16, 16, 256, Undefined)
 DEFINE_ELEM_L1(elem_half_16x16_256size, aclFloat16, half, int32_t, 16, 16, 256, Undefined)

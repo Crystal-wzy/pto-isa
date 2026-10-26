@@ -1,5 +1,18 @@
 # SET_QUANT_VECTOR
 
+## Product Support<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT products: Supported
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3 products: Supported
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2 products: Supported
+<!-- end id3 -->
+
+
 ## Introduction
 
 Set the vector quantization parameter for subsequent `TPUSH` operations by configuring the hardware FPC register from a Scaling-type tile's address. The tile address is converted to the quantization parameter address format and written to the hardware quantization configuration.

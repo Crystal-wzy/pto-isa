@@ -1,5 +1,18 @@
 # TGET_ASYNC
 
+## Product Support<a name="section73648168211"></a>
+
+<!-- npu="950" id1 -->
+- Ascend 950PR&950DT products: Supported
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- Atlas A3 products: Supported
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- Atlas A2 products: Supported
+<!-- end id3 -->
+
+
 ## Introduction
 
 `TGET_ASYNC` is an asynchronous remote read primitive. It starts a transfer from remote GM to local GM and returns an `AsyncEvent` immediately.
@@ -94,7 +107,8 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
                                     __gm__ uint8_t *workspace,
                                     uint32_t myPe,
                                     AsyncSession &session,
-                                    uint32_t syncId = 0);
+                                    uint32_t syncId = 0,
+                                    uint32_t qpIdx = 0);
 #endif
 ```
 
@@ -105,6 +119,7 @@ PTO_INTERNAL bool BuildAsyncSession(ScratchTile &scratchTile,
 | `myPe` | Local rank id used to select the registered local memory region. |
 | `session` | Output `AsyncSession` object. |
 | `syncId` | MTE/scalar synchronization event id in the range 0-7. |
+| `qpIdx` | QP index for each peer; defaults to 0 and must be less than the host-configured [`qpNum`](TPUT_ASYNC.md#rdma-construction-npu_arch-3510-only). |
 
 Build one peer-independent session, then select the source rank with the explicit `peer` argument:
 

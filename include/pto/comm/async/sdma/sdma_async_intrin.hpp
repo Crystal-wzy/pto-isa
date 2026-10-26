@@ -29,13 +29,13 @@ PTO_INTERNAL void LoadSdmaSession(const AsyncSession& async, SdmaSession& sessio
     session.execCtx.tmpBuf.addr = async.tmpBufAddr;
     session.execCtx.tmpBuf.size = async.tmpBufSize;
     session.execCtx.syncId = async.syncId;
-    session.execCtx.channelGroupIdx = async.channelGroupIdx;
-    session.execCtx.baseConfig.block_bytes = async.blockBytes;
-    session.execCtx.baseConfig.comm_block_offset = async.commBlockOffset;
-    session.execCtx.baseConfig.queue_num = async.queueNum;
+    session.execCtx.channelGroupIdx = async.cfg.sdma.channelGroupIdx;
+    session.execCtx.baseConfig.block_bytes = async.cfg.sdma.blockBytes;
+    session.execCtx.baseConfig.comm_block_offset = async.cfg.sdma.commBlockOffset;
+    session.execCtx.baseConfig.queue_num = async.cfg.sdma.queueNum;
     session.eventCtx.tmpBuf = session.execCtx.tmpBuf;
     session.eventCtx.syncId = async.syncId;
-    session.runtimeCtx = async.sdmaRuntimeCtx;
+    session.runtimeCtx = async.rt.sdma;
     session.valid = async.valid;
 }
 
@@ -95,7 +95,7 @@ PTO_INTERNAL bool BuildSdmaSession(
         session.valid = false;
         return false;
     }
-    session.valid = detail::InitializeRuntimeCtx(session);
+    session.valid = detail::InitializeRuntimeCtx(session.execCtx, session.runtimeCtx);
     return session.valid;
 }
 
@@ -104,8 +104,9 @@ PTO_INTERNAL bool BuildSdmaSession(
     ScratchTile& scratchTile, __gm__ uint8_t* workspace, AsyncSession& session, uint32_t syncId = 0,
     const SdmaBaseConfig& baseConfig = {kDefaultSdmaBlockBytes, 0, 1}, uint32_t channelGroupIdx = kAutoChannelGroupIdx)
 {
-    session.sdmaRuntimeCtx = {};
-    session.urmaRuntimeCtx = {};
+    // Activate the SDMA alternative of both unions. Only this engine's state may
+    // be touched afterwards, so the URMA alternative must not be reset here.
+    ::pto::comm::detail::ActivateEngineState<DmaEngine::SDMA>(session);
     if (channelGroupIdx == kAutoChannelGroupIdx) {
         channelGroupIdx = static_cast<uint32_t>(get_block_idx());
     }
@@ -114,27 +115,23 @@ PTO_INTERNAL bool BuildSdmaSession(
         session.valid = false;
         return false;
     }
-    TmpBuffer tmpBuf;
-    if (!detail::MakeTmpBufferFromTile(scratchTile, tmpBuf)) {
+    SdmaExecContext execCtx{};
+    if (!BuildSdmaExecContext(scratchTile, channelGroupIdx, baseConfig, workspace, syncId, execCtx)) {
         session.valid = false;
         return false;
     }
-    session.engine = DmaEngine::SDMA;
-    session.valid = true;
     session.contextGm = workspace;
-    session.tmpBufAddr = tmpBuf.addr;
-    session.tmpBufSize = tmpBuf.size;
+    session.tmpBufAddr = execCtx.tmpBuf.addr;
+    session.tmpBufSize = execCtx.tmpBuf.size;
     session.syncId = syncId;
-    session.channelGroupIdx = channelGroupIdx;
-    session.blockBytes = baseConfig.block_bytes;
-    session.commBlockOffset = baseConfig.comm_block_offset;
-    session.queueNum = baseConfig.queue_num;
-    // Initialize the persistent runtime state once, mirroring the
-    // SdmaSession build path (the backend requires runtimeCtx per session).
-    SdmaSession probe;
-    detail::LoadSdmaSession(session, probe);
-    session.valid = detail::InitializeRuntimeCtx(probe);
-    session.sdmaRuntimeCtx = probe.runtimeCtx;
+    session.cfg.sdma.channelGroupIdx = channelGroupIdx;
+    session.cfg.sdma.blockBytes = baseConfig.block_bytes;
+    session.cfg.sdma.commBlockOffset = baseConfig.comm_block_offset;
+    session.cfg.sdma.queueNum = baseConfig.queue_num;
+    // The backend needs its runtime state initialized once per session. The exec context built above
+    // is the only input, so initialize session.rt.sdma in place instead of routing it through a
+    // temporary SdmaSession and copying the result back.
+    session.valid = detail::InitializeRuntimeCtx(execCtx, session.rt.sdma);
     return session.valid;
 }
 
@@ -177,7 +174,7 @@ __sdma_put_async(__gm__ T* dst, __gm__ T* src, uint64_t transfer_size, const Asy
     detail::LoadSdmaSession(session, sdmaSession);
     const AsyncEvent event =
         detail::SdmaPostAsync((__gm__ uint8_t*)dst, (__gm__ uint8_t*)src, 0U, transfer_size, sdmaSession);
-    session.sdmaRuntimeCtx = sdmaSession.runtimeCtx;
+    session.rt.sdma = sdmaSession.runtimeCtx;
     return event.handle;
 }
 
@@ -192,7 +189,7 @@ __sdma_get_async(__gm__ T* dst, __gm__ T* src, uint64_t transfer_size, const Asy
     detail::LoadSdmaSession(session, sdmaSess);
     const AsyncEvent event =
         detail::SdmaPostAsync((__gm__ uint8_t*)dst, (__gm__ uint8_t*)src, 0U, transfer_size, sdmaSess);
-    session.sdmaRuntimeCtx = sdmaSess.runtimeCtx;
+    session.rt.sdma = sdmaSess.runtimeCtx;
     return event.handle;
 }
 
@@ -209,7 +206,7 @@ PTO_INTERNAL uint64_t __sdma_put_async_notify(
     const AsyncEvent event = detail::SdmaPostAsyncNotify(
         reinterpret_cast<__gm__ uint8_t*>(dst), reinterpret_cast<__gm__ uint8_t*>(src),
         reinterpret_cast<__gm__ uint8_t*>(remoteSignal), signalValue, notifyOp, transferSize, sdmaSession);
-    session.sdmaRuntimeCtx = sdmaSession.runtimeCtx;
+    session.rt.sdma = sdmaSession.runtimeCtx;
     return event.handle;
 }
 
@@ -221,7 +218,7 @@ PTO_INTERNAL bool SdmaWaitEvent(uint64_t handle, const AsyncSession& session)
     SdmaSession sdmaSession;
     LoadSdmaSession(session, sdmaSession);
     const bool done = SdmaWaitEvent(handle, sdmaSession);
-    session.sdmaRuntimeCtx = sdmaSession.runtimeCtx;
+    session.rt.sdma = sdmaSession.runtimeCtx;
     return done;
 }
 
@@ -230,7 +227,7 @@ PTO_INTERNAL bool SdmaTestEvent(uint64_t handle, const AsyncSession& session)
     SdmaSession sdmaSession;
     LoadSdmaSession(session, sdmaSession);
     const bool done = SdmaTestEvent(handle, sdmaSession);
-    session.sdmaRuntimeCtx = sdmaSession.runtimeCtx;
+    session.rt.sdma = sdmaSession.runtimeCtx;
     return done;
 }
 

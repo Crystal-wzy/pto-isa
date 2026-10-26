@@ -234,6 +234,125 @@ void runTloadNDC1HWC0(__gm__ T* out, __gm__ T* src)
     }
 }
 
+/*-----------------ValidShape cases------------------*/
+// The tile buffer starts filled with a sentinel; TLOAD must only overwrite the valid box.
+constexpr int kValidSentinel = -7;
+
+template <typename T, int N, int C1, int H, int W, int vN, int vC1, int vH, int vW, bool Dynamic>
+void runTloadNC1HWC0Valid(__gm__ T* out, __gm__ T* src)
+{
+    constexpr int C0 = 32 / sizeof(T);
+    constexpr uint32_t totalElements = N * C1 * H * W * C0;
+
+    using GShape = Shape<N, C1, H, W, C0>;
+    using GStride = Stride<(int64_t)C1 * H * W * C0, (int64_t)H * W * C0, (int64_t)W * C0, C0, 1>;
+    using GlobalData = GlobalTensor<T, GShape, GStride, Layout::NC1HWC0>;
+
+    using TShape = ConvTileShape<N, C1, H, W, C0>;
+    using VShape = std::conditional_t<
+        Dynamic, ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>, ConvTileShape<vN, vC1, vH, vW, C0>>;
+    using MyTile = ConvTile<TileType::Mat, T, totalElements * sizeof(T), Layout::NC1HWC0, TShape, VShape>;
+
+    MyTile convTile;
+    std::vector<T> localBuffer(totalElements, static_cast<T>(kValidSentinel));
+    convTile.data() = reinterpret_cast<typename MyTile::TileDType>(localBuffer.data());
+    if constexpr (Dynamic) {
+        convTile.SetValidShape(int64_t(vN), int64_t(vC1), int64_t(vH), int64_t(vW), int64_t(C0));
+    }
+
+    GlobalData srcGlobal(src);
+    TLOAD(convTile, srcGlobal);
+
+    for (uint32_t i = 0; i < totalElements; i++) {
+        out[i] = convTile.data()[i];
+    }
+}
+
+template <typename T, int N, int D, int C1, int H, int W, int vN, int vD, int vC1, int vH, int vW>
+void runTloadNDC1HWC0Valid(__gm__ T* out, __gm__ T* src)
+{
+    constexpr int C0 = 32 / sizeof(T);
+    constexpr uint32_t totalElements = N * D * C1 * H * W * C0;
+
+    using GShape = Shape<N, D, C1, H, W>;
+    using GStride =
+        Stride<(int64_t)D * C1 * H * W * C0, (int64_t)C1 * H * W * C0, (int64_t)H * W * C0, (int64_t)W * C0, C0>;
+    using GlobalData = GlobalTensor<T, GShape, GStride, Layout::NDC1HWC0>;
+
+    using TShape = ConvTileShape<N, D, C1, H, W, C0>;
+    using VShape = ConvTileShape<vN, vD, vC1, vH, vW, C0>;
+    using MyTile = ConvTile<TileType::Mat, T, totalElements * sizeof(T), Layout::NDC1HWC0, TShape, VShape>;
+
+    MyTile convTile;
+    std::vector<T> localBuffer(totalElements, static_cast<T>(kValidSentinel));
+    convTile.data() = reinterpret_cast<typename MyTile::TileDType>(localBuffer.data());
+
+    GlobalData srcGlobal(src);
+    TLOAD(convTile, srcGlobal);
+
+    for (uint32_t i = 0; i < totalElements; i++) {
+        out[i] = convTile.data()[i];
+    }
+}
+
+// Flat FRACTAL_Z source view [1, C1HW, N/16, 16, C0]; the tile is [C1HW, N/16, 16, C0].
+template <typename T, int D0, int D1, int v0, int v1, int v2>
+void runTloadFractalZ4DValid(__gm__ T* out, __gm__ T* src)
+{
+    constexpr int C0 = 32 / sizeof(T);
+    constexpr int N0 = 16;
+    constexpr uint32_t totalElements = D0 * D1 * N0 * C0;
+
+    using GShape = Shape<1, D0, D1, N0, C0>;
+    using GStride = Stride<(int64_t)D0 * D1 * N0 * C0, (int64_t)D1 * N0 * C0, (int64_t)N0 * C0, C0, 1>;
+    using GlobalData = GlobalTensor<T, GShape, GStride, Layout::FRACTAL_Z>;
+
+    using TShape = ConvTileShape<D0, D1, N0, C0>;
+    using VShape = ConvTileShape<v0, v1, v2, C0>;
+    using MyTile = ConvTile<TileType::Mat, T, totalElements * sizeof(T), Layout::FRACTAL_Z, TShape, VShape>;
+
+    MyTile convTile;
+    std::vector<T> localBuffer(totalElements, static_cast<T>(kValidSentinel));
+    convTile.data() = reinterpret_cast<typename MyTile::TileDType>(localBuffer.data());
+
+    GlobalData srcGlobal(src);
+    TLOAD(convTile, srcGlobal);
+
+    for (uint32_t i = 0; i < totalElements; i++) {
+        out[i] = convTile.data()[i];
+    }
+}
+
+template <typename T, int C1, int H, int W, int N, int vC1, int vH, int vW, int vN, bool Dynamic>
+void runTloadFractalZ5DValid(__gm__ T* out, __gm__ T* src)
+{
+    constexpr int C0 = 32 / sizeof(T);
+    constexpr uint32_t totalElements = C1 * H * W * N * C0;
+
+    using GShape = Shape<C1, H, W, N, C0>;
+    using GStride = Stride<(int64_t)H * W * N * C0, (int64_t)W * N * C0, (int64_t)N * C0, C0, 1>;
+    using GlobalData = GlobalTensor<T, GShape, GStride, Layout::FRACTAL_Z>;
+
+    using TShape = ConvTileShape<C1, H, W, N, C0>;
+    using VShape = std::conditional_t<
+        Dynamic, ConvTileShape<DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC>, ConvTileShape<vC1, vH, vW, vN, C0>>;
+    using MyTile = ConvTile<TileType::Mat, T, totalElements * sizeof(T), Layout::FRACTAL_Z, TShape, VShape>;
+
+    MyTile convTile;
+    std::vector<T> localBuffer(totalElements, static_cast<T>(kValidSentinel));
+    convTile.data() = reinterpret_cast<typename MyTile::TileDType>(localBuffer.data());
+    if constexpr (Dynamic) {
+        convTile.SetValidShape(int64_t(vC1), int64_t(vH), int64_t(vW), int64_t(vN), int64_t(C0));
+    }
+
+    GlobalData srcGlobal(src);
+    TLOAD(convTile, srcGlobal);
+
+    for (uint32_t i = 0; i < totalElements; i++) {
+        out[i] = convTile.data()[i];
+    }
+}
+
 // Unified Dispatcher for GTest
 enum class TLoadConvCase {
     NC1HWC0Static,
@@ -242,6 +361,12 @@ enum class TLoadConvCase {
     NDC1HWC0Static,
     FRACTAL_Z4DStatic,
     FRACTAL_Z5DStatic,
+    NC1HWC0ValidStatic,
+    NC1HWC0ValidDynamic,
+    NDC1HWC0ValidStatic,
+    FRACTAL_Z4DValidStatic,
+    FRACTAL_Z5DValidStatic,
+    FRACTAL_Z5DValidDynamic,
 };
 
 template <typename T, TLoadConvCase caseKey, int s0, int s1, int s2, int s3, int s4>
@@ -273,6 +398,25 @@ void LaunchTLoadConv(uint8_t* out, uint8_t* src, int64_t n, uint64_t* gLog, void
     }
 }
 
+template <
+    typename T, TLoadConvCase caseKey, int s0, int s1, int s2, int s3, int s4, int v0, int v1, int v2, int v3, int v4>
+void LaunchTLoadConvValid(uint8_t* out, uint8_t* src)
+{
+    if constexpr (caseKey == TLoadConvCase::NC1HWC0ValidStatic) {
+        runTloadNC1HWC0Valid<T, s0, s1, s2, s3, v0, v1, v2, v3, false>((__gm__ T*)out, (__gm__ T*)src);
+    } else if constexpr (caseKey == TLoadConvCase::NC1HWC0ValidDynamic) {
+        runTloadNC1HWC0Valid<T, s0, s1, s2, s3, v0, v1, v2, v3, true>((__gm__ T*)out, (__gm__ T*)src);
+    } else if constexpr (caseKey == TLoadConvCase::NDC1HWC0ValidStatic) {
+        runTloadNDC1HWC0Valid<T, s0, s1, s2, s3, s4, v0, v1, v2, v3, v4>((__gm__ T*)out, (__gm__ T*)src);
+    } else if constexpr (caseKey == TLoadConvCase::FRACTAL_Z4DValidStatic) {
+        runTloadFractalZ4DValid<T, s0, s1, v0, v1, v2>((__gm__ T*)out, (__gm__ T*)src);
+    } else if constexpr (caseKey == TLoadConvCase::FRACTAL_Z5DValidStatic) {
+        runTloadFractalZ5DValid<T, s0, s1, s2, s3, v0, v1, v2, v3, false>((__gm__ T*)out, (__gm__ T*)src);
+    } else if constexpr (caseKey == TLoadConvCase::FRACTAL_Z5DValidDynamic) {
+        runTloadFractalZ5DValid<T, s0, s1, s2, s3, v0, v1, v2, v3, true>((__gm__ T*)out, (__gm__ T*)src);
+    }
+}
+
 // Template instantiations
 template void LaunchTLoadConv<half, TLoadConvCase::NC1HWC0Static, 1, 2, 4, 4, 1>(
     uint8_t*, uint8_t*, int64_t, uint64_t*, void*);
@@ -295,4 +439,22 @@ template void LaunchTLoadConv<float, TLoadConvCase::NC1HWC0DynNGlobal, 4, 2, 3, 
 #ifdef CPU_SIM_BFLOAT_ENABLED
 template void LaunchTLoadConv<bfloat16_t, TLoadConvCase::NC1HWC0Static, 1, 2, 4, 4, 1>(
     uint8_t*, uint8_t*, int64_t, uint64_t*, void*);
+#endif
+
+// ValidShape instantiations
+template void LaunchTLoadConvValid<half, TLoadConvCase::NC1HWC0ValidStatic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>(
+    uint8_t*, uint8_t*);
+template void LaunchTLoadConvValid<float, TLoadConvCase::NC1HWC0ValidDynamic, 2, 3, 4, 5, 1, 1, 2, 3, 4, 1>(
+    uint8_t*, uint8_t*);
+template void LaunchTLoadConvValid<half, TLoadConvCase::NDC1HWC0ValidStatic, 2, 3, 2, 4, 5, 1, 2, 1, 3, 4>(
+    uint8_t*, uint8_t*);
+template void LaunchTLoadConvValid<half, TLoadConvCase::FRACTAL_Z4DValidStatic, 8, 2, 1, 1, 1, 6, 1, 10, 1, 1>(
+    uint8_t*, uint8_t*);
+template void LaunchTLoadConvValid<int8_t, TLoadConvCase::FRACTAL_Z5DValidStatic, 4, 2, 6, 16, 1, 3, 1, 4, 10, 1>(
+    uint8_t*, uint8_t*);
+template void LaunchTLoadConvValid<int8_t, TLoadConvCase::FRACTAL_Z5DValidDynamic, 2, 3, 4, 8, 1, 1, 2, 3, 6, 1>(
+    uint8_t*, uint8_t*);
+#ifdef CPU_SIM_BFLOAT_ENABLED
+template void LaunchTLoadConvValid<bfloat16_t, TLoadConvCase::NC1HWC0ValidStatic, 1, 2, 4, 4, 1, 1, 1, 3, 3, 1>(
+    uint8_t*, uint8_t*);
 #endif

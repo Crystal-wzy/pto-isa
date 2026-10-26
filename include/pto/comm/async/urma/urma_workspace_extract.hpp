@@ -14,11 +14,11 @@ See LICENSE in the root of the software repository for the full text of the Lice
 // Included from UrmaWorkspaceManager's private section.
 // Reads ChannelEntity back and fills the device-side UrmaInfo tables.
 
-// Host-side tables filled during extraction, sized to the active layout:
-// context rows (SQ/CQ) are per-peer in PerPeer and per-jetty in SharedPool;
-// target rows (mem/eid) are per-peer in PerPeer and per (jetty, peer) in
-// SharedPool. Per-channel tokens live in memList rows because hcomm issues a
-// fresh tokenId per channel even for one HcclCommMemReg.
+// Host-side tables filled during extraction, sized to the active layout. In
+// PerPeer both context rows (SQ/CQ) and target rows (mem/eid) are per
+// (peer, queue); in SharedPool context rows are per-jetty and target rows are
+// per (jetty, peer). Per-channel tokens live in memList rows because hcomm
+// issues a fresh tokenId per channel even for one HcclCommMemReg.
 struct UrmaPeerInfoTables {
     UrmaPeerInfoTables(size_t ctxRows, size_t targetRows)
         : wqList(ctxRows), cqList(ctxRows), memList(targetRows), eidTable(targetRows * kUrmaEidBytes, 0)
@@ -34,8 +34,11 @@ bool ExtractAndFillUrmaInfo()
 {
     UrmaPeerInfoTables tables(static_cast<size_t>(CtxRowCount()), static_cast<size_t>(TargetRowCount()));
 
-    const bool extracted = (aivCount_ == 0) ? ExtractPerPeerInfo(tables) : ExtractSharedPoolInfo(tables);
+    const bool extracted = IsPerPeer() ? ExtractPerPeerInfo(tables) : ExtractSharedPoolInfo(tables);
     if (!extracted) {
+        return false;
+    }
+    if (!CtxRowsAreDistinctQueues(tables.wqList, tables.cqList)) {
         return false;
     }
     if (!InitializeAsyncQueueState(tables.wqList, tables.cqList)) {
@@ -51,8 +54,6 @@ bool ExtractAndFillUrmaInfo()
     if (!BuildAndCopyUrmaInfoTable(tables)) {
         return false;
     }
-
-    std::cerr << "[URMA] UrmaInfo OK rank=" << rankId_ << " notifyPoolBytes=" << notifyPoolSize_ << std::endl;
     return true;
 }
 
@@ -87,20 +88,23 @@ bool ExtractPerPeerInfo(UrmaPeerInfoTables& tables)
 {
     uint32_t channelIdx = 0;
     for (uint32_t peer = 0; peer < rankCount_; ++peer) {
-        if (peer == rankId_) {
-            tables.wqList[peer] = UrmaWQCtx{};
-            tables.cqList[peer] = UrmaCqCtx{};
-            tables.memList[peer] = UrmaMemInfo{};
-            tables.memList[peer].addr = reinterpret_cast<uint64_t>(symmetricAddr_);
-            tables.memList[peer].len = static_cast<uint32_t>(symmetricSize_);
-            continue;
+        for (uint32_t queue = 0; queue < rowsPerPeer_; ++queue) {
+            const size_t row = TargetRow(queue, peer);
+            if (peer == rankId_) {
+                tables.wqList[row] = UrmaWQCtx{};
+                tables.cqList[row] = UrmaCqCtx{};
+                tables.memList[row] = UrmaMemInfo{};
+                tables.memList[row].addr = reinterpret_cast<uint64_t>(symmetricAddr_);
+                tables.memList[row].len = static_cast<uint32_t>(symmetricSize_);
+                continue;
+            }
+            if (!ExtractChannel(
+                    peer, channelIdx, tables.wqList[row], tables.cqList[row], tables.memList[row],
+                    &tables.eidTable[row * kUrmaEidBytes])) {
+                return false;
+            }
+            ++channelIdx;
         }
-        if (!ExtractChannel(
-                peer, channelIdx, tables.wqList[peer], tables.cqList[peer], tables.memList[peer],
-                &tables.eidTable[static_cast<size_t>(peer) * kUrmaEidBytes])) {
-            return false;
-        }
-        ++channelIdx;
     }
     return true;
 }
@@ -147,6 +151,44 @@ static bool IsSameJetty(
                   << std::endl;
     }
     return same;
+}
+
+static bool CtxRowsAreDistinctQueues(const std::vector<UrmaWQCtx>& wqList, const std::vector<UrmaCqCtx>& cqList)
+{
+    for (size_t row = 0; row < wqList.size(); ++row) {
+        if (wqList[row].depth == 0U) {
+            continue;
+        }
+        for (size_t prev = 0; prev < row; ++prev) {
+            if (wqList[prev].depth == 0U) {
+                continue;
+            }
+            if (RowsAliasOneQueue(wqList, cqList, row, prev)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool RowsAliasOneQueue(
+    const std::vector<UrmaWQCtx>& wqList, const std::vector<UrmaCqCtx>& cqList, size_t row, size_t prev)
+{
+    const UrmaWQCtx& wq = wqList[row];
+    const UrmaCqCtx& cq = cqList[row];
+    const bool wqAlias = wqList[prev].bufAddr == wq.bufAddr || wqList[prev].dbAddr == wq.dbAddr ||
+                         wqList[prev].headAddr == wq.headAddr || wqList[prev].tailAddr == wq.tailAddr;
+    const bool cqAlias = cqList[prev].bufAddr == cq.bufAddr || cqList[prev].tailAddr == cq.tailAddr;
+    if (!wqAlias && !cqAlias) {
+        return false;
+    }
+    std::cerr << "[URMA] ctx row " << row << " aliases row " << prev << ": jfsID=" << wq.wqn << "/" << wqList[prev].wqn
+              << " jfcID=" << cq.cqn << "/" << cqList[prev].cqn << std::hex << " sqVa=0x" << wq.bufAddr << "/0x"
+              << wqList[prev].bufAddr << " dbAddr=0x" << wq.dbAddr << "/0x" << wqList[prev].dbAddr << " sqTail=0x"
+              << wq.tailAddr << "/0x" << wqList[prev].tailAddr << " scqVa=0x" << cq.bufAddr << "/0x"
+              << cqList[prev].bufAddr << std::dec << "; two AIVs would post into one queue and race its head/tail"
+              << std::endl;
+    return true;
 }
 
 struct PeerChannelState {
@@ -203,12 +245,6 @@ bool ExtractPeerRegistrations(
     return true;
 }
 
-static void LogPeerInfo(uint32_t peer, const UrmaWQCtx& wq, const UrmaMemInfo& mem)
-{
-    std::cerr << "[URMA] peer=" << peer << " tpId=" << mem.tpn << " rmtAddr=0x" << std::hex << mem.addr << " sqVa=0x"
-              << wq.bufAddr << " dbAddr=0x" << wq.dbAddr << std::dec << std::endl;
-}
-
 bool ExtractChannel(uint32_t peer, uint32_t channelIdx, UrmaWQCtx& wq, UrmaCqCtx& cq, UrmaMemInfo& mem, uint8_t* eidDst)
 {
     PeerChannelState state{};
@@ -219,6 +255,9 @@ bool ExtractChannel(uint32_t peer, uint32_t channelIdx, UrmaWQCtx& wq, UrmaCqCtx
         !ExtractPeerRegistrations(peer, state, symRemoteBuf, symRmaAddr, symRmaSize, mem)) {
         return false;
     }
+    if (!ContextTagsAreUb(peer, channelIdx, state.sq, state.cq)) {
+        return false;
+    }
     FillWqCtx(wq, state.sq);
     FillCqCtx(cq, state.cq);
     if (!ValidateQueueDepths(peer, wq, cq)) {
@@ -226,13 +265,15 @@ bool ExtractChannel(uint32_t peer, uint32_t channelIdx, UrmaWQCtx& wq, UrmaCqCtx
     }
     FillMemInfo(mem, state.sq, symRemoteBuf, symRmaAddr, symRmaSize);
     (void)memcpy_s(eidDst, kUrmaEidBytes, state.sq.contextInfo.ubJfs.remoteEID, kUrmaEidBytes);
-    LogPeerInfo(peer, wq, mem);
     return true;
 }
 
 size_t TargetRow(uint32_t jetty, uint32_t peer) const
 {
-    return (aivCount_ == 0) ? peer : static_cast<size_t>(jetty) * rankCount_ + peer;
+    if (IsPerPeer()) {
+        return static_cast<size_t>(peer) * rowsPerPeer_ + jetty;
+    }
+    return static_cast<size_t>(jetty) * rankCount_ + peer;
 }
 
 static bool ValidateQueueDepths(uint32_t peer, const UrmaWQCtx& wq, const UrmaCqCtx& cq)
@@ -244,6 +285,19 @@ static bool ValidateQueueDepths(uint32_t peer, const UrmaWQCtx& wq, const UrmaCq
     }
     std::cerr << "[URMA] peer=" << peer << " queue depths must be non-zero powers of two and CQ depth must be >= "
               << kUrmaCompletionRecordMinCqDepth << ", got sqDepth=" << wq.depth << " cqDepth=" << cq.depth
+              << std::endl;
+    return false;
+}
+
+static bool ContextTagsAreUb(uint32_t peer, uint32_t channelIdx, const SqContext& sq, const CqContext& cq)
+{
+    constexpr int32_t kUbContextType = 0;
+    if (sq.type == kUbContextType && cq.type == kUbContextType) {
+        return true;
+    }
+    std::cerr << "[URMA] peer=" << peer << " channel=" << channelIdx << " sqType=" << sq.type << " cqType=" << cq.type
+              << " is not a UB jetty context (UB is 0, RoCE is 1, uninitialised is -1); the ubJfs/ubJfc arm would be "
+                 "the wrong one to read"
               << std::endl;
     return false;
 }
@@ -329,16 +383,34 @@ bool BuildAndCopyUrmaInfoTable(const UrmaPeerInfoTables& tables)
     return true;
 }
 
+void FillRailCycle(UrmaInfo& info) const
+{
+    info.railCycleLen = 0U;
+    for (uint8_t& entry : info.railCycle) {
+        entry = 0U;
+    }
+    if (Layout() != UrmaLayout::SHARED_POOL || railPeerLinks_.empty() || !RunCoversEveryRail()) {
+        return;
+    }
+    const std::vector<uint32_t> cycle = AivRailCycle();
+    const size_t len = std::min(cycle.size(), sizeof(info.railCycle) / sizeof(info.railCycle[0]));
+    for (size_t k = 0; k < len; ++k) {
+        info.railCycle[k] = static_cast<uint8_t>(cycle[k]);
+    }
+    info.railCycleLen = static_cast<uint32_t>(len);
+}
+
 void FillUrmaInfoLayout(std::vector<uint8_t>& hostBuf, const UrmaPeerInfoTables& tables)
 {
     const size_t ctxRows = tables.wqList.size();
     auto* info = reinterpret_cast<UrmaInfo*>(hostBuf.data());
-    info->rowsPerPeer = kUrmaQpNum;
+    info->rowsPerPeer = RowsPerPeer();
     info->rankCount = rankCount_;
     info->notifyPoolPtr = reinterpret_cast<uint64_t>(notifyPoolDevice_);
     info->layout = Layout();
     info->jettyCount = static_cast<uint32_t>(ctxRows);
     info->jettiesPerCore = JettiesPerCore();
+    FillRailCycle(*info);
 
     uint8_t* devAddr = static_cast<uint8_t*>(urmaInfoDevice_) + sizeof(UrmaInfo);
     info->sqPtr = reinterpret_cast<uint64_t>(devAddr);

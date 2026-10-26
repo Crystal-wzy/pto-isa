@@ -25,7 +25,8 @@ namespace comm {
 namespace rdma {
 
 AICORE inline bool BuildSession(
-    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, RdmaSession& session)
+    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, RdmaSession& session,
+    uint32_t qpIdx = 0)
 {
     session = {};
     __gm__ RdmaInfo* info = reinterpret_cast<__gm__ RdmaInfo*>(workspace);
@@ -35,7 +36,7 @@ AICORE inline bool BuildSession(
     switch (info->backend) {
 #ifdef PTO_RDMA_BACKEND_HNS_1825_SUPPORTED
         case RdmaBackend::HNS_1825:
-            return hns_1825::BuildSession(workspace, myPe, tmpBuf, syncId, session);
+            return hns_1825::BuildSession(workspace, myPe, tmpBuf, syncId, session, qpIdx);
 #endif
         default:
             return false;
@@ -44,7 +45,7 @@ AICORE inline bool BuildSession(
 
 AICORE inline bool BuildSession(
     __gm__ uint8_t* workspace, uint32_t destRankId, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId,
-    RdmaSession& session)
+    RdmaSession& session, uint32_t qpIdx = 0)
 {
     session = {};
     __gm__ RdmaInfo* info = reinterpret_cast<__gm__ RdmaInfo*>(workspace);
@@ -54,7 +55,7 @@ AICORE inline bool BuildSession(
     switch (info->backend) {
 #ifdef PTO_RDMA_BACKEND_HNS_1825_SUPPORTED
         case RdmaBackend::HNS_1825:
-            return hns_1825::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session);
+            return hns_1825::BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, session, qpIdx);
 #endif
         default:
             return false;
@@ -64,7 +65,9 @@ AICORE inline bool BuildSession(
 AICORE inline void StoreSession(const RdmaSession& rdmaSession, AsyncSession& session)
 {
     session = AsyncSession{};
-    session.engine = DmaEngine::RDMA;
+    // AsyncSession{} leaves cfg on its SDMA alternative; activate the RDMA one.
+    // session.rt has no RDMA alternative because RDMA keeps no runtime state.
+    ::pto::comm::detail::ActivateEngineState<DmaEngine::RDMA>(session);
     session.valid = rdmaSession.valid;
     session.contextGm = rdmaSession.execCtx.contextGm;
     session.tmpBufAddr = rdmaSession.execCtx.tmpBuf.addr;
@@ -72,15 +75,16 @@ AICORE inline void StoreSession(const RdmaSession& rdmaSession, AsyncSession& se
     session.syncId = rdmaSession.execCtx.syncId;
     session.destRankId = rdmaSession.execCtx.destRankId;
     session.qpIdxBase = rdmaSession.execCtx.qpIdx;
-    session.rdmaBackend = rdmaSession.execCtx.backend;
-    session.myPe = rdmaSession.execCtx.myPe;
+    session.cfg.rdma.backend = rdmaSession.execCtx.backend;
+    session.cfg.rdma.myPe = rdmaSession.execCtx.myPe;
 }
 
 AICORE inline bool BuildSession(
-    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, AsyncSession& session)
+    __gm__ uint8_t* workspace, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId, AsyncSession& session,
+    uint32_t qpIdx = 0)
 {
     RdmaSession rdmaSession{};
-    const bool valid = BuildSession(workspace, myPe, tmpBuf, syncId, rdmaSession);
+    const bool valid = BuildSession(workspace, myPe, tmpBuf, syncId, rdmaSession, qpIdx);
     StoreSession(rdmaSession, session);
     session.valid = valid;
     return valid;
@@ -88,10 +92,10 @@ AICORE inline bool BuildSession(
 
 AICORE inline bool BuildSession(
     __gm__ uint8_t* workspace, uint32_t destRankId, uint32_t myPe, const RdmaTmpBuffer& tmpBuf, uint32_t syncId,
-    AsyncSession& session)
+    AsyncSession& session, uint32_t qpIdx = 0)
 {
     RdmaSession rdmaSession{};
-    const bool valid = BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, rdmaSession);
+    const bool valid = BuildSession(workspace, destRankId, myPe, tmpBuf, syncId, rdmaSession, qpIdx);
     StoreSession(rdmaSession, session);
     session.valid = valid;
     return valid;
@@ -101,10 +105,10 @@ AICORE inline RdmaExecContext MakeExecContext(const AsyncSession& session, uint3
 {
     RdmaExecContext ctx{};
     ctx.contextGm = session.contextGm;
-    ctx.backend = session.rdmaBackend;
+    ctx.backend = session.cfg.rdma.backend;
     ctx.destRankId = peer;
     ctx.qpIdx = session.qpIdxBase;
-    ctx.myPe = session.myPe;
+    ctx.myPe = session.cfg.rdma.myPe;
     ctx.tmpBuf = {session.tmpBufAddr, session.tmpBufSize};
     ctx.syncId = session.syncId;
     return ctx;
@@ -114,7 +118,7 @@ AICORE inline RdmaEventContext MakeEventContext(const AsyncSession& session)
 {
     RdmaEventContext ctx{};
     ctx.contextGm = session.contextGm;
-    ctx.backend = session.rdmaBackend;
+    ctx.backend = session.cfg.rdma.backend;
     ctx.tmpBuf = {session.tmpBufAddr, session.tmpBufSize};
     ctx.syncId = session.syncId;
     return ctx;
@@ -146,12 +150,12 @@ AICORE inline uint64_t Read(const RdmaExecContext& ctx, __gm__ uint8_t* dst, __g
 
 AICORE inline uint64_t WriteNotify(
     const RdmaExecContext& ctx, __gm__ uint8_t* dst, __gm__ uint8_t* src, uint64_t len, __gm__ int32_t* remoteSignal,
-    int32_t signalValue)
+    int32_t signalValue, NotifyOp notifyOp = NotifyOp::Set)
 {
     switch (ctx.backend) {
 #ifdef PTO_RDMA_BACKEND_HNS_1825_SUPPORTED
         case RdmaBackend::HNS_1825:
-            return hns_1825::WriteNotify(ctx, dst, src, len, remoteSignal, signalValue);
+            return hns_1825::WriteNotify(ctx, dst, src, len, remoteSignal, signalValue, notifyOp);
 #endif
         default:
             return EncodeErrorHandle(kRdmaBackendUnavailableError);
@@ -171,9 +175,9 @@ AICORE inline uint64_t Write(const AsyncSession& session, __gm__ uint8_t* dst, _
 
 AICORE inline uint64_t WriteNotify(
     const AsyncSession& session, __gm__ uint8_t* dst, __gm__ uint8_t* src, uint64_t len, __gm__ int32_t* remoteSignal,
-    int32_t signalValue, uint32_t peer)
+    int32_t signalValue, uint32_t peer, NotifyOp notifyOp = NotifyOp::Set)
 {
-    return WriteNotify(MakeExecContext(session, peer), dst, src, len, remoteSignal, signalValue);
+    return WriteNotify(MakeExecContext(session, peer), dst, src, len, remoteSignal, signalValue, notifyOp);
 }
 
 AICORE inline uint64_t Read(

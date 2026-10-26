@@ -48,3 +48,7 @@ bool RunTPutAsyncConsecutivePostsWaitEach(
 bool RunTPutAsyncPostsWaitFinal(
     int nRanks, int nDevices, int firstRankId, int firstDeviceId, uint32_t postCount, uint32_t rounds,
     uint32_t queueNum);
+
+bool RunTPutAsyncSessionRebuild(
+    int nRanks, int nDevices, int firstRankId, int firstDeviceId, uint32_t postCount, uint32_t rounds,
+    uint32_t queueNum, bool wideFirstSession);

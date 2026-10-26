@@ -199,7 +199,8 @@ struct PredictRuntimeConfig {
 
 namespace a5 {
 inline bool TryEstimateA5VfCycles(const CostModelInput& input, uint64_t& cycles);
-inline bool TryEstimateA5SpecialCycles(const CostModelInput& input, uint64_t& cycles);
+inline bool TryEstimateA5ReductionCycles(const CostModelInput& input, uint64_t& cycles);
+inline bool TryEstimateA5MatrixTransferCycles(const CostModelInput& input, uint64_t& cycles);
 } // namespace a5
 
 inline constexpr const char* DTypeToString(DType dtype)
@@ -518,7 +519,8 @@ inline bool TryEstimateA5Cycles(
     const CostModelInput& input, const PredictRuntimeConfig& predict_config, CostModelResult& result)
 {
     uint64_t cycles = 0;
-    if (!a5::TryEstimateA5SpecialCycles(input, cycles) && !a5::TryEstimateA5VfCycles(input, cycles)) {
+    if (!a5::TryEstimateA5ReductionCycles(input, cycles) && !a5::TryEstimateA5MatrixTransferCycles(input, cycles) &&
+        !a5::TryEstimateA5VfCycles(input, cycles)) {
         return WarnAndFallbackToZero(input, result, "unsupported A5 costmodel key");
     }
     result.cycles = static_cast<double>(cycles);
@@ -609,5 +611,6 @@ inline CostModelResult EstimateCycles(const CostModelInput& input)
 
 #include <pto/costmodel/a5/vf_costmodel.hpp>
 #include <pto/costmodel/a5/reduction_costmodel.hpp>
+#include <pto/costmodel/a5/matrix_transfer_costmodel.hpp>
 
 #endif
