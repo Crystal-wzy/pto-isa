@@ -182,6 +182,12 @@ PTO_INTERNAL void CheckConvTileData(TileData& dst, GlobalData& src)
 template <typename TileData, typename T>
 PTO_INTERNAL void FillTLoadRowTail(TileData& dst, size_t validRow, size_t validCol, size_t padCols, T padVal)
 {
+    if (validRow != 0 && padCols != 0) {
+        const size_t lastElement = GetTileElementOffset<TileData>(validRow - 1, validCol + padCols - 1);
+        const size_t spanBytes =
+            (lastElement / TileData::kPackedElementsPerByte + 1) * sizeof(typename TileData::DType);
+        NPUMemoryModel::Instance().CheckAccess(dst.data(), 0, spanBytes);
+    }
     for (size_t row = 0; row < validRow; ++row) {
         for (size_t col = validCol; col < validCol + padCols; ++col) {
             dst.SetElement(row, col, padVal);
@@ -192,6 +198,12 @@ PTO_INTERNAL void FillTLoadRowTail(TileData& dst, size_t validRow, size_t validC
 template <typename TileData, typename T>
 PTO_INTERNAL void FillTLoadColTail(TileData& dst, size_t validRow, size_t validCol, size_t padRows, T padVal)
 {
+    if (validCol != 0 && padRows != 0) {
+        const size_t lastElement = GetTileElementOffset<TileData>(validRow + padRows - 1, validCol - 1);
+        const size_t spanBytes =
+            (lastElement / TileData::kPackedElementsPerByte + 1) * sizeof(typename TileData::DType);
+        NPUMemoryModel::Instance().CheckAccess(dst.data(), 0, spanBytes);
+    }
     for (size_t col = 0; col < validCol; ++col) {
         for (size_t row = validRow; row < validRow + padRows; ++row) {
             dst.SetElement(row, col, padVal);
@@ -278,9 +290,11 @@ PTO_INTERNAL void loadA5VecNz(TileData& dst, GlobalData& src)
     // A5 TLoadVecNZ2NZ copies every GM column block, including columns beyond validCol.
     for (size_t group = 0; group < groupCount; ++group) {
         for (size_t block = 0; block < blockCount; ++block) {
+            const size_t dstOffsetBytes = group * dstGroupStrideBytes + block * DST_BLOCK_STRIDE_BYTES;
+            NPUMemoryModel::Instance().CheckAccess(dstBytes, dstOffsetBytes, burstBytes);
             std::memcpy(
-                dstBytes + group * dstGroupStrideBytes + block * DST_BLOCK_STRIDE_BYTES,
-                srcBytes + group * srcGroupStrideBytes + block * srcBlockStrideBytes, burstBytes);
+                dstBytes + dstOffsetBytes, srcBytes + group * srcGroupStrideBytes + block * srcBlockStrideBytes,
+                burstBytes);
         }
     }
 }
