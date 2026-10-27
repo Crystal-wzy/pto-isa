@@ -82,11 +82,12 @@ template <typename DstTileData, typename Src0TileData, typename Src1TileData>
 PTO_INTERNAL void CheckValid()
 {
     static_assert(
-        sizeof(typename Src1TileData::DType) == 2 || sizeof(typename Src1TileData::DType) == 4,
-        "expect b16/b32 indices");
+        std::is_integral_v<typename Src1TileData::DType> &&
+            ((sizeof(typename Src1TileData::DType) == 2) || (sizeof(typename Src1TileData::DType) == 4)),
+        "TGATHER: expect integral b16/b32 indices");
     static_assert(
         sizeof(typename DstTileData::DType) != 8 || sizeof(typename Src1TileData::DType) == 4,
-        "expect b32 indices for b64 data");
+        "TGATHER: b64 data requires b32 indices");
     static_assert(
         (std::is_same<typename DstTileData::DType, typename Src0TileData::DType>::value),
         "expect same size for indice and dst");

@@ -120,19 +120,23 @@ class TGatherParamsColMasked(TGatherParamsBase):
 
 
 class TGatherParams1D(TGatherParamsBase):
-    def __init__(self, name, src_type, src_row, src_col, dst_row, dst_col):
+    def __init__(self, name, src_type, src_row, src_col, dst_row, dst_col, idx_type=np.int32, oob=False):
         super().__init__(name)
         self.src_type = src_type
         self.src_row = src_row
         self.src_col = src_col
         self.dst_row = dst_row
         self.dst_col = dst_col
+        self.idx_type = idx_type
+        self.oob = oob
 
 
 def gather1d(src, indices):
     output = np.zeros_like(indices, dtype=src.dtype)
     for i in range(indices.shape[0]):
-        output[i] = src[indices[i]]
+        idx = int(indices[i])
+        if 0 <= idx < src.shape[0]:
+            output[i] = src[idx]
     return output
 
 
@@ -204,8 +208,12 @@ def gen_golden_data(param: TGatherParamsBase):
             src_data = np.random.randint(-20, 20, (param.src_row *
                                          param.src_col)).astype(param.src_type)
         src_data.tofile("./src0.bin")
-        indices = np.random.randint(
-            0, param.src_row * param.src_col, (param.dst_row * param.dst_col)).astype(np.int32)
+        numel = param.src_row * param.src_col
+        indices = np.random.randint(0, numel, (param.dst_row * param.dst_col)).astype(param.idx_type)
+        if param.oob:
+            indices[1] = numel + 10
+            if np.issubdtype(param.idx_type, np.signedinteger):
+                indices[0] = -1
         indices.tofile("./src1.bin")
         golden = gather1d(src_data, indices)
         golden.tofile("./golden.bin")
@@ -334,6 +342,18 @@ if __name__ == "__main__":
                         np.int64, 32, 256, 32, 64),
         TGatherParams1D("TGATHERTest.case_1D_uint64_32x256_32x64",
                         np.uint64, 32, 256, 32, 64),
+
+        # Test cases for TGather1D with b16 indices
+        TGatherParams1D("TGATHERTest.case_1D_float_i16idx_32x256_32x64",
+                        np.float32, 32, 256, 32, 64, idx_type=np.int16),
+        TGatherParams1D("TGATHERTest.case_1D_half_i16idx_16x1024_16x128",
+                        np.float16, 16, 1024, 16, 128, idx_type=np.int16),
+        TGatherParams1D("TGATHERTest.case_1D_int8_i16idx_32x256_32x64",
+                        np.int8, 32, 256, 32, 64, idx_type=np.int16),
+        TGatherParams1D("TGATHERTest.case_1D_uint8_u16idx_32x256_32x64",
+                        np.uint8, 32, 256, 32, 64, idx_type=np.uint16),
+        TGatherParams1D("TGATHERTest.case_1D_int16_i16idx_oob_32x256_32x64",
+                        np.int16, 32, 256, 32, 64, idx_type=np.int16, oob=True),
     ]
 
     for case in case_params_list:

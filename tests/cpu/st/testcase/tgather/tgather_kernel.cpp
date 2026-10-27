@@ -608,6 +608,34 @@ extern "C" __global__ AICORE void test_tgather1D_uint64(
     runTGather1D<uint64_t, int32_t, 32, 256, 32, 64, 32, 256>(out, src0, src1);
 }
 
+extern "C" __global__ AICORE void test_tgather1D_float_i16(__gm__ float* out, __gm__ float* src0, __gm__ int16_t* src1)
+{
+    runTGather1D<float, int16_t, 32, 256, 32, 64, 32, 256>(out, src0, src1);
+}
+
+extern "C" __global__ AICORE void test_tgather1D_half_i16(
+    __gm__ aclFloat16* out, __gm__ aclFloat16* src0, __gm__ int16_t* src1)
+{
+    runTGather1D<aclFloat16, int16_t, 16, 1024, 16, 128, 16, 1024>(out, src0, src1);
+}
+
+extern "C" __global__ AICORE void test_tgather1D_int8_i16(__gm__ int8_t* out, __gm__ int8_t* src0, __gm__ int16_t* src1)
+{
+    runTGather1D<int8_t, int16_t, 32, 256, 32, 64, 32, 256>(out, src0, src1);
+}
+
+extern "C" __global__ AICORE void test_tgather1D_uint8_u16(
+    __gm__ uint8_t* out, __gm__ uint8_t* src0, __gm__ uint16_t* src1)
+{
+    runTGather1D<uint8_t, uint16_t, 32, 256, 32, 64, 32, 256>(out, src0, src1);
+}
+
+extern "C" __global__ AICORE void test_tgather1D_int16_i16_oob(
+    __gm__ int16_t* out, __gm__ int16_t* src0, __gm__ int16_t* src1)
+{
+    runTGather1D<int16_t, int16_t, 32, 256, 32, 64, 32, 256>(out, src0, src1);
+}
+
 void launchTGATHER1D_demo_float(float* out, float* src0, int32_t* src1, aclrtStream stream)
 {
     cout << "launch TGATHER float start!" << endl;
@@ -662,4 +690,39 @@ void launchTGATHER1D_demo_uint64(uint64_t* out, uint64_t* src0, int32_t* src1, a
     cout << "launch TGATHER uint64 start!" << endl;
     test_tgather1D_uint64(out, src0, src1);
     cout << "launch TGATHER uint64 end!" << endl;
+}
+
+void launchTGATHER1D_demo_float_i16(float* out, float* src0, int16_t* src1, aclrtStream stream)
+{
+    cout << "launch TGATHER float i16 start!" << endl;
+    test_tgather1D_float_i16(out, src0, src1);
+    cout << "launch TGATHER float i16 end!" << endl;
+}
+
+void launchTGATHER1D_demo_half_i16(aclFloat16* out, aclFloat16* src0, int16_t* src1, aclrtStream stream)
+{
+    cout << "launch TGATHER half i16 start!" << endl;
+    test_tgather1D_half_i16(out, src0, src1);
+    cout << "launch TGATHER half i16 end!" << endl;
+}
+
+void launchTGATHER1D_demo_int8_i16(int8_t* out, int8_t* src0, int16_t* src1, aclrtStream stream)
+{
+    cout << "launch TGATHER int8 i16 start!" << endl;
+    test_tgather1D_int8_i16(out, src0, src1);
+    cout << "launch TGATHER int8 i16 end!" << endl;
+}
+
+void launchTGATHER1D_demo_uint8_u16(uint8_t* out, uint8_t* src0, uint16_t* src1, aclrtStream stream)
+{
+    cout << "launch TGATHER uint8 u16 start!" << endl;
+    test_tgather1D_uint8_u16(out, src0, src1);
+    cout << "launch TGATHER uint8 u16 end!" << endl;
+}
+
+void launchTGATHER1D_demo_int16_i16_oob(int16_t* out, int16_t* src0, int16_t* src1, aclrtStream stream)
+{
+    cout << "launch TGATHER int16 i16 oob start!" << endl;
+    test_tgather1D_int16_i16_oob(out, src0, src1);
+    cout << "launch TGATHER int16 i16 oob end!" << endl;
 }
