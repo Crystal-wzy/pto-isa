@@ -59,6 +59,45 @@ inline constexpr bool kIsMmadS8S4 =
     std::is_same_v<typename TileRight::DType, int4b_t>;
 } // namespace TMatmulInternal
 
+template <
+    AccPhase Phase = AccPhase::Unspecified, typename TileRes, typename TileLeft, typename TileLeftScale,
+    typename TileRight, typename TileRightScale, bool biasBufferCtrl, bool cmatrixInitVal, bool gemvCtrl>
+__tf__ AICORE void TMatmulMx(
+    typename TileRes::TileDType __out__ cMatrix, typename TileLeft::TileDType __in__ aMatrix,
+    typename TileLeftScale::TileDType __in__ aScaleMatrix, typename TileRight::TileDType __in__ bMatrix,
+    typename TileRightScale::TileDType __in__ bScaleMatrix, uint16_t m, uint16_t k, uint16_t n)
+{
+    // CmatrixInitVal Indicates the initial matrix, 1: the number in C matrix is 0, 0：use the real number in C matrix
+    __cc__ typename TileRes::DType* c = (__cc__ typename TileRes::DType*)__cce_get_tile_ptr(cMatrix);
+    __ca__ typename TileLeft::DType* a = (__ca__ typename TileLeft::DType*)__cce_get_tile_ptr(aMatrix);
+    __cb__ typename TileRight::DType* b = (__cb__ typename TileRight::DType*)__cce_get_tile_ptr(bMatrix);
+
+    uint64_t l0aMxBufferStartAddr = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(aScaleMatrix));
+    uint64_t l0bMxBufferStartAddr = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(bScaleMatrix));
+    mad_mx(
+        c, 0, a, l0aMxBufferStartAddr, b, l0bMxBufferStartAddr, m, k, n, static_cast<uint8_t>(Phase), gemvCtrl,
+        biasBufferCtrl, cmatrixInitVal);
+}
+
+template <
+    AccPhase Phase = AccPhase::Unspecified, typename TileRes, typename TileLeft, typename TileLeftScale,
+    typename TileRight, typename TileRightScale, bool biasBufferCtrl, bool cmatrixInitVal, bool gemvCtrl>
+__tf__ AICORE void TMatmulMxBias(
+    typename TileRes::TileDType __out__ cMatrix, typename TileLeft::TileDType __in__ aMatrix,
+    typename TileLeftScale::TileDType __in__ aScaleMatrix, typename TileRight::TileDType __in__ bMatrix,
+    typename TileRightScale::TileDType __in__ bScaleMatrix, uint64_t bias, uint16_t m, uint16_t k, uint16_t n)
+{
+    __cc__ typename TileRes::DType* c = (__cc__ typename TileRes::DType*)__cce_get_tile_ptr(cMatrix);
+    __ca__ typename TileLeft::DType* a = (__ca__ typename TileLeft::DType*)__cce_get_tile_ptr(aMatrix);
+    __cb__ typename TileRight::DType* b = (__cb__ typename TileRight::DType*)__cce_get_tile_ptr(bMatrix);
+
+    uint64_t l0aMxBufferStartAddr = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(aScaleMatrix));
+    uint64_t l0bMxBufferStartAddr = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(bScaleMatrix));
+    mad_mx(
+        c, bias, a, l0aMxBufferStartAddr, b, l0bMxBufferStartAddr, m, k, n, static_cast<uint8_t>(Phase), gemvCtrl,
+        biasBufferCtrl, cmatrixInitVal);
+}
+
 #define PTO_A6_DISPATCH_MAD(C_PTR, A_PTR, B_PTR, M_VAL, K_VAL, N_VAL)                                           \
     do {                                                                                                        \
         if constexpr (kIsMmadS8S4<TileRes, TileLeft, TileRight>) {                                              \

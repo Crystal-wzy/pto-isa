@@ -17,6 +17,7 @@ constexpr uint32_t MX_SCALE_GROUP = 32;
 constexpr uint32_t HIF4_SCALE_GROUP = 64;
 constexpr uint64_t L0C_SIZE_BYTES = 256u * 1024u;
 constexpr uint64_t L0A_BUF0 = 0x0u;
+constexpr uint64_t L0A_BUF1 = 0x800u;
 constexpr uint64_t L0B_BUF0 = 0x0u;
 
 template <typename T>
@@ -38,7 +39,7 @@ AICORE inline void MxSetupLoadExtractA(
     TASSIGN(bMatTile, 0x20000u);
     TASSIGN(aScaleTile, 0x40000u);
     TASSIGN(bScaleTile, 0x60000u);
-    TASSIGN(al0, L0A_BUF0);
+    TASSIGN(al0, L0A_BUF1);
     TASSIGN(bl0, L0B_BUF0);
     TASSIGN(aScaleL0, GetScaleAddr(al0.data()));
     TASSIGN(bScaleL0, GetScaleAddr(bl0.data()));

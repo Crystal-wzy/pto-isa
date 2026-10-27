@@ -16,7 +16,11 @@ See LICENSE in the root of the software repository for the full text of the Lice
 namespace pto {
 const uint32_t VECTOR_REG_WIDTH = 256;
 const uint32_t VECTOR_REG_WIDTH_2XVL = 512;
-constexpr uint32_t SHIFT_MX_ADDR = 4;
+#if defined(PTO_NPU_ARCH_A6)
+constexpr uint32_t SHIFT_MX_ADDR = 3; // MX scale buffer size is 8K
+#else
+constexpr uint32_t SHIFT_MX_ADDR = 4; // MX scale buffer size is 4K
+#endif
 
 enum class DistVST {
     DIST_NORM_B8,
@@ -81,8 +85,7 @@ PTO_INTERNAL MaskReg PSetWithType(U dist)
 template <typename T>
 PTO_INTERNAL uint64_t GetScaleAddr(T* dst)
 {
-    uintptr_t addr = reinterpret_cast<uintptr_t>(dst);
-    return addr >> SHIFT_MX_ADDR;
+    return reinterpret_cast<uintptr_t>(dst) >> SHIFT_MX_ADDR;
 }
 
 } // namespace pto
