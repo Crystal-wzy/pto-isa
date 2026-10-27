@@ -556,7 +556,7 @@ inline AICORE void cast32to8_1D_NoPostUpdate(
  * ROUND_R (round to nearest even) for correct IEEE-like behavior with 8-bit precision.
  * This is a hardware requirement specific to the hifloat8 format.
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void cast32toH8_1D_NoPostUpdate(
     __ubuf__ hifloat8_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -627,7 +627,7 @@ inline AICORE void cast16toH8_1D_NoPostUpdate(
         // sReg is decremented by CreatePredicate with POST_UPDATE
     }
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 //=============================================================================================
 // 2D Helper Templates - For non-contiguous data with padding
@@ -1282,7 +1282,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 {
     cast32to16_2D_NoPostUpdate<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 /**
  * FP32 to I16
@@ -1362,7 +1362,7 @@ inline AICORE void castData_2D_NoPostUpdate(
  * Conversion: f32 -> e4m3 #rnd #sat #pp
  * Uses cast32to8 helper
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float8_e4m3_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1378,14 +1378,14 @@ inline AICORE void castData_2D_NoPostUpdate(
 {
     cast32to8<R, CastMode::ROUND_SAT_PART, vector_f8e4m3>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 /**
  * FP32 to FP8_E5M2
  * Conversion: f32 -> e5m2 #rnd #sat #pp
  * Uses cast32to8 helper
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float8_e5m2_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1401,14 +1401,14 @@ inline AICORE void castData_2D_NoPostUpdate(
 {
     cast32to8<R, CastMode::ROUND_SAT_PART, vector_f8e5m2>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 /**
  * FP32 to H8
  * Conversion: f32 -> h8 #rnd #sat #part
  * Note: H8 conversion requires ROUND_A mode
  */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ hifloat8_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1461,7 +1461,7 @@ inline AICORE void castData_2D_NoPostUpdate(
     // Same complex logic as castData - just reuse it
     castData<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 //---------------------------------------------------------------------------------------------
 // Source: FP16 (half) - 2D versions
@@ -1576,7 +1576,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 }
 
 /** FP16 -> H8 #rnd #sat #part */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ hifloat8_t* dst, __ubuf__ half* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1609,14 +1609,14 @@ inline AICORE void castData_2D_NoPostUpdate(
     // Same complex logic as castData - just reuse it
     castData<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 //---------------------------------------------------------------------------------------------
 // Source: BFloat16 - 2D versions
 //---------------------------------------------------------------------------------------------
 
 /** BF16 -> FP32 #part (type expansion) → vcvt(output, input, preg, PART_EVEN) */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float* dst, __ubuf__ bfloat16_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1666,7 +1666,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 {
     cast16to16<R, CastMode::SAT_ROUND>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 /**
  * BF16 to FP4 (packed x2) conversion helpers
@@ -1676,7 +1676,7 @@ inline AICORE void castData_2D_NoPostUpdate(
  * Output requires vselr (select every 4th byte) to compact scattered result, and
  * all dst byte offsets are >> 1 (nibble count → byte count).
  */
-#ifdef PTO_NPU_ARCH_A5
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6)
 template <typename R, typename DST_VEC, typename DST>
 inline AICORE void castBf16toFp4(
     __ubuf__ DST* dst, __ubuf__ bfloat16_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1732,7 +1732,7 @@ inline AICORE void castBf16toFp4_2D_NoPostUpdate(
     // Same pass-count as castBf16toFp4 (no interleaved dual-load variant for FP4)
     castBf16toFp4<R, DST_VEC>(dst, src, validRows, validCols, dstCols, srcCols);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 /**
  * FP4 (packed x2) to BF16 conversion helpers
@@ -1815,7 +1815,7 @@ inline AICORE void castFp4toBf16_1D_NoPostUpdate(
     }
 }
 
-#ifdef PTO_NPU_ARCH_A5
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6)
 template <typename R, typename DST_VEC, typename DST>
 inline AICORE void castBf16toFp4_1D_NoPostUpdate(
     __ubuf__ DST* dst, __ubuf__ bfloat16_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1896,14 +1896,14 @@ inline AICORE void castData_2D_NoPostUpdate(
 {
     castBf16toFp4_2D_NoPostUpdate<R, vector_f4e2m1x2>(dst, src, validRows, validCols, dstCols, srcCols);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 //---------------------------------------------------------------------------------------------
 // Source: FP4 variants (float4_e1m2x2_t, float4_e2m1x2_t) - 2D versions
 //---------------------------------------------------------------------------------------------
 
 /** FP4_E1M2X2 -> BF16 #part (type expansion) → vcvt(output, input, preg, PART_P0) */
-#ifdef PTO_NPU_ARCH_A5
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ bfloat16_t* dst, __ubuf__ float4_e1m2x2_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -1936,7 +1936,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 {
     castFp4toBf16_2D_NoPostUpdate<vector_f4e2m1x2>(dst, src, validRows, validCols, dstCols, srcCols);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 //---------------------------------------------------------------------------------------------
 // Source: U8, I8 (8-bit integers) - 2D versions
@@ -2307,7 +2307,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 //   - HIF8: Hardware-specific 8-bit float format
 
 /** E4M3 -> FP32 #part (type expansion) → vcvt(output, input, preg, PART_P0) */
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData(
     __ubuf__ float* dst, __ubuf__ float8_e4m3_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2357,7 +2357,7 @@ inline AICORE void castData_2D_NoPostUpdate(
 {
     cast8to32<vector_hif8>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 //=============================================================================================
 // castData_1D_NoPostUpdate Overloads - Organized by Source Type (8→16→32→64-bit sources)
@@ -2412,7 +2412,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 }
 
 // Source: FP8_E4M3
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ float* dst, __ubuf__ float8_e4m3_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2438,7 +2438,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 {
     cast8to32_1D_NoPostUpdate<vector_hif8>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 //---------------------------------------------------------------------------------------------
 // Source: 16-bit types (half/fp16, bfloat16, int16_t) - 1D versions
@@ -2515,7 +2515,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 // Note: FP16 -> FP8_E5M2 and FP16 -> FP8_E4M3 conversions are NOT supported
 // Only FP16 -> Hifloat8 (H8) conversion is supported
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ hifloat8_t* dst, __ubuf__ half* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2550,7 +2550,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 }
 
 // FP4 (packed x2) conversions are A5-only
-#ifdef PTO_NPU_ARCH_A5
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ float4_e1m2x2_t* dst, __ubuf__ bfloat16_t* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2583,9 +2583,9 @@ inline AICORE void castData_1D_NoPostUpdate(
 {
     castFp4toBf16_1D_NoPostUpdate<vector_f4e2m1x2>(dst, src, validRows, validCols, dstCols, srcCols);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
-#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_KIRIN9050
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6 || PTO_NPU_ARCH_KIRIN9050
 
 // Source: I16 (signed 16-bit integer)
 template <typename R>
@@ -2659,7 +2659,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 {
     cast32to16_1D_NoPostUpdate<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
@@ -2695,7 +2695,7 @@ inline AICORE void castData_1D_NoPostUpdate(
     cast32toS64_1D_NoPostUpdate<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
 
-#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_KIRIN9050)
+#if defined(PTO_NPU_ARCH_A5) || defined(PTO_NPU_ARCH_A6) || defined(PTO_NPU_ARCH_KIRIN9050)
 template <typename R>
 inline AICORE void castData_1D_NoPostUpdate(
     __ubuf__ float8_e4m3_t* dst, __ubuf__ float* src, uint32_t validRows, uint32_t validCols, uint32_t dstCols,
@@ -2721,7 +2721,7 @@ inline AICORE void castData_1D_NoPostUpdate(
 {
     cast32toH8_1D_NoPostUpdate<R>(dst, src, validRows, validCols, dstCols, srcCols, satMode);
 }
-#endif // PTO_NPU_ARCH_A5
+#endif // PTO_NPU_ARCH_A5 || PTO_NPU_ARCH_A6
 
 // Source: I32 (signed 32-bit integer)
 template <typename R>
