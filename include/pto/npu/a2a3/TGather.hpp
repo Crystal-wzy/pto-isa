@@ -163,6 +163,7 @@ AICORE void TGather_cmp_FillIndexAndConvertK(
     __ubuf__ typename TileDataS1::DType* kPtr, unsigned srcValidRow)
 {
     using TIN = typename TileDataS::DType;
+    using TS = typename TileDataS1::DType;
 
     for (int i = 0; i < TileDataS::Rows * TileDataS::Cols; i++) {
         *(indexTmpPtr + i) = offset + i;
@@ -170,7 +171,13 @@ AICORE void TGather_cmp_FillIndexAndConvertK(
     PtoSetWaitFlag<PIPE_S, PIPE_V>();
 
     unsigned numRepeat = CeilDivision(srcValidRow, (REPEAT_BYTE / sizeof(typename TileDataS1::DType)));
-    if constexpr (std::is_same_v<TIN, float>) {
+    if constexpr (std::is_same_v<TS, TIN>) {
+        // Typed K tile: thresholds are already stored in the src dtype (e.g. 0.5f in a float K
+        // tile), so copy them per row as-is; non-integer float thresholds are directly expressible.
+        for (int i = 0; i < TileDataS::Rows; i++) {
+            *(cvtTmpPtr + i) = *(kPtr + i);
+        }
+    } else if constexpr (std::is_same_v<TIN, float>) {
         vconv_s322f32(cvtTmpPtr, reinterpret_cast<__ubuf__ int32_t*>(kPtr), numRepeat, 1, 1, 8, 8);
     } else if constexpr (std::is_same_v<TIN, int32_t>) {
         for (int i = 0; i < TileDataS::Rows; i++) {
@@ -313,6 +320,12 @@ PTO_INTERNAL void TGATHER_IMPL(
     static_assert((cmpMode == CmpMode::GT || cmpMode == CmpMode::EQ), "Fix: TGATHER only support GT or EQ mode");
     static_assert(
         (TileDataD::Loc == TileType::Vec) && (TileDataS::Loc == TileType::Vec), "Fix: TGATHER expect vec TileType");
+    static_assert(
+        std::is_same_v<typename TileDataS1::DType, typename TileDataS::DType> ||
+            (std::is_integral_v<typename TileDataS1::DType> &&
+             sizeof(typename TileDataS1::DType) == sizeof(typename TileDataS::DType)),
+        "Fix: TGATHER k_value tile must use the src dtype (typed thresholds, e.g. 0.5f in a float "
+        "K tile) or an integer type of the same width (integer-coded, numerically converted).");
 
     unsigned sValidCols = src0.GetValidCol();
     unsigned sValidRows = src0.GetValidRow();

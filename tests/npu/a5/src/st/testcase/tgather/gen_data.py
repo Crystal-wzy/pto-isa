@@ -125,7 +125,7 @@ def gen_golden_data(param: TGatherParamsBase):
         x1_gm.tofile("./x1_gm.bin")
         os.chdir(original_dir)
     else:
-        if param.cmpmode == 0:
+        if param.cmpmode == 0 and getattr(param, "data_dist", "int") == "int":
             assert param.kvalue > 50, (
                 "k-value is not supposed to be too small to make sure golden will not exceed src data"
             )
@@ -138,13 +138,20 @@ def gen_golden_data(param: TGatherParamsBase):
         kvalue = param.kvalue
         i_offset = param.i_offset
         cmpmode = param.cmpmode
-        src_data = np.random.randint(0, 100, [src_row, src_col]).astype(src_type)
+        if getattr(param, "data_dist", "int") == "uniform01":
+            src_data = np.random.uniform(0.0, 1.0, [src_row, src_col]).astype(src_type)
+        elif getattr(param, "data_dist", "int") == "uniform-11":
+            src_data = np.random.uniform(-1.0, 1.0, [src_row, src_col]).astype(src_type)
+        elif getattr(param, "data_dist", "int") == "quarter":
+            src_data = (np.random.randint(0, 4, [src_row, src_col]).astype(np.float32) * 0.25).astype(src_type)
+        else:
+            src_data = np.random.randint(0, 100, [src_row, src_col]).astype(src_type)
         golden = np.zeros((dst_row, dst_col)).astype(dst_type)
         if cmpmode == 0:
             for i in range(src_row):
                 k = 0
                 for j in range(src_col):
-                    idx = i * src_col + j
+                    idx = i * src_col + j + i_offset
                     if src_data[i, j] > kvalue:
                         golden[i, k] = idx
                         k = k + 1
@@ -152,7 +159,7 @@ def gen_golden_data(param: TGatherParamsBase):
             for i in range(src_row):
                 k = 0
                 for j in range(src_col):
-                    idx = i * src_col + j
+                    idx = i * src_col + j + i_offset
                     if src_data[i, j] == kvalue:
                         golden[i, k] = idx
                         k = k + 1
@@ -161,7 +168,9 @@ def gen_golden_data(param: TGatherParamsBase):
 
         # k-value tile support per-row and use uint as input
         src_data1 = np.array(kvalue).astype(src_type)
-        if src_type == np.float32 or src_type == np.int32 or src_type == np.uint32:
+        if param.k_encoding == "typed":
+            src_data1 = np.tile(src_data1, src_row)
+        elif src_type == np.float32 or src_type == np.int32 or src_type == np.uint32:
             src_data1 = np.tile(src_data1, src_row).astype(np.uint32)
         elif src_type == np.half or src_type == np.int16 or src_type == np.uint16:
             src_data1 = np.tile(src_data1, src_row).astype(np.uint16)
@@ -188,7 +197,20 @@ class TGatherParamsNorm(TGatherParamsBase):
 
 
 class TGatherParamsCmp(TGatherParamsBase):
-    def __init__(self, name, src_type, dst_type, src_row, src_col, kvalue, i_offset, k, cmpmode=0):
+    def __init__(
+        self,
+        name,
+        src_type,
+        dst_type,
+        src_row,
+        src_col,
+        kvalue,
+        i_offset,
+        k,
+        cmpmode=0,
+        k_encoding="value",
+        data_dist="int",
+    ):
         super().__init__(name)
         self.src_type = src_type
         self.dst_type = dst_type
@@ -198,6 +220,12 @@ class TGatherParamsCmp(TGatherParamsBase):
         self.i_offset = i_offset
         self.k = k
         self.cmpmode = cmpmode  # 0 for gt, 1 for eq
+        # k_encoding: "value" -> legacy integer-coded K tile (numeric cast, int(0.5) truncates to 0);
+        #             "typed" -> K tile uses the src dtype, so non-integer thresholds are expressible
+        self.k_encoding = k_encoding
+        # data_dist: "int" -> randint(0, 100); "uniform01" -> uniform [0, 1); "uniform-11" -> uniform [-1, 1);
+        #            "quarter" -> {0, 0.25, 0.5, 0.75}
+        self.data_dist = data_dist
 
 
 if __name__ == "__main__":
@@ -242,12 +270,8 @@ if __name__ == "__main__":
         ParamMasked("TGATHERTest.case_uint64_4x144_P0001", np.uint64, np.uint64, 4, 144, P0001),
         ParamMasked("TGATHERTest.case_int64_1x16368_P1010", np.int64, np.int64, 1, 16368, P1010),
         ParamMasked("TGATHERTest.case_uint64_1x16368_P1010", np.uint64, np.uint64, 1, 16368, P1010),
-        ParamMasked(
-            "TGATHERTest.case_int64_dynamic_3x15_static_4x24_P1010", np.int64, np.int64, 3, 15, P1010
-        ),
-        ParamMasked(
-            "TGATHERTest.case_uint64_dynamic_3x15_static_4x24_P1010", np.uint64, np.uint64, 3, 15, P1010
-        ),
+        ParamMasked("TGATHERTest.case_int64_dynamic_3x15_static_4x24_P1010", np.int64, np.int64, 3, 15, P1010),
+        ParamMasked("TGATHERTest.case_uint64_dynamic_3x15_static_4x24_P1010", np.uint64, np.uint64, 3, 15, P1010),
         ParamMasked("TGATHERTest.case1_b8_P0101", np.int8, np.int8, HALF_P0101_ROW, HALF_P0101_COL, P0101),
         ParamMasked("TGATHERTest.case1_b8_P1010", np.uint8, np.uint8, HALF_P1010_ROW, HALF_P1010_COL, P1010),
         ParamMasked("TGATHERTest.case1_b8_P0001", np.int8, np.int8, HALF_P0001_ROW, HALF_P0001_COL, P0001),
@@ -265,6 +289,114 @@ if __name__ == "__main__":
         TGatherParamsCmp("TGATHERTest.case8_i8_topk", np.int8, np.uint32, 16, 128, 90, 0, 32, 0),
         TGatherParamsCmp("TGATHERTest.case9_i8_topk", np.int8, np.uint32, 16, 128, 50, 0, 32, 1),
         TGatherParamsCmp("TGATHERTest.case10_u8_topk", np.uint8, np.uint32, 16, 128, 90, 0, 32, 0),
+        # Typed K tile (issue #366): K tile dtype == src dtype, non-integer thresholds expressible.
+        TGatherParamsCmp(
+            "TGATHERTest.case11_float_gt_frac_typedk",
+            np.float32,
+            np.uint32,
+            16,
+            64,
+            0.5,
+            0,
+            64,
+            0,
+            k_encoding="typed",
+            data_dist="uniform01",
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case12_half_gt_frac_typedk",
+            np.half,
+            np.uint32,
+            8,
+            128,
+            0.5,
+            0,
+            128,
+            0,
+            k_encoding="typed",
+            data_dist="uniform01",
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case13_float_gt_frac01_typedk",
+            np.float32,
+            np.uint32,
+            16,
+            64,
+            0.1,
+            0,
+            64,
+            0,
+            k_encoding="typed",
+            data_dist="uniform01",
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case14_s32_eq_offset_typedk", np.int32, np.uint32, 8, 128, 50, 16, 64, 1, k_encoding="typed"
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case15_float_gt_frac_offset_typedk",
+            np.float32,
+            np.uint32,
+            16,
+            64,
+            0.5,
+            100,
+            64,
+            0,
+            k_encoding="typed",
+            data_dist="uniform01",
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case16_float_gt_neg_typedk",
+            np.float32,
+            np.uint32,
+            16,
+            64,
+            -0.5,
+            0,
+            64,
+            0,
+            k_encoding="typed",
+            data_dist="uniform-11",
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case17_float_gt_none_typedk",
+            np.float32,
+            np.uint32,
+            16,
+            64,
+            2.0,
+            0,
+            64,
+            0,
+            k_encoding="typed",
+            data_dist="uniform01",
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case18_float_eq_quarter_typedk",
+            np.float32,
+            np.uint32,
+            16,
+            64,
+            0.25,
+            0,
+            64,
+            1,
+            k_encoding="typed",
+            data_dist="quarter",
+        ),
+        TGatherParamsCmp(
+            "TGATHERTest.case19_half_eq_quarter_typedk",
+            np.half,
+            np.uint32,
+            8,
+            128,
+            0.25,
+            0,
+            128,
+            1,
+            k_encoding="typed",
+            data_dist="quarter",
+        ),
     ]
 
     for _, case in enumerate(case_params_list):

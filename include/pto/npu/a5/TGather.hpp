@@ -441,18 +441,25 @@ __tf__ AICORE void TGather_float_gt(
         for (uint16_t i = 0; i < (uint16_t)srcValidRow; ++i) {
             uint32_t cols = (uint32_t)(srcValidCol);
             typename TileDataS1::DType k_scalar1 = *(kvaluePtr + i);
+            // Typed K tile: thresholds are already float, so compare the f32 score directly
+            // (no f32->s32 rounding); non-integer thresholds (0.5f) are directly expressible.
+            constexpr bool kTyped = std::is_same_v<typename TileDataS1::DType, typename TileDataS::DType>;
             for (uint16_t j = 0; j < repeatTimes; ++j) {
                 RegTensor<typename TileDataS::DType> score;
-                vector_s32 score_s32;
                 vlds(score, src0Ptr, (i * TileDataS::Cols + j * elementsPerRepeat), NORM);
-                // f32->s32
-                vcvt(score_s32, score, preg_b32, ROUND_R, RS_DISABLE);
 
                 preg = CreatePredicate<typename TileDataS::DType>(cols);
 
                 vector_bool pout_ge;
                 vector_s32 sqz_index_out;
-                vcmps_gt(pout_ge, (vector_u32)score_s32, k_scalar1, preg);
+                if constexpr (kTyped) {
+                    vcmps_gt(pout_ge, score, k_scalar1, preg);
+                } else {
+                    vector_s32 score_s32;
+                    // f32->s32
+                    vcvt(score_s32, score, preg_b32, ROUND_R, RS_DISABLE);
+                    vcmps_gt(pout_ge, (vector_u32)score_s32, k_scalar1, preg);
+                }
                 vsqz(sqz_index_out, index, pout_ge, MODE_STORED);
                 vstur(align_index, (vector_u32)sqz_index_out, (__ubuf__ uint32_t*)dstPtr, POST_UPDATE);
                 vadd(index, index, add_offset, preg_b32, MODE_ZEROING);
@@ -494,18 +501,25 @@ __tf__ AICORE void TGather_float_eq(
         for (uint16_t i = 0; i < (uint16_t)srcValidRow; ++i) {
             uint32_t cols1 = (uint32_t)(srcValidCol);
             typename TileDataS1::DType k_scalar1 = *(kvaluePtr + i);
+            // Typed K tile: thresholds are already float, so compare the f32 score directly
+            // (no f32->s32 rounding); non-integer thresholds are directly expressible.
+            constexpr bool kTyped = std::is_same_v<typename TileDataS1::DType, typename TileDataS::DType>;
             for (uint16_t j = 0; j < repeatTimes; ++j) {
-                vector_s32 score_s32;
                 RegTensor<typename TileDataS::DType> score;
                 vlds(score, src0Ptr, (i * TileDataS::Cols + j * elementsPerRepeat), NORM);
-                vcvt(score_s32, score, preg_b32, ROUND_R, RS_DISABLE);
 
                 uint32_t count = (cols1 > elementsPerRepeat) ? elementsPerRepeat : cols1;
                 preg = CreatePredicate<typename TileDataS::DType>(count);
 
                 vector_bool pout_eq;
                 vector_s32 sqz_index_out;
-                vcmps_eq(pout_eq, (vector_u32)score_s32, k_scalar1, preg);
+                if constexpr (kTyped) {
+                    vcmps_eq(pout_eq, score, k_scalar1, preg);
+                } else {
+                    vector_s32 score_s32;
+                    vcvt(score_s32, score, preg_b32, ROUND_R, RS_DISABLE);
+                    vcmps_eq(pout_eq, (vector_u32)score_s32, k_scalar1, preg);
+                }
                 vsqz(sqz_index_out, index, pout_eq, MODE_STORED);
                 vadd(index, index, add_offset, preg_b32, MODE_ZEROING);
                 vstur(align_index, (vector_u32)sqz_index_out, (__ubuf__ uint32_t*)dstPtr, POST_UPDATE);
@@ -557,7 +571,7 @@ __tf__ AICORE void TGather_b32_gt(
 
                 vector_bool pout_ge;
                 vector_s32 sqz_index_out;
-                vcmps_gt(pout_ge, (vector_u32)score, k_scalar, preg);
+                vcmps_gt(pout_ge, score, k_scalar, preg);
                 vsqz(sqz_index_out, index1, pout_ge, MODE_STORED);
                 vstur(align_index1, (vector_u32)sqz_index_out, (__ubuf__ uint32_t*)dstPtr, POST_UPDATE);
                 vadd(index1, index1, add_offset, preg_b32, MODE_ZEROING);
@@ -607,7 +621,7 @@ __tf__ AICORE void TGather_b32_eq(
 
                 vector_bool pout_eq;
                 vector_s32 sqz_index_out;
-                vcmps_eq(pout_eq, (vector_u32)score, k_scalar, preg);
+                vcmps_eq(pout_eq, score, k_scalar, preg);
                 vsqz(sqz_index_out, index2, pout_eq, MODE_STORED);
                 vadd(index2, index2, add_offset, preg_b32, MODE_ZEROING);
                 vstur(align_index2, (vector_u32)sqz_index_out, (__ubuf__ uint32_t*)dstPtr, POST_UPDATE);
@@ -754,8 +768,16 @@ __tf__ AICORE void TGather_half_gt(
 
         for (uint16_t i = 0; i < (uint16_t)srcValidRow; ++i) {
             typename TileDataS1::DType k_scalar = *(kvaluePtr + i);
-            vbr(mask_k_b16, k_scalar);
-            vcvt(mask_k, mask_k_b16, preg_b16, PART_EVEN);
+            // Typed K tile: thresholds are already half, broadcast the value as f16 and convert
+            // f16->f32 with the vector pipe; non-integer thresholds (0.5h) are directly expressible.
+            if constexpr (std::is_same_v<typename TileDataS1::DType, typename TileDataS::DType>) {
+                vector_f16 mask_k_f16;
+                vbr(mask_k_f16, k_scalar);
+                vcvt(mask_k, mask_k_f16, preg_b16, PART_EVEN);
+            } else {
+                vbr(mask_k_b16, k_scalar);
+                vcvt(mask_k, mask_k_b16, preg_b16, PART_EVEN);
+            }
 
             for (uint16_t j = 0; j < repeatTimes; ++j) {
                 vector_f16 score;
@@ -813,8 +835,16 @@ __tf__ AICORE void TGather_half_eq(
 
         for (uint16_t i = 0; i < (uint16_t)srcValidRow; ++i) {
             typename TileDataS1::DType k_scalar = *(kvaluePtr + i);
-            vbr(mask_k_b16, k_scalar);
-            vcvt(mask_k, mask_k_b16, preg_b16, PART_EVEN);
+            // Typed K tile: thresholds are already half, broadcast the value as f16 and convert
+            // f16->f32 with the vector pipe; non-integer thresholds (0.5h) are directly expressible.
+            if constexpr (std::is_same_v<typename TileDataS1::DType, typename TileDataS::DType>) {
+                vector_f16 mask_k_f16;
+                vbr(mask_k_f16, k_scalar);
+                vcvt(mask_k, mask_k_f16, preg_b16, PART_EVEN);
+            } else {
+                vbr(mask_k_b16, k_scalar);
+                vcvt(mask_k, mask_k_b16, preg_b16, PART_EVEN);
+            }
 
             for (uint16_t j = 0; j < repeatTimes; ++j) {
                 vector_f16 score;
@@ -827,7 +857,6 @@ __tf__ AICORE void TGather_half_eq(
 
                 vcmp_eq(pout_eq, score_f32, mask_k, preg_b32);
                 vsqz(sqz_index_out, index, pout_eq, MODE_STORED);
-
                 vstur(align_index, (vector_u32)sqz_index_out, (__ubuf__ uint32_t*)dstPtr, POST_UPDATE);
                 vadd(index, index, add_offset, preg_b32, MODE_ZEROING);
             }
@@ -1037,8 +1066,11 @@ PTO_INTERNAL void TGATHER_IMPL(
         "Fix: TGATHER Src data type must be int8_t/uint8_t/int16_t/uint16_t/int32_t/uint32_t/half/float.");
     static_assert((cmpMode == CmpMode::GT || cmpMode == CmpMode::EQ), "Fix: TGATHER only support GT or EQ mode");
     static_assert(
-        (std::is_same_v<typename TileDataS1::DType, uint16_t> || std::is_same_v<typename TileDataS1::DType, uint32_t>),
-        "Fix: TGATHER k_value tile must be uint16_t/uint32_t");
+        std::is_same_v<typename TileDataS1::DType, typename TileDataS::DType> ||
+            std::is_same_v<typename TileDataS1::DType, uint16_t> ||
+            std::is_same_v<typename TileDataS1::DType, uint32_t>,
+        "Fix: TGATHER k_value tile must use the src dtype (typed thresholds, e.g. 0.5f in a float "
+        "K tile) or uint16_t/uint32_t (integer-coded, numerically converted).");
 
     unsigned sValidCols = src0.GetValidCol();
     unsigned sValidRows = src0.GetValidRow();

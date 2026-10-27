@@ -21,7 +21,7 @@ void LaunchTGATHER(T* out, T* src, void* stream);
 
 template <
     typename srcT, typename src1T, typename dstT, int kGRows_, int kGCols_, int kTRows_, int kTCols_, int K,
-    pto::CmpMode cmpMode>
+    pto::CmpMode cmpMode, bool kTypedHalfK = false>
 void LaunchTGATHER_CMP(srcT* src, src1T* src1, dstT* out, uint32_t offset, void* stream);
 
 constexpr int HALF_SIZE = 2;
@@ -291,8 +291,12 @@ TEST_F(TGATHERTest, case_1D_float_16x16_32x32) { test_gather_index<float, int32_
 
 TEST_F(TGATHERTest, case_1D_half_16x16_32x32) { test_gather_index<int16_t, int32_t, int16_t, 16, 16, 32, 32>(); }
 
-template <typename srcT, typename src1T, typename dstT, uint32_t ROW, uint32_t COL, uint32_t K, pto::CmpMode cmpMode>
-void test_gather_cmp()
+// Compare-form TGATHER test: dst holds u32 indices, so golden is compared exactly (a float-tolerance
+// compare cannot see index diffs because any u32 index reinterpreted as f32 is a denormal).
+template <
+    typename srcT, typename src1T, typename dstT, uint32_t ROW, uint32_t COL, uint32_t K, pto::CmpMode cmpMode,
+    bool kTypedHalfK = false>
+void test_gather_cmp(uint32_t offset = 0)
 {
     aclInit(nullptr);
     aclrtSetDevice(0);
@@ -307,8 +311,6 @@ void test_gather_cmp()
     src1T *src1Host, *src1Device;
     dstT *dstHost, *dstDevice;
 
-    uint32_t offset = 0;
-
     aclrtMallocHost((void**)(&srcHost), size);
     aclrtMallocHost((void**)(&dstHost), dstsize);
     aclrtMallocHost((void**)(&src1Host), scalarSize);
@@ -322,7 +324,7 @@ void test_gather_cmp()
     aclrtMemcpy(src1Device, scalarSize, src1Host, scalarSize, ACL_MEMCPY_HOST_TO_DEVICE);
     aclrtMemcpy(srcDevice, size, srcHost, size, ACL_MEMCPY_HOST_TO_DEVICE);
     aclrtMemset(dstDevice, dstsize, 0, dstsize);
-    LaunchTGATHER_CMP<srcT, src1T, dstT, ROW, COL, ROW, COL, K, cmpMode>(
+    LaunchTGATHER_CMP<srcT, src1T, dstT, ROW, COL, ROW, COL, K, cmpMode, kTypedHalfK>(
         srcDevice, src1Device, dstDevice, offset, stream);
 
     aclrtSynchronizeStream(stream);
@@ -340,14 +342,12 @@ void test_gather_cmp()
     aclrtResetDevice(0);
     aclFinalize();
 
-    std::vector<float> devFinal(dstsize / sizeof(float));
-    std::vector<float> golden(dstsize / sizeof(float));
+    std::vector<uint32_t> golden(dstsize / sizeof(uint32_t));
+    std::vector<uint32_t> devFinal(dstsize / sizeof(uint32_t));
     ReadFile(GetGoldenDir() + "/output.bin", dstsize, devFinal.data(), dstsize);
     ReadFile(GetGoldenDir() + "/golden.bin", dstsize, golden.data(), dstsize);
 
-    bool ret = ResultCmp(golden, devFinal, 0.001f);
-
-    EXPECT_TRUE(ret);
+    EXPECT_EQ(golden, devFinal);
 }
 
 TEST_F(TGATHERTest, case1_float_topk) { test_gather_cmp<float, uint32_t, uint32_t, 16, 64, 32, pto::CmpMode::GT>(); }
@@ -364,4 +364,52 @@ TEST_F(TGATHERTest, case4_half_topk)
 TEST_F(TGATHERTest, case5_half_topk)
 {
     test_gather_cmp<aclFloat16, uint16_t, uint32_t, 8, 128, 32, pto::CmpMode::EQ>();
+}
+
+// Typed K tile (issue #366): the K tile uses the src dtype, so non-integer float thresholds
+// (0.5, 0.1) and negative thresholds are directly expressible. dst holds u32 indices, so golden
+// is compared exactly.
+TEST_F(TGATHERTest, case6_float_gt_frac_typedk)
+{
+    test_gather_cmp<float, float, uint32_t, 16, 64, 64, pto::CmpMode::GT>();
+}
+
+TEST_F(TGATHERTest, case7_half_gt_frac_typedk)
+{
+    test_gather_cmp<aclFloat16, aclFloat16, uint32_t, 8, 128, 128, pto::CmpMode::GT, true>();
+}
+
+TEST_F(TGATHERTest, case8_float_gt_frac01_typedk)
+{
+    test_gather_cmp<float, float, uint32_t, 16, 64, 64, pto::CmpMode::GT>();
+}
+
+TEST_F(TGATHERTest, case9_float_gt_neg_typedk)
+{
+    test_gather_cmp<float, float, uint32_t, 16, 64, 64, pto::CmpMode::GT>();
+}
+
+TEST_F(TGATHERTest, case10_s32_eq_offset_typedk)
+{
+    test_gather_cmp<int32_t, int32_t, uint32_t, 8, 128, 64, pto::CmpMode::EQ>(16);
+}
+
+TEST_F(TGATHERTest, case11_float_gt_frac_offset_typedk)
+{
+    test_gather_cmp<float, float, uint32_t, 16, 64, 64, pto::CmpMode::GT>(100);
+}
+
+TEST_F(TGATHERTest, case12_float_gt_none_typedk)
+{
+    test_gather_cmp<float, float, uint32_t, 16, 64, 64, pto::CmpMode::GT>();
+}
+
+TEST_F(TGATHERTest, case13_float_eq_quarter_typedk)
+{
+    test_gather_cmp<float, float, uint32_t, 16, 64, 64, pto::CmpMode::EQ>();
+}
+
+TEST_F(TGATHERTest, case14_half_eq_quarter_typedk)
+{
+    test_gather_cmp<aclFloat16, aclFloat16, uint32_t, 8, 128, 128, pto::CmpMode::EQ, true>();
 }

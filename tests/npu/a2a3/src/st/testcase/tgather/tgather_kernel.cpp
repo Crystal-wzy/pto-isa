@@ -304,14 +304,17 @@ __global__ AICORE void runTGATHER_CMP(__gm__ srcT* src, __gm__ src1T* src1, __gm
     out = dstGlobal.data();
 }
 
+// kTypedHalfK: set for a typed (half-dtype) K tile; src1T is then an aclFloat16/uint16_t buffer
+// holding half values and is reinterpreted as the kernel-side half type, which only this TU knows.
 template <
     typename srcT, typename src1T, typename dstT, int kGRows_, int kGCols_, int kTRows_, int kTCols_, int K,
-    CmpMode cmpMode>
+    CmpMode cmpMode, bool kTypedHalfK = false>
 void LaunchTGATHER_CMP(srcT* src, src1T* src1, dstT* out, uint32_t offset, void* stream)
 {
     if constexpr (std::is_same_v<srcT, aclFloat16>) {
-        runTGATHER_CMP<half, src1T, dstT, kGRows_, kGCols_, kTRows_, kTCols_, K, cmpMode>
-            <<<1, nullptr, stream>>>((half*)(src), src1, out, offset);
+        using KernelSrc1T = std::conditional_t<kTypedHalfK, half, src1T>;
+        runTGATHER_CMP<half, KernelSrc1T, dstT, kGRows_, kGCols_, kTRows_, kTCols_, K, cmpMode>
+            <<<1, nullptr, stream>>>((half*)(src), reinterpret_cast<KernelSrc1T*>(src1), out, offset);
     } else {
         runTGATHER_CMP<srcT, src1T, dstT, kGRows_, kGCols_, kTRows_, kTCols_, K, cmpMode>
             <<<1, nullptr, stream>>>(src, src1, out, offset);
@@ -328,3 +331,15 @@ template void LaunchTGATHER_CMP<aclFloat16, uint16_t, uint32_t, 2, 256, 2, 256, 
     aclFloat16* src, uint16_t* src1, uint32_t* out, uint32_t offset, void* stream);
 template void LaunchTGATHER_CMP<aclFloat16, uint16_t, uint32_t, 8, 128, 8, 128, 32, CmpMode::EQ>(
     aclFloat16* src, uint16_t* src1, uint32_t* out, uint32_t offset, void* stream);
+// Typed K tiles (issue #366): the K tile uses the src dtype, so non-integer thresholds (0.5) are
+// directly expressible without the legacy integer encoding.
+template void LaunchTGATHER_CMP<float, float, uint32_t, 16, 64, 16, 64, 64, CmpMode::GT>(
+    float* src, float* src1, uint32_t* out, uint32_t offset, void* stream);
+template void LaunchTGATHER_CMP<float, float, uint32_t, 16, 64, 16, 64, 64, CmpMode::EQ>(
+    float* src, float* src1, uint32_t* out, uint32_t offset, void* stream);
+template void LaunchTGATHER_CMP<aclFloat16, aclFloat16, uint32_t, 8, 128, 8, 128, 128, CmpMode::GT, true>(
+    aclFloat16* src, aclFloat16* src1, uint32_t* out, uint32_t offset, void* stream);
+template void LaunchTGATHER_CMP<aclFloat16, aclFloat16, uint32_t, 8, 128, 8, 128, 128, CmpMode::EQ, true>(
+    aclFloat16* src, aclFloat16* src1, uint32_t* out, uint32_t offset, void* stream);
+template void LaunchTGATHER_CMP<int32_t, int32_t, uint32_t, 8, 128, 8, 128, 64, CmpMode::EQ>(
+    int32_t* src, int32_t* src1, uint32_t* out, uint32_t offset, void* stream);
