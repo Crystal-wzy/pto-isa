@@ -100,6 +100,10 @@ void test_trowsum()
 
 TEST_F(TROWSUMTest, case_float_64x64_64x64_64x64) { test_trowsum<float, 64, 64, 64, 64>(); }
 TEST_F(TROWSUMTest, case_half_16x256_16x256_16x256) { test_trowsum<aclFloat16, 16, 256, 16, 256>(); }
+TEST_F(TROWSUMTest, case_int16_64x64_64x64_64x64) { test_trowsum<int16_t, 64, 64, 64, 64>(); }
+TEST_F(TROWSUMTest, case_int32_64x64_64x64_64x64) { test_trowsum<int32_t, 64, 64, 64, 64>(); }
+TEST_F(TROWSUMTest, case_int64_64x64_64x64_64x64) { test_trowsum<int64_t, 64, 64, 64, 64>(); }
+TEST_F(TROWSUMTest, case_uint64_64x64_64x64_64x64) { test_trowsum<uint64_t, 64, 64, 64, 64>(); }
 #ifdef CPU_SIM_BFLOAT_ENABLED
 TEST_F(TROWSUMTest, case_bf16_16x256_16x256_16x256) { test_trowsum<bfloat16_t, 16, 256, 16, 256>(); }
 #endif
