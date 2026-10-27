@@ -34,6 +34,19 @@ jobs:
     runs-on: [self-hosted, a5]
     timeout-minutes: 120
 
+    # Git over the flaky intranet route to github.com benefits from HTTP/1.1
+    # (avoids HTTP/2 stream resets seen through middleboxes) and from failing
+    # fast when a transfer stalls, so the retry step below kicks in promptly
+    # instead of hanging on one curl attempt for minutes.
+    env:
+      GIT_CONFIG_COUNT: "3"
+      GIT_CONFIG_KEY_0: "http.version"
+      GIT_CONFIG_VALUE_0: "HTTP/1.1"
+      GIT_CONFIG_KEY_1: "http.lowSpeedLimit"
+      GIT_CONFIG_VALUE_1: "1000"
+      GIT_CONFIG_KEY_2: "http.lowSpeedTime"
+      GIT_CONFIG_VALUE_2: "45"
+
     steps:
       - name: Resolve trigger context
         id: trigger
@@ -59,13 +72,103 @@ jobs:
             core.setOutput("sha", sha);
             core.setOutput("pr_number", prNumber);
 
+      # The runner's direct route to github.com is intermittently unavailable
+      # (connect timeouts / mid-transfer drops). Keep actions/checkout as the
+      # fast path but tolerate its failure; the next step verifies the result,
+      # restores the source tree, and retries the fetch if needed.
       - name: Checkout target ref
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: ${{ steps.trigger.outputs.repository }}
           ref: ${{ steps.trigger.outputs.ref }}
           fetch-depth: 1
           clean: false
+
+      # Runs only when the trigger resolved successfully and the job is not
+      # cancelled; a failed/cancelled run must not retry network fetches.
+      # The proxy fallback (A5_SMOKE_GH_PROXY) is applied only on the dedicated
+      # retry attempts; otherwise the runner's existing network configuration
+      # is inherited and restored afterwards, never cleared unconditionally.
+      - name: Ensure target ref checked out
+        if: ${{ !cancelled() && success() }}
+        shell: bash
+        env:
+          TARGET_REPO: ${{ steps.trigger.outputs.repository }}
+          TARGET_SHA: ${{ steps.trigger.outputs.sha }}
+          FALLBACK_PROXY: ${{ vars.A5_SMOKE_GH_PROXY || '' }}
+        run: |
+          set -euo pipefail
+          ws="${GITHUB_WORKSPACE}"
+          if [[ ! "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "ERROR: invalid target SHA '${TARGET_SHA}'." >&2
+            exit 1
+          fi
+
+          fetch_url="https://github.com/${TARGET_REPO}.git"
+          if [[ ! -d "${ws}/.git" ]]; then
+            git -C "${ws}" init -q
+            git -C "${ws}" remote add origin "${fetch_url}"
+          else
+            git -C "${ws}" remote set-url origin "${fetch_url}"
+          fi
+
+          current="$(git -C "${ws}" rev-parse HEAD 2>/dev/null || true)"
+          if [[ -z "${current}" || "${current}" != "${TARGET_SHA}" ]]; then
+            proxy_vars=(https_proxy http_proxy HTTPS_PROXY HTTP_PROXY)
+            saved_proxy_env=()
+            for v in "${proxy_vars[@]}"; do
+              if [[ -v ${v} ]]; then
+                saved_proxy_env+=("${v}=${!v}")
+              fi
+            done
+
+            use_fallback=0
+            for attempt in 1 2 3 4 5 6; do
+              echo "Fetch attempt ${attempt}/6: ${fetch_url} @ ${TARGET_SHA}"
+              if [[ $((attempt % 3)) -eq 0 && -n "${FALLBACK_PROXY}" ]]; then
+                if [[ "${use_fallback}" -eq 0 ]]; then
+                  echo "  routing through proxy ${FALLBACK_PROXY}"
+                  for v in "${proxy_vars[@]}"; do
+                    export "${v}=${FALLBACK_PROXY}"
+                  done
+                  use_fallback=1
+                fi
+              elif [[ "${use_fallback}" -eq 1 ]]; then
+                unset "${proxy_vars[@]}"
+                for entry in "${saved_proxy_env[@]}"; do
+                  export "${entry}"
+                done
+                use_fallback=0
+              fi
+              if git -C "${ws}" fetch --no-tags --prune --no-recurse-submodules --depth=1 \
+                origin "${TARGET_SHA}"; then
+                break
+              fi
+              if [[ "${attempt}" -eq 6 ]]; then
+                echo "ERROR: failed to fetch ${fetch_url} @ ${TARGET_SHA} after 6 attempts." >&2
+                exit 1
+              fi
+              sleep "$((attempt * 15))"
+            done
+          else
+            echo "Workspace HEAD already at ${TARGET_SHA}."
+          fi
+
+          # Always restore controlled (tracked) files to the target commit's
+          # state, even when HEAD already matches: a previous run or interrupted
+          # step may have modified or deleted tracked files, and tests must run
+          # against the PR source. Untracked caches and previous logs are left
+          # in place (the workflow uses clean: false).
+          git -C "${ws}" reset --hard -q "${TARGET_SHA}"
+          git -C "${ws}" checkout -q --detach "${TARGET_SHA}"
+          dirty="$(git -C "${ws}" status --porcelain --untracked-files=no)"
+          if [[ -n "${dirty}" ]]; then
+            echo "ERROR: controlled files differ from target commit after restore:" >&2
+            echo "${dirty}" >&2
+            exit 1
+          fi
+          echo "Checkout OK at ${TARGET_SHA}: HEAD matches and controlled files are clean."
 
       - name: Record trigger summary
         shell: bash
@@ -104,6 +207,9 @@ jobs:
             echo "A5_TOOLCHAIN_PATH_PREFIX=${DEFAULT_TOOLCHAIN_PATH_PREFIX}"
           } >> "${GITHUB_ENV}"
 
+      # Use a per-run unique log name so a failed/skipped attempt can never
+      # replay a log written by an earlier run (the workspace persists between
+      # runs because clean: false).
       - name: Run A5 smoke on self-hosted runner
         shell: bash
         run: |
@@ -113,6 +219,10 @@ jobs:
             echo "ERROR: task-submit is required so the non-root runner can submit A5 smoke to root." >&2
             exit 1
           fi
+
+          log_file="a5_smoke_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.log"
+          echo "A5_SMOKE_LOG_FILE=${log_file}" >> "${GITHUB_ENV}"
+          rm -f ./a5_smoke_*.log
 
           cat > ./a5_smoke.env <<EOF
           ASCEND_HOME_PATH=${ASCEND_HOME_PATH}
@@ -129,15 +239,19 @@ jobs:
 
           task-submit "${task_args[@]}" \
             --run "bash '${GITHUB_WORKSPACE}/.github/scripts/a5/run_smoke.sh'" \
-            2>&1 | tee ./a5_smoke.log
+            2>&1 | tee "./${log_file}"
 
+      # Only the log produced by this attempt is printed. If no log exists,
+      # the tests never started, and an old success summary must not be shown.
       - name: Print A5 smoke log tail
         if: always()
         shell: bash
         run: |
-          if [[ -f ./a5_smoke.log ]]; then
-            echo "===== a5_smoke.log (tail -200) ====="
-            tail -n 200 ./a5_smoke.log || true
+          log_file="${A5_SMOKE_LOG_FILE:-}"
+          if [[ -n "${log_file}" && -f "./${log_file}" ]]; then
+            echo "===== ${log_file} (tail -200) ====="
+            tail -n 200 "./${log_file}" || true
           else
-            echo "a5_smoke.log was not generated."
+            echo "No A5 smoke log exists for this run/attempt; the smoke tests did not start"
+            echo "(checkout or an earlier step failed before tests could run)."
           fi
