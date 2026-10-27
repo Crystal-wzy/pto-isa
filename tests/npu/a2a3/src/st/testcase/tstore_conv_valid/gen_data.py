@@ -27,6 +27,15 @@ CASES = [
     ("TStoreConvValidTest.FracZ_4D_valid_half", (8, 2, 16, 16), (6, 1, 10, 16), np.float16),
     ("TStoreConvValidTest.FracZ_5D_valid_int8", (4, 2, 6, 16, 32), (3, 1, 4, 10, 32), np.int8),
     ("TStoreConvValidTest.FracZ_5D_valid_dynamic_int8", (2, 3, 4, 8, 32), (1, 2, 3, 6, 32), np.int8),
+    # UB (Vec) ConvTile sources produced by the TTRANS format conversions.
+    ("TStoreConvValidTest.NC1HWC0_ub_slow_half", (2, 3, 4, 5, 16), (1, 2, 3, 4, 16), np.float16),
+    ("TStoreConvValidTest.NC1HWC0_ub_fast_half", (2, 3, 4, 5, 16), (2, 2, 3, 5, 16), np.float16),
+    ("TStoreConvValidTest.NC1HWC0_ub_dynamic_float", (2, 3, 4, 5, 8), (1, 2, 3, 4, 8), np.float32),
+    ("TStoreConvValidTest.NC1HWC0_ub_bf16", (2, 3, 4, 5, 16), (1, 2, 3, 4, 16), np.uint16),
+    ("TStoreConvValidTest.NDC1HWC0_ub_half", (2, 3, 2, 4, 5, 16), (1, 2, 1, 3, 4, 16), np.float16),
+    ("TStoreConvValidTest.FracZ_4D_ub_half", (8, 2, 16, 16), (6, 1, 10, 16), np.float16),
+    ("TStoreConvValidTest.FracZ_5D_ub_int8", (4, 2, 6, 16, 32), (3, 1, 4, 10, 32), np.int8),
+    ("TStoreConvValidTest.FracZ_5D_ub_dynamic_int8", (2, 3, 4, 8, 32), (1, 2, 3, 6, 32), np.int8),
 ]
 
 
