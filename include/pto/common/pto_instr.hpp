@@ -14,9 +14,6 @@ See LICENSE in the root of the software repository for the full text of the Lice
 #include "pto/common/debug.h"
 #include "pto/common/event.hpp"
 #include "pto/common/fifo.hpp"
-#ifndef __CPU_SIM
-#include "pto/npu/a2a3/grid_intrinsic.hpp"
-#endif
 #include "pto/common/tassign_check.hpp"
 #include "pto/common/utils.hpp"
 #include "pto/common/pto_instr_impl.hpp"
@@ -103,6 +100,8 @@ PTO_INTERNAL void PtoWaitEvents(WaitEvents&... events)
 }
 
 } // namespace detail
+
+PTO_CPU_TARGET_NAMESPACE_BEGIN
 
 template <typename T, typename AddrType>
 PTO_INST void TASSIGN(T& obj, AddrType addr)
@@ -3087,5 +3086,6 @@ PTO_INST RecordEvent TQUANT(
     return {};
 }
 
+PTO_CPU_TARGET_NAMESPACE_END
 } // namespace pto
 #endif
