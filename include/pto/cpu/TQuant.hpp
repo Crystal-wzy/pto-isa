@@ -48,12 +48,17 @@ inline uint16_t FloatToBf16BitsTrunc(float value) { return static_cast<uint16_t>
 
 inline uint16_t FloatToBf16BitsRound(float value)
 {
+    constexpr uint32_t bitsShift = 16;
     const uint32_t bits = FloatToBits(value);
-    const uint32_t lsb = (bits >> 16) & 1u;
-    return static_cast<uint16_t>((bits + 0x7FFFu + lsb) >> 16);
+    const uint32_t lsb = (bits >> bitsShift) & 1u;
+    return static_cast<uint16_t>((bits + 0x7FFFu + lsb) >> bitsShift);
 }
 
-inline float Bf16BitsToFloat(uint16_t bits) { return BitsToFloat(static_cast<uint32_t>(bits) << 16); }
+inline float Bf16BitsToFloat(uint16_t bits)
+{
+    constexpr uint32_t bitsShift = 16;
+    return BitsToFloat(static_cast<uint32_t>(bits) << bitsShift);
+}
 
 inline uint16_t AbsBf16BitsFromFloat(float value)
 {
@@ -479,7 +484,11 @@ inline void QuantizeMxTile(
             const float groupScaling = ComputeMxGroupScaling<quant_type, scale_alg>(maxAbsValue, e8m0);
 
             flatMax.data()[flatGroupIdx] = static_cast<typename FlatMaxTile::DType>(maxAbsValue);
-            exp.data()[GetTileElementOffset<TileDataExp>(row, col)] = e8m0;
+            if constexpr (grp_axis == 1 && TileDataExp::Rows == 1) {
+                exp.data()[GetTileElementOffset<TileDataExp>(0, flatGroupIdx)] = e8m0;
+            } else {
+                exp.data()[GetTileElementOffset<TileDataExp>(row, col)] = e8m0;
+            }
 
             QuantizeMxGroup<grp_axis, quant_type, scale_alg>(
                 dst, src, flatScaling, i, group, flatGroupIdx, groupScaling);

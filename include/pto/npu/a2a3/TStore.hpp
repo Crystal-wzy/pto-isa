@@ -174,7 +174,9 @@ PTO_INTERNAL void CheckAcc2gm(GlobalData& dst, TileData& src)
 // ConvTile TSTORE: only the source valid box (anchored at the logical origin) is copied to GM; GM outside
 // the box is left untouched. DMA bursts move whole 32-byte blocks, so the valid C0 extent must stay the
 // full C0 block. Valid extents drive the loop counts / burst lengths, the declared tile extents provide
-// every L1 pitch, and the GlobalTensor strides provide every GM address.
+// every source pitch, and the GlobalTensor strides provide every GM address.
+// The source ConvTile may hold L1 (Mat) data loaded by TLOAD, or UB (Vec) data produced by the TTRANS
+// format conversions; the per-burst instruction and its gap units differ between the two.
 // -----------------------------------------------------------------------------
 template <typename GlobalData, typename TileData>
 PTO_INTERNAL void TStoreInstrL1ToGm(
@@ -194,6 +196,40 @@ PTO_INTERNAL void TStoreInstrL1ToGm(
     }
 }
 
+// UB->GM burst. The align descriptors take the burst length and the GM gap in bytes, while the UB gap
+// counts 32-byte blocks (the same convention as TStoreUb2gmInstr). The 32-bit gap fields cannot
+// overflow for the supported ConvTile layouts.
+template <typename GlobalData, typename TileData>
+PTO_INTERNAL void TStoreInstrUbToGm(
+    typename GlobalData::DType* dst, __ubuf__ typename TileData::DType* src, uint16_t nBurst, uint32_t lenBurstBlocks,
+    uint32_t ubGapBlocks, uint64_t gmGapBlocks)
+{
+    PTO_ASSERT(gmGapBlocks <= (uint64_t(UINT32_MAX) >> SHIFT_BLOCK_BYTE), "Fix: GM gap exceeds the UB->GM DMA range!");
+    const uint32_t lenBurst = lenBurstBlocks << SHIFT_BLOCK_BYTE;
+    const uint32_t gmGap = static_cast<uint32_t>(gmGapBlocks << SHIFT_BLOCK_BYTE);
+    if constexpr (sizeof(typename TileData::DType) == 1) {
+        copy_ubuf_to_gm_align_b8(dst, src, (uint8_t)0, nBurst, lenBurst, 0, 0, ubGapBlocks, gmGap);
+    } else if constexpr (sizeof(typename TileData::DType) == 2) {
+        copy_ubuf_to_gm_align_b16(dst, src, (uint8_t)0, nBurst, lenBurst, 0, 0, ubGapBlocks, gmGap);
+    } else if constexpr (sizeof(typename TileData::DType) == 4 || sizeof(typename TileData::DType) == 8) {
+        copy_ubuf_to_gm_align_b32(dst, src, (uint8_t)0, nBurst, lenBurst, 0, 0, ubGapBlocks, gmGap);
+    }
+}
+
+// One ConvTile burst: identical geometry for L1 and UB sources, different instruction / units.
+template <bool Ub, typename GlobalData, typename TileData, typename SrcPtr>
+PTO_INTERNAL void TStoreConvBurst(
+    typename GlobalData::DType* dst, SrcPtr src, uint16_t nBurst, uint32_t lenBurstBlocks, uint32_t srcGapBlocks,
+    uint64_t gmGapBlocks)
+{
+    if constexpr (Ub) {
+        TStoreInstrUbToGm<GlobalData, TileData>(dst, src, nBurst, lenBurstBlocks, srcGapBlocks, gmGapBlocks);
+    } else {
+        TStoreInstrL1ToGm<GlobalData, TileData>(
+            dst, src, nBurst, static_cast<uint16_t>(lenBurstBlocks), static_cast<uint16_t>(srcGapBlocks), gmGapBlocks);
+    }
+}
+
 template <typename GlobalData, typename TileData>
 PTO_INTERNAL void CheckConvTileDataStore(GlobalData& dst, TileData& src)
 {
@@ -204,7 +240,9 @@ PTO_INTERNAL void CheckConvTileDataStore(GlobalData& dst, TileData& src)
             std::is_same_v<typename TileData::DType, half> || std::is_same_v<typename TileData::DType, bfloat16_t> ||
             std::is_same_v<typename TileData::DType, float>,
         "Fix: Data type must be int8_t/uint8_t/int16_t/uint16_t/int32_t/uint32_t/half/bfloat16_t/float!");
-    static_assert(TileData::Loc == pto::TileType::Mat, "Fix: Source TileType must be Mat!");
+    static_assert(
+        TileData::Loc == pto::TileType::Mat || TileData::Loc == pto::TileType::Vec,
+        "Fix: Source TileType must be Mat (L1) or Vec (UB)!");
     static_assert(
         sizeof(typename TileData::DType) == sizeof(typename GlobalData::DType),
         "Fix: Source dtype must be same with dst dtype!");
@@ -236,12 +274,11 @@ PTO_INTERNAL void CheckConvTileDataStore(GlobalData& dst, TileData& src)
     }
 }
 
-template <typename GlobalData, typename TileData>
-__tf__ PTO_INTERNAL void TStore5HDValid(
-    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
-    int64_t gStride1, int64_t gStride2, int srcC1, int srcH, int srcW, int vN, int vC1, int vH, int vW)
+template <typename GlobalData, typename TileData, bool Ub, typename SrcPtr>
+PTO_INTERNAL void TStore5HDValidBody(
+    typename GlobalData::DType* dst, SrcPtr srcAddr, int64_t gStride0, int64_t gStride1, int64_t gStride2, int srcC1,
+    int srcH, int srcW, int vN, int vC1, int vH, int vW)
 {
-    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
     constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
     constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
 
@@ -260,7 +297,7 @@ __tf__ PTO_INTERNAL void TStore5HDValid(
     const int64_t declNPitch = int64_t(srcC1) * declPlaneElems;
 
     typename GlobalData::DType* dstAddrP = dst;
-    __cbuf__ typename TileData::DType* srcAddrP = srcAddr;
+    SrcPtr srcAddrP = srcAddr;
     const bool fastPath = (vH == 1 || (vW == srcW && gStride2 == int64_t(vW) * c0ElemCount)) && vC1 <= 4095 &&
                           validPlane <= UINT16_MAX && declPlane <= UINT16_MAX;
     if (fastPath) {
@@ -269,7 +306,7 @@ __tf__ PTO_INTERNAL void TStore5HDValid(
         const uint16_t l1Gap = static_cast<uint16_t>(declPlane - validPlane);
         const uint64_t gmGap = static_cast<uint64_t>(gStride1Blocks - validPlane);
         for (int n = 0; n < vN; ++n) {
-            TStoreInstrL1ToGm<GlobalData, TileData>(
+            TStoreConvBurst<Ub, GlobalData, TileData>(
                 dstAddrP + int64_t(n) * gStride0, srcAddrP + int64_t(n) * declNPitch, nBurst, lenBurst, l1Gap, gmGap);
         }
         return;
@@ -282,7 +319,7 @@ __tf__ PTO_INTERNAL void TStore5HDValid(
     const uint64_t gmGap = static_cast<uint64_t>(gStride2Blocks - vW);
     for (int n = 0; n < vN; ++n) {
         for (int c1 = 0; c1 < vC1; ++c1) {
-            TStoreInstrL1ToGm<GlobalData, TileData>(
+            TStoreConvBurst<Ub, GlobalData, TileData>(
                 dstAddrP + int64_t(n) * gStride0 + int64_t(c1) * gStride1,
                 srcAddrP + int64_t(n) * declNPitch + int64_t(c1) * declPlaneElems, nBurst, lenBurst, l1Gap, gmGap);
         }
@@ -290,12 +327,27 @@ __tf__ PTO_INTERNAL void TStore5HDValid(
 }
 
 template <typename GlobalData, typename TileData>
-__tf__ PTO_INTERNAL void TStoreNDC1HWC0Valid(
+__tf__ PTO_INTERNAL void TStore5HDValid(
     typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
-    int64_t gStride1, int64_t gStride2, int64_t gStride3, int srcD, int srcC1, int srcH, int srcW, int vN, int vD,
-    int vC1, int vH, int vW)
+    int64_t gStride1, int64_t gStride2, int srcC1, int srcH, int srcW, int vN, int vC1, int vH, int vW)
 {
-    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
+    using T = typename TileData::DType;
+    if constexpr (TileData::Loc == pto::TileType::Vec) {
+        TStore5HDValidBody<GlobalData, TileData, true>(
+            dst, (__ubuf__ T*)__cce_get_tile_ptr(src), gStride0, gStride1, gStride2, srcC1, srcH, srcW, vN, vC1, vH,
+            vW);
+    } else {
+        TStore5HDValidBody<GlobalData, TileData, false>(
+            dst, (__cbuf__ T*)__cce_get_tile_ptr(src), gStride0, gStride1, gStride2, srcC1, srcH, srcW, vN, vC1, vH,
+            vW);
+    }
+}
+
+template <typename GlobalData, typename TileData, bool Ub, typename SrcPtr>
+PTO_INTERNAL void TStoreNDC1HWC0ValidBody(
+    typename GlobalData::DType* dst, SrcPtr srcAddr, int64_t gStride0, int64_t gStride1, int64_t gStride2,
+    int64_t gStride3, int srcD, int srcC1, int srcH, int srcW, int vN, int vD, int vC1, int vH, int vW)
+{
     constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
     constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
 
@@ -314,7 +366,7 @@ __tf__ PTO_INTERNAL void TStoreNDC1HWC0Valid(
     const int64_t declNPitch = int64_t(srcD) * declDpitch;
 
     typename GlobalData::DType* dstAddrP = dst;
-    __cbuf__ typename TileData::DType* srcAddrP = srcAddr;
+    SrcPtr srcAddrP = srcAddr;
     const bool fastPath = (vH == 1 || (vW == srcW && gStride3 == int64_t(vW) * c0ElemCount)) && vC1 <= 4095 &&
                           validPlane <= UINT16_MAX && declPlane <= UINT16_MAX;
     if (fastPath) {
@@ -324,7 +376,7 @@ __tf__ PTO_INTERNAL void TStoreNDC1HWC0Valid(
         const uint64_t gmGap = static_cast<uint64_t>(gStride2Blocks - validPlane);
         for (int n = 0; n < vN; ++n) {
             for (int d = 0; d < vD; ++d) {
-                TStoreInstrL1ToGm<GlobalData, TileData>(
+                TStoreConvBurst<Ub, GlobalData, TileData>(
                     dstAddrP + int64_t(n) * gStride0 + int64_t(d) * gStride1,
                     srcAddrP + int64_t(n) * declNPitch + int64_t(d) * declDpitch, nBurst, lenBurst, l1Gap, gmGap);
             }
@@ -340,7 +392,7 @@ __tf__ PTO_INTERNAL void TStoreNDC1HWC0Valid(
     for (int n = 0; n < vN; ++n) {
         for (int d = 0; d < vD; ++d) {
             for (int c1 = 0; c1 < vC1; ++c1) {
-                TStoreInstrL1ToGm<GlobalData, TileData>(
+                TStoreConvBurst<Ub, GlobalData, TileData>(
                     dstAddrP + int64_t(n) * gStride0 + int64_t(d) * gStride1 + int64_t(c1) * gStride2,
                     srcAddrP + int64_t(n) * declNPitch + int64_t(d) * declDpitch + int64_t(c1) * declPlaneElems, nBurst,
                     lenBurst, l1Gap, gmGap);
@@ -350,9 +402,27 @@ __tf__ PTO_INTERNAL void TStoreNDC1HWC0Valid(
 }
 
 template <typename GlobalData, typename TileData>
-__tf__ PTO_INTERNAL void TStoreFractalZ4DValid(
-    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride1,
-    int64_t gStride2, int srcD1, int srcD2, int srcD3, int v0, int v1, int v2, int v3)
+__tf__ PTO_INTERNAL void TStoreNDC1HWC0Valid(
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
+    int64_t gStride1, int64_t gStride2, int64_t gStride3, int srcD, int srcC1, int srcH, int srcW, int vN, int vD,
+    int vC1, int vH, int vW)
+{
+    using T = typename TileData::DType;
+    if constexpr (TileData::Loc == pto::TileType::Vec) {
+        TStoreNDC1HWC0ValidBody<GlobalData, TileData, true>(
+            dst, (__ubuf__ T*)__cce_get_tile_ptr(src), gStride0, gStride1, gStride2, gStride3, srcD, srcC1, srcH, srcW,
+            vN, vD, vC1, vH, vW);
+    } else {
+        TStoreNDC1HWC0ValidBody<GlobalData, TileData, false>(
+            dst, (__cbuf__ T*)__cce_get_tile_ptr(src), gStride0, gStride1, gStride2, gStride3, srcD, srcC1, srcH, srcW,
+            vN, vD, vC1, vH, vW);
+    }
+}
+
+template <typename GlobalData, typename TileData, bool Ub, typename SrcPtr>
+PTO_INTERNAL void TStoreFractalZ4DValidBody(
+    typename GlobalData::DType* dst, SrcPtr srcAddr, int64_t gStride1, int64_t gStride2, int srcD1, int srcD2,
+    int srcD3, int v0, int v1, int v2, int v3)
 {
     constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
     constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
@@ -363,12 +433,13 @@ __tf__ PTO_INTERNAL void TStoreFractalZ4DValid(
         GlobalData::staticShape[3] == FRACTAL_NZ_ROW && GlobalData::staticShape[4] == c0ElemCount,
         "Fix: The GlobalTensor last 2 dim must be static and satisfy [16, 32 / sizeof(DataType)]");
 
-    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
-
     PTO_ASSERT(v0 > 0 && v1 > 0 && v2 > 0, "Fix: ConvTile valid extents must be positive!");
     PTO_ASSERT(v1 <= srcD1 && v2 <= srcD2, "Fix: ConvTile valid N1/N0 must not exceed the declared extent!");
     PTO_ASSERT(v3 == srcD3 && srcD3 == int(c0ElemCount), "Fix: valid C0 must stay the full 32-byte C0 block!");
     PTO_ASSERT(v1 <= UINT16_MAX && v2 <= UINT16_MAX, "Fix: valid N1/N0 exceeds the DMA range!");
+    if constexpr (Ub) {
+        PTO_ASSERT(v1 <= 4095, "Fix: valid N1 exceeds the UB->GM DMA burst count range!");
+    }
     PTO_ASSERT(gStride2 >= int64_t(v2) * c0ElemCount, "Fix: destination stride is smaller than the valid N0 box!");
 
     const int64_t gStride2Blocks = (gStride2 * elemBytes) >> SHIFT_BLOCK_BYTE;
@@ -379,18 +450,31 @@ __tf__ PTO_INTERNAL void TStoreFractalZ4DValid(
     const uint64_t gmGap = static_cast<uint64_t>(gStride2Blocks - v2);
 
     for (int i0 = 0; i0 < v0; ++i0) {
-        TStoreInstrL1ToGm<GlobalData, TileData>(
+        TStoreConvBurst<Ub, GlobalData, TileData>(
             dst + int64_t(i0) * gStride1, srcAddr + int64_t(i0) * declPlaneElems, nBurst, lenBurst, l1Gap, gmGap);
     }
 }
 
 template <typename GlobalData, typename TileData>
-__tf__ PTO_INTERNAL void TStoreFractalZ5DValid(
-    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
-    int64_t gStride1, int64_t gStride2, int srcC1, int srcH, int srcW, int srcN, int srcC0, int vC1, int vH, int vW,
-    int vN, int vC0)
+__tf__ PTO_INTERNAL void TStoreFractalZ4DValid(
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride1,
+    int64_t gStride2, int srcD1, int srcD2, int srcD3, int v0, int v1, int v2, int v3)
 {
-    __cbuf__ typename TileData::DType* srcAddr = (__cbuf__ typename TileData::DType*)__cce_get_tile_ptr(src);
+    using T = typename TileData::DType;
+    if constexpr (TileData::Loc == pto::TileType::Vec) {
+        TStoreFractalZ4DValidBody<GlobalData, TileData, true>(
+            dst, (__ubuf__ T*)__cce_get_tile_ptr(src), gStride1, gStride2, srcD1, srcD2, srcD3, v0, v1, v2, v3);
+    } else {
+        TStoreFractalZ4DValidBody<GlobalData, TileData, false>(
+            dst, (__cbuf__ T*)__cce_get_tile_ptr(src), gStride1, gStride2, srcD1, srcD2, srcD3, v0, v1, v2, v3);
+    }
+}
+
+template <typename GlobalData, typename TileData, bool Ub, typename SrcPtr>
+PTO_INTERNAL void TStoreFractalZ5DValidBody(
+    typename GlobalData::DType* dst, SrcPtr srcAddr, int64_t gStride0, int64_t gStride1, int64_t gStride2, int srcC1,
+    int srcH, int srcW, int srcN, int srcC0, int vC1, int vH, int vW, int vN, int vC0)
+{
     constexpr uint32_t c0ElemCount = C0_SIZE_BYTE / sizeof(typename TileData::DType);
     constexpr uint32_t elemBytes = sizeof(typename TileData::DType);
 
@@ -413,11 +497,29 @@ __tf__ PTO_INTERNAL void TStoreFractalZ5DValid(
             const int64_t srcBase = (int64_t(c1) * srcH + h) * declHPitch;
             for (int w0 = 0; w0 < vW; w0 += maxBurst) {
                 const int wCount = (vW - w0 > maxBurst) ? maxBurst : (vW - w0);
-                TStoreInstrL1ToGm<GlobalData, TileData>(
+                TStoreConvBurst<Ub, GlobalData, TileData>(
                     dst + dstBase + int64_t(w0) * gStride2, srcAddr + srcBase + int64_t(w0) * srcN * srcC0,
                     static_cast<uint16_t>(wCount), lenBurst, l1Gap, gmGap);
             }
         }
+    }
+}
+
+template <typename GlobalData, typename TileData>
+__tf__ PTO_INTERNAL void TStoreFractalZ5DValid(
+    typename GlobalData::DType __out__* dst, typename TileData::TileDType __in__ src, int64_t gStride0,
+    int64_t gStride1, int64_t gStride2, int srcC1, int srcH, int srcW, int srcN, int srcC0, int vC1, int vH, int vW,
+    int vN, int vC0)
+{
+    using T = typename TileData::DType;
+    if constexpr (TileData::Loc == pto::TileType::Vec) {
+        TStoreFractalZ5DValidBody<GlobalData, TileData, true>(
+            dst, (__ubuf__ T*)__cce_get_tile_ptr(src), gStride0, gStride1, gStride2, srcC1, srcH, srcW, srcN, srcC0,
+            vC1, vH, vW, vN, vC0);
+    } else {
+        TStoreFractalZ5DValidBody<GlobalData, TileData, false>(
+            dst, (__cbuf__ T*)__cce_get_tile_ptr(src), gStride0, gStride1, gStride2, srcC1, srcH, srcW, srcN, srcC0,
+            vC1, vH, vW, vN, vC0);
     }
 }
 

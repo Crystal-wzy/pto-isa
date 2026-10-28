@@ -343,6 +343,11 @@ void launchTGATHER1D_demo_int8(int8_t* out, int8_t* src0, int32_t* src1, aclrtSt
 void launchTGATHER1D_demo_uint8(uint8_t* out, uint8_t* src0, int32_t* src1, aclrtStream stream);
 void launchTGATHER1D_demo_int64(int64_t* out, int64_t* src0, int32_t* src1, aclrtStream stream);
 void launchTGATHER1D_demo_uint64(uint64_t* out, uint64_t* src0, int32_t* src1, aclrtStream stream);
+void launchTGATHER1D_demo_float_i16(float* out, float* src0, int16_t* src1, aclrtStream stream);
+void launchTGATHER1D_demo_half_i16(aclFloat16* out, aclFloat16* src0, int16_t* src1, aclrtStream stream);
+void launchTGATHER1D_demo_int8_i16(int8_t* out, int8_t* src0, int16_t* src1, aclrtStream stream);
+void launchTGATHER1D_demo_uint8_u16(uint8_t* out, uint8_t* src0, uint16_t* src1, aclrtStream stream);
+void launchTGATHER1D_demo_int16_i16_oob(int16_t* out, int16_t* src0, int16_t* src1, aclrtStream stream);
 
 template <typename Src0DstT, typename Src1T, typename LaunchFunc>
 void runTGATHERTest(size_t rowsSrc0, size_t colsSrc0, size_t rowsDst, size_t colsDst, LaunchFunc launchFunc)
@@ -399,7 +404,7 @@ void runTGATHERTest(size_t rowsSrc0, size_t colsSrc0, size_t rowsDst, size_t col
     CHECK_RESULT_GTEST(ReadFile(GetGoldenDir() + "/output.bin", dstFileSize, devFinal.data(), dstFileSize));
 
     bool ret;
-    if constexpr (std::is_integral_v<Src0DstT> && sizeof(Src0DstT) == 8) {
+    if constexpr (std::is_integral_v<Src0DstT>) {
         ret = ResultCmpExact<Src0DstT>(golden, devFinal.data());
     } else {
         ret = ResultCmp<Src0DstT>(golden, devFinal, 0.001f);
@@ -494,4 +499,29 @@ TEST_F(TGATHERTest, a5_index_width_full_and_partial)
             testGatherIndexWidth<int64_t, int32_t>(rows, cols);
         }
     }
+}
+
+TEST_F(TGATHERTest, case_1D_float_i16idx_32x256_32x64)
+{
+    runTGATHERTest<float, int16_t>(32, 256, 32, 64, launchTGATHER1D_demo_float_i16);
+}
+
+TEST_F(TGATHERTest, case_1D_half_i16idx_16x1024_16x128)
+{
+    runTGATHERTest<aclFloat16, int16_t>(16, 1024, 16, 128, launchTGATHER1D_demo_half_i16);
+}
+
+TEST_F(TGATHERTest, case_1D_int8_i16idx_32x256_32x64)
+{
+    runTGATHERTest<int8_t, int16_t>(32, 256, 32, 64, launchTGATHER1D_demo_int8_i16);
+}
+
+TEST_F(TGATHERTest, case_1D_uint8_u16idx_32x256_32x64)
+{
+    runTGATHERTest<uint8_t, uint16_t>(32, 256, 32, 64, launchTGATHER1D_demo_uint8_u16);
+}
+
+TEST_F(TGATHERTest, case_1D_int16_i16idx_oob_32x256_32x64)
+{
+    runTGATHERTest<int16_t, int16_t>(32, 256, 32, 64, launchTGATHER1D_demo_int16_i16_oob);
 }
